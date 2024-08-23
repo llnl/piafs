@@ -4,6 +4,19 @@ PIAFS2D - Compressible Euler/Navier-Stokes Solver
 `PIAFS2D` is a finite-difference code to solve the compressible Euler/Navier-Stokes
 equations (with source terms) on Cartesian grids. 
 
+Getting the code
+----------------
+
+(With SSH keys)
+```
+git clone ssh://git@czgitlab.llnl.gov:7999/piafs/piafs2d.git
+```
+
+(Without SSH keys)
+```
+https://lc.llnl.gov/gitlab/piafs/piafs2d.git
+```
+
 Documentation
 -------------
 
@@ -39,7 +52,7 @@ Running
 Create a copy of an example from `Examples` directory in a new location (outside the PIAFS2D 
 directory), then follow these steps:
 
-+ Compile the code <example_dir>/aux/init.[c,C] as follows:
++ Compile the code `<example_dir>/aux/init.[c,C]` as follows:
 ```
 gcc init.c -lm -o INIT
 ```
