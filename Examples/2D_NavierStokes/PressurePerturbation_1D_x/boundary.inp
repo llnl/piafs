@@ -1,0 +1,5 @@
+4
+extrapolate 0  1    0  0  0  10 
+extrapolate 0 -1    0  0  0  10 
+periodic    1  1  -50 50  0   0 
+periodic    1 -1  -50 50  0   0 
