@@ -44,6 +44,7 @@ Note:
 + The first command `autoreconf -i` needs to be run only the first time 
   after a fresh copy of this code is downloaded.
 + The `-j <n>` is an optional argument that will use <n> threads for compiling the code.
+  For example, `make -j 4`.
 
 
 Running
