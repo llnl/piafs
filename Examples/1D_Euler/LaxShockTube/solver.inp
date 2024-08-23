@@ -2,7 +2,6 @@ begin
   ndims               1
   nvars               3
   size                201
-  iproc               2
   ghost               3
   n_iter              80
   time_scheme         rk
