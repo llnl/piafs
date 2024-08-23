@@ -27,3 +27,4 @@ __pycache__
 .ipynb_checkpoints
 *.tmp
 doc/README
+PIAFS2D
