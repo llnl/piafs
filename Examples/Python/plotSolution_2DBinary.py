@@ -9,7 +9,7 @@ simulation time for which the solution is available.
 created for for each variable (solution vector component).
 - solution must be in binary format
 
-Make sure the environment variable "piafs2d_DIR" is set
+Make sure the environment variable "PIAFS2D_DIR" is set
 and points to the correct location (/path/to/piafs2d)
 '''
 
@@ -22,7 +22,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-piafs2d_dir = os.environ.get('piafs2d_DIR')
+piafs2d_dir = os.environ.get('PIAFS2D_DIR')
 piafs2d_dir_python = piafs2d_dir + '/Examples/Python'
 sys.path.append(piafs2d_dir_python)
 
@@ -67,7 +67,10 @@ if solver_inp_data['op_overwrite'] == 'no':
 
   op_write_iter = int(solver_inp_data['file_op_iter'][0])
   dt_snapshots = op_write_iter*dt
-  n_snapshots = int(niter/op_write_iter) + 1
+  if (op_write_iter > niter):
+    n_snapshots = 2
+  else:
+    n_snapshots = int(niter/op_write_iter) + 1
 
   print('Simulation parameters:')
   print('  ndims = ', ndims)
