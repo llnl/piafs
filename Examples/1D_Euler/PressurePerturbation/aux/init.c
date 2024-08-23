@@ -5,24 +5,32 @@
 
 int main()
 {
-  // default values
-  int NI=101;
-  int ndims=1;
-  char ip_file_type[50]; strcpy(ip_file_type,"ascii");
+  // normalization
+  // L_ref = 1e-6 meters (1 micrometer)
+  // t_ref = 1e-9 seconds (1 nanosecond)
+  // rho_ref = 1.225 kg m^{-3}
+  // Consequently,
+  // v_ref = L_ref / t_ref = 1e3 m/s
+  // p_ref = rho_ref*v_ref^2 = 1.225e6 kg m^{-2}  `
 
   // domain
-  double xmin = -50.0;
-  double xmax = 50.0;
+  double lambda_ac = 42.0; // 42 micrometers
+  double xmin = -5*lambda_ac;
+  double xmax = 5*lambda_ac;
 
   // uniform flow parameters
   double gamma = 1.4;
   double rho0 = 1.0;
-  double p0 = 1.0;
+  double p0 = 0.082714; // 101325.0 Pa / p_ref
   double u0 = 0.0;
 
   // pressure pertubation
-  double width = 5.0;
-  double ampl = 1.0;
+  double width = 5.0; // 5 micrometers
+  double ampl = 1.0*p0;
+
+  int NI, ndims;
+  // default values
+  char ip_file_type[50]; strcpy(ip_file_type,"ascii");
 
   FILE *in;
   printf("Reading file \"solver.inp\"...\n");
