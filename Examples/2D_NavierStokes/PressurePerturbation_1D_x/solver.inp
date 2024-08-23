@@ -1,17 +1,17 @@
 begin
 	ndims              2
 	nvars              4
-	size               201 4
+	size               512 4
 	ghost              3
-	n_iter             100
+	n_iter             202
 	time_scheme        rk
 	time_scheme_type   44
 	hyp_space_scheme   weno5
 	hyp_interp_type    characteristic
-	dt                 0.25
+	dt                 2.0
 	conservation_check yes
 	screen_op_iter     1
-	file_op_iter       10
+	file_op_iter       25
 	op_file_format     binary
 	ip_file_type       binary
 	op_overwrite       no
