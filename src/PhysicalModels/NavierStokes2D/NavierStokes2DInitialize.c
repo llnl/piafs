@@ -49,17 +49,7 @@ int    NavierStokes2DUpwindRusanov     (double*,double*,double*,double*,double*,
     Pr                 | double       | #NavierStokes2D::Pr                             | 0.72
     Re                 | double       | #NavierStokes2D::Re                             | -1
     Minf               | double       | #NavierStokes2D::Minf                           | 1.0
-    R                  | double       | #NavierStokes2D::R                              | 1.0
     upwinding          | char[]       | #NavierStokes2D::upw_choice                     | "roe" (#_ROE_)
-
-    + If "HB" (#NavierStokes2D::HB) is specified as 3, it should be followed by the the
-      Brunt-Vaisala frequency (#NavierStokes2D::N_bv), i.e.
-
-        begin
-            ...
-            HB      3 0.01
-            ...
-        end
 
     \b Note: "physics.inp" is \b optional; if absent, default values will be used.
 */

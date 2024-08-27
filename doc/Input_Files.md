@@ -31,16 +31,13 @@ Keyword name       | Type         | Variable                      | Default valu
 ndims              | int          | #HyPar::ndims                 | 1
 nvars              | int          | #HyPar::nvars                 | 1
 size               | int[ndims]   | #HyPar::dim_global            | must be specified
-iproc              | int[ndims]   | #MPIVariables::iproc          | must be specified
 ghost              | int          | #HyPar::ghosts                | 1
 n_iter             | int          | #HyPar::n_iter                | 0
 restart_iter       | int          | #HyPar::restart_iter          | 0
 time_scheme        | char[]       | #HyPar::time_scheme           | euler
 time_scheme_type   | char[]       | #HyPar::time_scheme_type      | none
 hyp_space_scheme   | char[]       | #HyPar::spatial_scheme_hyp    | 1
-hyp_flux_split     | char[]       | #HyPar::SplitHyperbolicFlux   | no
 hyp_interp_type    | char[]       | #HyPar::interp_type           | characteristic
-par_space_type     | char[]       | #HyPar::spatial_type_par      | nonconservative-1stage
 par_space_scheme   | char[]       | #HyPar::spatial_scheme_par    | 2
 dt                 | double       | #HyPar::dt                    | 0.0
 conservation_check | char[]       | #HyPar::ConservationCheck     | no
@@ -52,10 +49,7 @@ input_mode         | char[]       | #HyPar::input_mode            | serial
 output_mode        | char[]       | #HyPar::output_mode           | serial
 op_overwrite       | char[]       | #HyPar::op_overwrite          | no
 model              | char[]       | #HyPar::model                 | must be specified
-immersed_body      | char[]       | #HyPar::ib_filename           | "none"
 size_exact         | int[ndims]   | #HyPar::dim_global_ex         | #HyPar::dim_global
-use_gpu            | char[]       | #HyPar::use_gpu               | no
-gpu_device_no      | int          | #HyPar::gpu_device_no         | -1
 
 \b Notes:
 + "ndims" \b must be specified \b before "size" and "iproc".
@@ -123,7 +117,7 @@ where
 
         u[0]  u[1]  ... u[#HyPar::nvars-1]
 
-  - #_SLIP_WALL_, #_NOSLIP_WALL_, #_SW_SLIP_WALL_, or #_SW_NOSLIP_WALL_: the next line should specify the wall velocity (assumed to be constant 
+  - #_SLIP_WALL_, #_NOSLIP_WALL_: the next line should specify the wall velocity (assumed to be constant 
     in space and time). Each component of the velocity must be specified (i.e. #HyPar::ndims real numbers).
 
         u[0]  u[1]  ... u[#HyPar::ndims-1]
@@ -146,12 +140,6 @@ where
     form to specify the Dirichlet boundary value:
 
         rho  rho*u[0]  rho*u[1]  ... rho*u[#HyPar::ndims-1]  E (internal energy)
-
-  - #_TURBULENT_SUPERSONIC_INFLOW_: the next line must specify the inflow mean density, velocity, and pressure (assumed to be constant in space and time),
-    i.e, #HyPar::ndims+2 real numbersm and the name of the file that contains the unsteady fluctuation data.
-
-        rho  u[0]  u[1]  ... u[#HyPar::ndims-1]  p  filename
-
 
 \section initial_inp initial.inp
 
@@ -251,56 +239,6 @@ Format: ASCII text
 
 See the documentation for the initialization function of the various phyical models for a list of keywords (for example, Euler1DInitialize(), NavierStokes2DInitialize()).
 
-\section petscrc .petscrc
-
-Requirement: \b mandatory <B>if using PETSc time integration</B>; if absent, HyPar will use native time integration. 
-             If compiled without PETSc, this file is not required.
-
-Read by: PETSc
-
-Description: This file contains the input flags required by PETSc time integration and its associated features.
-
-Format: ASCII text
-
-\b Note: The contents of this file may also be specified as command line flags.
-
-This file contains all the inputs required for the PETSc time integrators. See PETSc documentation (https://petsc.org/release/docs/)
-for all the inputs that PETSc needs, or <B>see the PETSc examples</B> for the inputs relevant to HyPar. In addition, following 
-are the HyPar-specific inputs (they are all optional, if not specified, default values are used):
-+ <B>-use-petscts</B>: If this flag is specified, PETSc time integration is used. If not specified, native time integration is used 
-  (default).
-+ <B>-jfnk_epsilon \<value\></B>: specify \f$\epsilon\f$ parameter for the directional-derivative-based approximation of the Jacobian 
-  (relevant only for implicit and IMEX time integration) (default: \f$10^{-6}\f$).
-+ <B>-with_pc</B>: If this flag is specified, a preconditioning matrix will be assembled for use with the preconditioners available
-  in PETSc. If not specified, no preconditioning will be used (default).
-
-In addition, if an IMEX time integrator (TSARKIMEX - https://petsc.org/release/docs/manualpages/TS/TSARKIMEX.html) 
-is being used, the following terms specify how the hyperbolic, parabolic,
-and source terms are integrated in time (explicitly or implicitly):
-+ <B>-hyperbolic_explicit</B>: treat hyperbolic term explicitly (\b default).
-+ <B>-parabolic_explicit</B>: treat parabolic term explicitly.
-+ <B>-source_explicit</B>: treat the source term explicitly.
-+ <B>-hyperbolic_implicit</B>: treat hyperbolic term implicitly.
-+ <B>-parabolic_implicit</B>: treat parabolic term implicitly (\b default).
-+ <B>-source_implicit</B>: treat the source term implicitly (\b default).
-
-\section immersed_body Immersed Body
-
-Requirement: \b mandatory <B>if using immersed boundaries</B> (the keyword \a immersed_body is specified in 
-             \b solver.inp); if absent, HyPar will not use immersed boundaries.
-
-Read by: IBReadBodySTL(), called by the initialization function for immersed boundaries InitializeImmersedBoundaries().
-
-File name: The name of this file <B>must</B> be the same as the value of the keyword \a immersed_body in \b solver.inp.
-
-Format: ASCII STL (https://en.wikipedia.org/wiki/STL_%28file_format%29)
-
-Notes:
-+ The normal defined in the STL file must be the <B>"outward"</B> normal, i.e., pointing outside the body.
-+ The geometry must be a closed one.
-+ Some sample STL files are available in \b hypar/Examples/STLGeometries/
-
-
 \section simulation_inp simulation.inp
 
 Requirement: \b mandatory if running an ensemble/multidomain simulation
@@ -327,81 +265,3 @@ nsims              | int          | #EnsembleSimulation::m_nsims                
 \b Notes:
 + This file \b must exist for ensemble simulations; 
   if this file does not exist, HyPar will run a standard single simulation.
-
-\section sparse_grids_inp sparse_grids.inp
-
-Requirement: \b mandatory if running with the sparse grids method
-
-Read by: SparseGridsSimulation::define()
-
-Description: Specify the parameters related to sparse grids method.
-
-Format: ASCII text
-
-        begin
-            <keyword>   <value>
-            <keyword>   <value>
-            <keyword>   <value>
-            ...
-            <keyword>   <value>
-        end
-
-where the list of keywords and their type are:\n
-Keyword name       | Type         | Variable                                      | Default value
------------------- | ------------ | --------------------------------------------- | ------------------------
-log2_imin          | int          | #SparseGridsSimulation::m_imin                | 2
-interp_order       | int          | #SparseGridsSimulation::m_interp_order        | 6
-write_sg_solution  | char[]       | #SparseGridsSimulation::m_write_sg_solutions  | no
-write_sg_errors    | char[]       | #SparseGridsSimulation::m_print_sg_errors     | no
-
-\b Notes:
-+ Even if you want to use the default values for all the parameters, the file
-  \b sparse_grids.inp must exist with just the text
-
-        begin
-        end
-
-  If this file does not exist, HyPar will not use the sparse grids method.
-
-\section librom_inp librom.inp
-
-Requirement: \b mandatory if one wants to use the libROM (https://www.librom.net/) interface. This file
-is read only if HyPar is compiled with the libROM interface (see compilation instructions).
-
-Read by: libROMInterface::define(), DMDROMObject::DMDROMObject()
-
-Description: Specify the parameters related to reduced-order modeling using libROM.
-
-Format: ASCII text
-
-        begin
-            <keyword>   <value>
-            <keyword>   <value>
-            <keyword>   <value>
-            ...
-            <keyword>   <value>
-        end
-
-where the list of keywords and their type are:\n
-Keyword name           | Type         | Variable                                      | Default value
----------------------- | ------------ | --------------------------------------------- | ------------------------
-rdim                   | int          | #libROMInterface::m_rdim                      | -1
-sampling_frequency     | int          | #libROMInterface::m_sampling_freq             | 1
-mode                   | string       | #libROMInterface::m_mode                      | "train"
-component_mode         | string       | #libROMInterface::m_comp_mode                 | "monolithic"
-type                   | string       | #libROMInterface::m_rom_type                  | "DMD"
-save_to_file           | string       | #libROMInterface::m_save_ROM                  | "true"
-dmd_num_win_samples    | int          | #DMDROMObject::m_num_window_samples           | INT_MAX
-dmd_dirname            | string       | #DMDROMObject::m_dirname                      | "DMD"
-dmd_write_snapshot_mat | bool         | #DMDROMObject::m_write_snapshot_mat           | false
-
-
-\b Notes:
-+ Even if you want to use the default values for all the parameters, the file
-  \b librom.inp must exist with just the text
-
-        begin
-        end
-
-  If this file does not exist, HyPar will not use the libROM interface.
-+ The default value for \a rdim is invalid, so it \b must be specified.
