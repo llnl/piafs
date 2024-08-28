@@ -1,4 +1,4 @@
-/*! @file main.c
+/*! @file main.cpp
  *  @brief Main driver.
  * The main driver function that calls the initialization, solving, and cleaning up functions.
  *  @author Debojyoti Ghosh

@@ -1,4 +1,4 @@
-/*! @file Solve.c
+/*! @file Solve.cpp
     @author Debojyoti Ghosh
     @brief  Solve the governing equations in time
 */

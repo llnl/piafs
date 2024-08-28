@@ -1,4 +1,4 @@
-/*! @file FillGhostCells.cpp
+/*! @file FillGhostCells.c
     @brief Fill the ghost cells of a global array
     @author Debojyoti Ghosh
 */
