@@ -3,15 +3,15 @@ begin
   nvars               3
   size                512
   ghost               3
-  n_iter              403
+  n_iter              400
   time_scheme         rk
   time_scheme_type    44
   hyp_space_scheme    weno5
   hyp_interp_type     characteristic
   conservation_check  yes
-  dt                  1.0
-  screen_op_iter      1
-  file_op_iter        10
+  dt                  0.05
+  screen_op_iter      10
+  file_op_iter        50
   op_file_format      binary
   op_overwrite        no
   model               euler1d
