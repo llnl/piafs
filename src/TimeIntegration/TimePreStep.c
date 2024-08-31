@@ -69,7 +69,7 @@ int TimePreStep(void *ts /*!< Object of type #TimeIntegration */ )
     _ArraySetValue_(solver->StepBoundaryIntegral,2*solver->ndims*solver->nvars,0.0);
 
     if (solver->PreStep) {
-      solver->PreStep(u,solver,mpi,TS->waqt);
+      solver->PreStep(u,solver,mpi,TS->dt,TS->waqt);
     }
 
   }

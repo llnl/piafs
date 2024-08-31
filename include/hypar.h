@@ -260,7 +260,7 @@ typedef struct main_parameters {
   int    (*PostStage)          (double*,void*,void*,double);
   /*! Pointer to the function to do some pre-time-integration-step computations, if required
    * (assigned in the physical model initialization called from InitializePhysics()) */
-  int    (*PreStep)            (double*,void*,void*,double);
+  int    (*PreStep)            (double*,void*,void*,double,double);
   /*! Pointer to the function to do some post-time-integration-step computations, if required (assigned in the physical model initialization called from InitializePhysics()) */
   int    (*PostStep)           (double*,void*,void*,double,int);
   /*! Pointer to the function to print some physics-specific time-integration-step information,

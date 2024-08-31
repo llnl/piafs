@@ -23,6 +23,7 @@ PIAFS2D_LDADD = \
   BoundaryConditions/libBoundaryConditions.a \
   PhysicalModels/Euler1D/libEuler1D.a \
   PhysicalModels/NavierStokes2D/libNavierStokes2D.a \
+  PhysicalModels/Chemistry/libChemistry.a \
   InterpolationFunctions/libInterpolationFunctions.a \
   LimiterFunctions/libLimiterFunctions.a \
   FirstDerivative/libFirstDerivative.a \

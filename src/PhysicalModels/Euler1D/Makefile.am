@@ -6,5 +6,7 @@ libEuler1D_a_SOURCES = \
   Euler1DFlux.c \
   Euler1DFunctions.c \
   Euler1DInitialize.c \
+  Euler1DPreStep.c \
 	Euler1DSource.c \
-  Euler1DUpwind.c
+  Euler1DUpwind.c \
+  Euler1DWriteChem.c

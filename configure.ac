@@ -139,6 +139,7 @@ AC_CONFIG_FILES([
  src/MathFunctions/Makefile
  src/MPIFunctions/Makefile
  src/PhysicalModels/Makefile
+   src/PhysicalModels/Chemistry/Makefile
    src/PhysicalModels/Euler1D/Makefile
    src/PhysicalModels/NavierStokes2D/Makefile
  src/Simulation/Makefile

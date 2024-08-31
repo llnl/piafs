@@ -186,6 +186,7 @@ def getSolutionSnapshots( path: str,
           x, u = readOpFile(fname, ndims, nvars, size_sim)
           snapshots = np.concatenate((snapshots,np.expand_dims(u,axis=0)),axis=0)
         except:
+          print('Unable to read',fname)
           pass
 
     else:
