@@ -19,18 +19,14 @@
 
 Non-Dimensionalization:
 
-    L_ref = 1e-6 meters (1 micrometer)
-    t_ref = 1e-9 seconds (1 nanosecond)
-    rho_ref = 1.225 kg m^{-3}
-
-  Consequently,
-    v_ref = L_ref / t_ref = 1e3 m/s
-    p_ref = rho_ref*v_ref^2 = 1.225e6 kg m^{-2}  `
+  See aux/init.c for normalization
 
 Domain:
 
-  lambda_ac = 42.0; (42 micrometers)
   -5 lambda_ac <= x <= 5 lambda_ac
+  where lambda_ac is the acoustic spatial period
+  (see aux/init.c)
+
   "periodic" boundary conditions
 
   y is a "dummy" dimension with periodic BCs 
@@ -41,15 +37,13 @@ Initial Solution:
     rho  = 1.0
     u    = 0.0
     v    = 0.0
-    p    = p0 + dp
-
-    where p0 = p/p_ref = 101325 Pa / p_ref = 0.082714
+    p    = 1.0 + dp
 
   where
     dp = a * exp [ -0.5 * (x/s)*(x/s) ] 
     s = w / [ 2 sqrt{2 log(2)} ]
 
-    a = 1.0*p0
+    a = 1.0
     w = 5.0
 
 The following input files are required:
