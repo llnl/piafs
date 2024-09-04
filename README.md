@@ -41,8 +41,10 @@ bin/PIAFS2D
 will be available.
 
 Note:
-+ The first command `autoreconf -i` needs to be run only the first time 
-  after a fresh copy of this code is downloaded.
++ The first command `autoreconf -i` needs to be run the first time 
+  after a fresh copy of this code is downloaded and any other time 
+  when there are major changes (addition/deletion of new source files
+  and/or subdirectories).
 + The `-j <n>` is an optional argument that will use <n> threads for compiling the code.
   For example, `make -j 4`.
 
@@ -73,8 +75,14 @@ Plotting
 --------
 
 + If `op_file_format` is set to `binary` in `solver.inp`, the solution is written as a binary file.
-  The Python scripts `Examples/Python/plotSolution*.py` can be used to generate plots. Alternatively,
-  the subdirectory `Extras` has codes that can convert binary files to text and Tecplot formats.
+  The Python scripts `Examples/Python/plotSolution*.py` can be used to generate plots. 
+  Alternatively, the subdirectory `Extras` has codes that can convert binary files to text and 
+  Tecplot formats.
+
+Note that the Python scripts expect the following environment to be defined:
+```
+PIAFS2D_DIR=/path/to/piafs2d
+```
 
 1D:
 + If the `op_file_format` is set to `text`, the solutions are written as ASCII text files and can be

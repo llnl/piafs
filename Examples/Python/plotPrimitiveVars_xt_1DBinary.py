@@ -2,12 +2,8 @@
 Python script to create plots from the solution of a
 PIAFS2D simulation.
 
-- if op_overwrite is set to "no", a plot is generated
-for each variable (solution vector component) and each
-simulation time for which the solution is available.
-- if op_overwrite is set to "yes", a single plot is
-created for for each variable (solution vector component).
-- solution must be in binary format
+op_overwrite must be set to "no": x-t plots are generated
+for each primitive variable
 
 Make sure the environment variable "PIAFS2D_DIR" is set
 and points to the correct location (/path/to/piafs2d)
