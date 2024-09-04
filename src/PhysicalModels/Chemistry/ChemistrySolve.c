@@ -11,7 +11,7 @@
 #include <hypar.h>
 #include <physicalmodels/chemistry.h>
 
-/*! solve the reaction equarions  */
+/*! set the photon density  */
 int ChemistrySetPhotonDensity( void*   s,    /*!< Solver object of type #HyPar */
                                void*   p,    /*!< Object of type #Chemistry */
                                void*   m,    /*!< MPI object of type #MPIVariables */
