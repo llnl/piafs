@@ -7,7 +7,7 @@
   \f{equation}{
     \frac {\partial} {\partial t} \left[\begin{array}{c} \rho \\ \rho u \\ e \end{array}\right]
   + \frac {\partial} {\partial x} \left[\begin{array}{c} \rho u \\ \rho u^2 + p \\ (e+p) u\end{array}\right]
-  = \left[\begin{array}{c} 0 \\ 0 \\ Q \end{array}\right]
+  = \left[\begin{array}{c} 0 \\ 0 \\ \frac{Q}{\gamma-1} \end{array}\right]
   \f}
   where
   \f{equation}{

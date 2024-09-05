@@ -26,7 +26,7 @@ int ChemistrySetPhotonDensity( void*   s,    /*!< Solver object of type #HyPar *
   int nz = params->z_i+1;
 
   // get xmin of the domain
-  double x0;
+  double x0 = 0.0;
   _GetCoordinate_(0,0,dim,ghosts,solver->x,x0);
   MPIMin_double(&x0, &x0, 1, &mpi->world);
 
@@ -34,11 +34,11 @@ int ChemistrySetPhotonDensity( void*   s,    /*!< Solver object of type #HyPar *
   int done = 0; _ArraySetValue_(index,solver->ndims,0);
   while (!done) {
     int p; _ArrayIndex1D_(solver->ndims,dim,index,ghosts,p);
-    double x;
-    _GetCoordinate_(0,index[0],dim,ghosts,solver->x,x);
 
     // first z-layer
     if (a_t <= params->t_pulse_norm) {
+      double x;
+      _GetCoordinate_(0,index[0],dim,ghosts,solver->x,x);
 
       double I0 = params->I0 * (1.0 + cos((x-x0)*params->L_ref*params->kg));
       double c = params->c;
@@ -64,7 +64,7 @@ int ChemistrySetPhotonDensity( void*   s,    /*!< Solver object of type #HyPar *
   return 0;
 }
 
-/*! solve the reaction equarions  */
+/*! solve the reaction equations  */
 int ChemistrySolve(  void*   s,    /*!< Solver object of type #HyPar */
                      void*   p,    /*!< Object of type #Chemistry */
                      void*   m,    /*!< MPI object of type #MPIVariables */

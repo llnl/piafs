@@ -2,7 +2,7 @@
     @brief 2D Navier Stokes equations (compressible flows)
     @author Debojyoti Ghosh
 
-  2D Navier-Stokes equations for viscous and inviscid compressible flows (with gravitational terms)\n
+  2D Navier-Stokes equations for viscous and inviscid compressible flows\n
 
   \f{equation}{
     \frac {\partial} {\partial t} \left[\begin{array}{c} \rho \\ \rho u \\ \rho v \\ e \end{array}\right]
@@ -10,9 +10,9 @@
   + \frac {\partial} {\partial y} \left[\begin{array}{c} \rho v \\ \rho u v \\ \rho v^2 + p \\ (e+p) v \end{array}\right]
   = \frac {\partial} {\partial x} \left[\begin{array}{c} 0 \\ \tau_{xx} \\ \tau_{yx} \\ u \tau_{xx} + v \tau_{yx} - q_x \end{array}\right]
   + \frac {\partial} {\partial y} \left[\begin{array}{c} 0 \\ \tau_{xy} \\ \tau_{yy} \\ u \tau_{xy} + v \tau_{yy} - q_y \end{array}\right]
-  + \left[\begin{array}{c} 0 \\ -\rho {\bf g}\cdot{\bf \hat{i}} \\ -\rho {\bf g}\cdot{\bf \hat{j}}  \\ -\rho u {\bf g}\cdot{\bf \hat{i}} - \rho v {\bf g}\cdot{\bf \hat{j}} \end{array}\right]
+  + \left[\begin{array}{c} 0 \\ 0 \\ 0  \\ \frac{Q}{\gamma-1} \end{array}\right]
   \f}
-  where \f${\bf g}\f$ is the gravitational force vector per unit mass, \f${\bf \hat{i}},{\bf \hat{j}}\f$ are the unit vectors along the x and y, the viscous terms are given by
+  where \f$Q\f$ is the chemical heating term, and the viscous terms are given by
   \f{align}{
     \tau_{ij} &= \frac{\mu}{Re_\infty} \left[ \left( \frac{\partial u_i}{\partial x_j} + \frac{\partial u_j}{\partial x_i}\right) - \frac{2}{3}\frac{\partial u_k}{\partial x_k} \delta_{ij} \right], \\
     q_i &= - \frac{\mu}{\left(\gamma-1\right)Re_\infty Pr} \frac{\partial T}{\partial x_i}
@@ -25,23 +25,9 @@
   + Tannehill, Anderson and Pletcher, Computational Fluid Mechanics and Heat Transfer,
     Chapter 5, Section 5.1.7 (However, the non-dimensional velocity and the Reynolds
     number is based on speed of sound, instead of the freestream velocity).
-
-  Reference for the well-balanced treatment of gravitational source term:
-  + Ghosh, D., Constantinescu, E.M., Well-Balanced Formulation of Gravitational Source
-    Terms for Conservative Finite-Difference Atmospheric Flow Solvers, AIAA Paper 2015-2889,
-    7th AIAA Atmospheric and Space Environments Conference, June 22-26, 2015, Dallas, TX,
-    http://dx.doi.org/10.2514/6.2015-2889
-  + Ghosh, D., Constantinescu, E.M., A Well-Balanced, Conservative Finite-Difference Algorithm
-    for Atmospheric Flows, AIAA Journal, 54 (4), 2016, pp. 1370-1385, http://dx.doi.org/10.2514/1.J054580
-
-  Reference for the partitioning of the flux into its stiff (acoustic) and non-stiff (convective)
-  components:
-  + Ghosh, D., Constantinescu, E. M., Semi-Implicit Time Integration of Atmospheric Flows
-    with Characteristic-Based Flux Partitioning, SIAM Journal on Scientific Computing,
-    38 (3), 2016, A1848-A1875, http://dx.doi.org/10.1137/15M1044369.
-
 */
 #include <basic.h>
+#include <physicalmodels/chemistry.h>
 
 /*! 2D Navier Stokes equations */
 #define _NAVIER_STOKES_2D_  "navierstokes2d"
@@ -326,6 +312,17 @@ typedef struct navierstokes2d_parameters {
   double  C1,                             /*!< Sutherlands law constants */
           C2;                             /*!< Sutherlands law constants */
   double  R;                              /*!< universal Gas constant */
+
+  int include_chem; /*!< Flag to include chemistry */
+  void* chem; /*!< Photochemical reactions object */
+
+  // reference quantities for normalization
+  double L_ref; /*!< reference length */
+  double v_ref; /*!< reference speed */
+  double t_ref; /*!< reference time */
+  double rho_ref; /*!< reference density */
+  double P_ref; /*!< reference pressure */
+
 } NavierStokes2D;
 
 int    NavierStokes2DInitialize (void*,void*);

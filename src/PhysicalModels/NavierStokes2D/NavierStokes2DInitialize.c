@@ -12,20 +12,24 @@
 #include <mpivars.h>
 #include <hypar.h>
 
-double NavierStokes2DComputeCFL        (void*,void*,double,double);
-int    NavierStokes2DFlux              (double*,double*,int,void*,double);
-int    NavierStokes2DRoeAverage        (double*,double*,double*,void*);
-int    NavierStokes2DParabolicFunction (double*,double*,void*,void*,double);
-int    NavierStokes2DSource            (double*,double*,void*,void*,double);
+double NavierStokes2DComputeCFL (void*,void*,double,double);
 
-int    NavierStokes2DLeftEigenvectors  (double*,double*,void*,int);
-int    NavierStokes2DRightEigenvectors (double*,double*,void*,int);
+int NavierStokes2DFlux              (double*,double*,int,void*,double);
+int NavierStokes2DRoeAverage        (double*,double*,double*,void*);
+int NavierStokes2DParabolicFunction (double*,double*,void*,void*,double);
+int NavierStokes2DSource            (double*,double*,void*,void*,double);
 
-int    NavierStokes2DUpwindRoe         (double*,double*,double*,double*,double*,double*,int,void*,double);
-int    NavierStokes2DUpwindRF          (double*,double*,double*,double*,double*,double*,int,void*,double);
-int    NavierStokes2DUpwindLLF         (double*,double*,double*,double*,double*,double*,int,void*,double);
-int    NavierStokes2DUpwindSWFS        (double*,double*,double*,double*,double*,double*,int,void*,double);
-int    NavierStokes2DUpwindRusanov     (double*,double*,double*,double*,double*,double*,int,void*,double);
+int NavierStokes2DLeftEigenvectors  (double*,double*,void*,int);
+int NavierStokes2DRightEigenvectors (double*,double*,void*,int);
+
+int NavierStokes2DUpwindRoe         (double*,double*,double*,double*,double*,double*,int,void*,double);
+int NavierStokes2DUpwindRF          (double*,double*,double*,double*,double*,double*,int,void*,double);
+int NavierStokes2DUpwindLLF         (double*,double*,double*,double*,double*,double*,int,void*,double);
+int NavierStokes2DUpwindSWFS        (double*,double*,double*,double*,double*,double*,int,void*,double);
+int NavierStokes2DUpwindRusanov     (double*,double*,double*,double*,double*,double*,int,void*,double);
+
+int NavierStokes2DWriteChem (void*,void*,double);
+int NavierStokes2DPreStep (double*,void*,void*,double,double);
 
 /*! Initialize the 2D Navier-Stokes (#NavierStokes2D) module:
     Sets the default parameters, read in and set physics-related parameters,
@@ -43,20 +47,19 @@ int    NavierStokes2DUpwindRusanov     (double*,double*,double*,double*,double*,
 
     where the list of keywords are:
 
-    Keyword name       | Type         | Variable                                        | Default value
-    ------------------ | ------------ | ----------------------------------------------- | ------------------------
-    gamma              | double       | #NavierStokes2D::gamma                          | 1.4
-    Pr                 | double       | #NavierStokes2D::Pr                             | 0.72
-    Re                 | double       | #NavierStokes2D::Re                             | -1
-    Minf               | double       | #NavierStokes2D::Minf                           | 1.0
-    upwinding          | char[]       | #NavierStokes2D::upw_choice                     | "roe" (#_ROE_)
+    Keyword name       | Type         | Variable                        | Default value
+    ------------------ | ------------ | ------------------------------- | ------------------------
+    gamma              | double       | #NavierStokes2D::gamma          | 1.4
+    Pr                 | double       | #NavierStokes2D::Pr             | 0.72
+    Re                 | double       | #NavierStokes2D::Re             | -1
+    Minf               | double       | #NavierStokes2D::Minf           | 1.0
+    upwinding          | char[]       | #NavierStokes2D::upw_choice     | "roe" (#_ROE_)
+    include_chemistry  | char[]       | #NavierStokes2D::include_chem   | "no"
 
     \b Note: "physics.inp" is \b optional; if absent, default values will be used.
 */
-int NavierStokes2DInitialize(
-                              void *s, /*!< Solver object of type #HyPar */
-                              void *m  /*!< MPI object of type #MPIVariables */
-                            )
+int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
+                              void *m  /*!< MPI object of type #MPIVariables */ )
 {
   HyPar           *solver  = (HyPar*)          s;
   MPIVariables    *mpi     = (MPIVariables*)   m;
@@ -83,6 +86,7 @@ int NavierStokes2DInitialize(
   physics->C2     = 110.4;
   physics->R      = 1.0;
   strcpy(physics->upw_choice,"roe");
+  char include_chem[_MAX_STRING_SIZE_] = "no";
 
   /* reading physical model specific inputs - all processes */
   if (!mpi->rank) {
@@ -108,6 +112,8 @@ int NavierStokes2DInitialize(
             ferr = fscanf(in,"%lf",&physics->Minf);     if (ferr != 1) return(1);
           } else if (!strcmp(word,"R")) {
             ferr = fscanf(in,"%lf",&physics->R);        if (ferr != 1) return(1);
+          } else if (!strcmp(word,"include_chemistry")) {
+            ferr = fscanf(in,"%s",include_chem);        if (ferr != 1) return(1);
           } else if (strcmp(word,"end")) {
             char useless[_MAX_STRING_SIZE_];
             ferr = fscanf(in,"%s",useless); if (ferr != 1) return(ferr);
@@ -123,17 +129,21 @@ int NavierStokes2DInitialize(
     fclose(in);
   }
 
-  IERR MPIBroadcast_character (physics->upw_choice,_MAX_STRING_SIZE_,0,&mpi->world); CHECKERR(ierr);
-  IERR MPIBroadcast_double    (&physics->gamma    ,1                ,0,&mpi->world); CHECKERR(ierr);
-  IERR MPIBroadcast_double    (&physics->Pr       ,1                ,0,&mpi->world); CHECKERR(ierr);
-  IERR MPIBroadcast_double    (&physics->Re       ,1                ,0,&mpi->world); CHECKERR(ierr);
-  IERR MPIBroadcast_double    (&physics->Minf     ,1                ,0,&mpi->world); CHECKERR(ierr);
-  IERR MPIBroadcast_double    (&physics->R        ,1                ,0,&mpi->world); CHECKERR(ierr);
+  physics->include_chem = (!strcmp(include_chem,"yes"));
+
+  MPIBroadcast_character (physics->upw_choice   ,_MAX_STRING_SIZE_,0,&mpi->world);
+  MPIBroadcast_double    (&physics->gamma       ,1                ,0,&mpi->world);
+  MPIBroadcast_double    (&physics->Pr          ,1                ,0,&mpi->world);
+  MPIBroadcast_double    (&physics->Re          ,1                ,0,&mpi->world);
+  MPIBroadcast_double    (&physics->Minf        ,1                ,0,&mpi->world);
+  MPIBroadcast_double    (&physics->R           ,1                ,0,&mpi->world);
+  MPIBroadcast_integer   (&physics->include_chem,1                ,0,&mpi->world);
 
   /* Scaling the Reynolds number with the M_inf */
   physics->Re /= physics->Minf;
 
   /* initializing physical model-specific functions */
+  solver->PreStep               = NavierStokes2DPreStep;
   solver->ComputeCFL            = NavierStokes2DComputeCFL;
   solver->FFunction             = NavierStokes2DFlux;
   solver->SFunction             = NavierStokes2DSource;
@@ -159,6 +169,28 @@ int NavierStokes2DInitialize(
   int n;
   DomainBoundary  *boundary = (DomainBoundary*) solver->boundary;
   for (n = 0; n < solver->nBoundaryZones; n++)  boundary[n].gamma = physics->gamma;
+
+  if (physics->include_chem) {
+    solver->PhysicsOutput = NavierStokes2DWriteChem;
+    physics->chem = (Chemistry*) calloc (1, sizeof(Chemistry));
+    ChemistryInitialize( solver,
+                         physics->chem,
+                         mpi,
+                         physics->gamma,
+                         &physics->L_ref,
+                         &physics->v_ref,
+                         &physics->t_ref,
+                         &physics->P_ref,
+                         &physics->rho_ref );
+    if (!mpi->rank) {
+      printf("Reference quantities:\n");
+      printf("    Length: %1.4e (m)\n", physics->L_ref);
+      printf("    Time: %1.4e (s)\n", physics->t_ref);
+      printf("    Speed: %1.4e (m s^{-1})\n", physics->v_ref);
+      printf("    Density: %1.4e (kg m^{-3})\n", physics->rho_ref);
+      printf("    Pressure: %1.4e (Pa)\n", physics->P_ref);
+    }
+  }
 
 
   count++;

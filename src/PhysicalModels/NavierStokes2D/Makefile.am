@@ -7,5 +7,7 @@ libNavierStokes2D_a_SOURCES = \
   NavierStokes2DFunctions.c \
   NavierStokes2DInitialize.c \
 	NavierStokes2DParabolicFunction.c \
+	NavierStokes2DPreStep.c \
 	NavierStokes2DSource.c \
-  NavierStokes2DUpwind.c
+  NavierStokes2DUpwind.c \
+  NavierStokes2DWriteChem.c

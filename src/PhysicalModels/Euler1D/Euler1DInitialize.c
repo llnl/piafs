@@ -49,23 +49,12 @@ int    Euler1DPreStep (double*,void*,void*,double,double);
     ------------------ | ------------ | ----------------------------- | ------------------------
     gamma              | double       | #Euler1D::gamma               | 1.4
     upwinding          | char[]       | #Euler1D::upw_choice          | "roe" (#_ROE_)
-    lambda_UB          | double       | #Euler1D::lambda_UB           | 2.48e-7 (248 nm)
-    theta              | double       | #Euler1D::theta               | 0.17*pi/180 radians
-    f_CO2              | double       | #Euler1D::f_CO2               | 0
-    f_O3               | double       | #Euler1D::f_O3                | 0.005
-    Ptot               | double       | #Euler1D::Ptot                | 101325 Pa
-    Ti                 | double       | #Euler1D::Ti                  | 288 K
-    Lz                 | double       | #Euler1D::Lz                  | 0.03 (30 mm)
-    z_mm               | double       | #Euler1D::z_mm                | 0
-    nz                 | int          | #Euler1D::nz                  | 20
-    t_pulse            | int          | #Euler1D::t_pulse             | 1e-8 s (10 nanoseconds)
+    include_chemistry  | char[]       | #Euler1D::include_chem        | "no"
 
     \b Note: "physics.inp" is \b optional; if absent, default values will be used.
 */
-int Euler1DInitialize(
-                      void *s, /*!< Solver object of type #HyPar */
-                      void *m  /*!< Object of type #MPIVariables containing MPI-related info */
-                     )
+int Euler1DInitialize(void *s, /*!< Solver object of type #HyPar */
+                      void *m  /*!< Object of type #MPIVariables containing MPI-related info */ )
 {
   HyPar         *solver  = (HyPar*)         s;
   MPIVariables  *mpi     = (MPIVariables*)  m;
@@ -88,9 +77,9 @@ int Euler1DInitialize(
   strcpy(physics->upw_choice,"roe");
   physics->include_chem = 0;
   physics->chem = NULL;
+  char include_chem[_MAX_STRING_SIZE_] = "no";
 
   /* reading physical model specific inputs */
-  char include_chem[_MAX_STRING_SIZE_] = "no";
   if (!mpi->rank) {
     FILE *in;
     if (!count) printf("Reading physical model inputs from file \"physics.inp\".\n");
@@ -152,9 +141,9 @@ int Euler1DInitialize(
   solver->AveragingFunction     = Euler1DRoeAverage;
   solver->GetLeftEigenvectors   = Euler1DLeftEigenvectors;
   solver->GetRightEigenvectors  = Euler1DRightEigenvectors;
-  solver->PhysicsOutput         = Euler1DWriteChem;
 
   if (physics->include_chem) {
+    solver->PhysicsOutput = Euler1DWriteChem;
     physics->chem = (Chemistry*) calloc (1, sizeof(Chemistry));
     ChemistryInitialize( solver,
                          physics->chem,

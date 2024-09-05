@@ -37,11 +37,7 @@ int Euler1DSource(
     int done = 0; _ArraySetValue_(index,ndims,0);
     while (!done) {
       int p; _ArrayIndex1D_(ndims,dim,index,ghosts,p);
-      double rho, v, e, P, c, dxinv, local_cfl;
-      _Euler1DGetFlowVar_((u+_MODEL_NVARS_*p),rho,v,e,P,param);
-
       source[_MODEL_NVARS_*p + 2] = chem->Qv[p]/(param->gamma-1.0);
-
       _ArrayIncrementIndex_(ndims,dim,index,done);
     }
 
