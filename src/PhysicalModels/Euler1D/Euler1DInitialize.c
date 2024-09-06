@@ -148,20 +148,7 @@ int Euler1DInitialize(void *s, /*!< Solver object of type #HyPar */
     ChemistryInitialize( solver,
                          physics->chem,
                          mpi,
-                         physics->gamma,
-                         &physics->L_ref,
-                         &physics->v_ref,
-                         &physics->t_ref,
-                         &physics->P_ref,
-                         &physics->rho_ref );
-    if (!mpi->rank) {
-      printf("Reference quantities:\n");
-      printf("    Length: %1.4e (m)\n", physics->L_ref);
-      printf("    Time: %1.4e (s)\n", physics->t_ref);
-      printf("    Speed: %1.4e (m s^{-1})\n", physics->v_ref);
-      printf("    Density: %1.4e (kg m^{-3})\n", physics->rho_ref);
-      printf("    Pressure: %1.4e (Pa)\n", physics->P_ref);
-    }
+                         physics->gamma );
   }
 
   count++;

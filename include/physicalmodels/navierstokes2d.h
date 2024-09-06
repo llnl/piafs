@@ -27,6 +27,7 @@
     number is based on speed of sound, instead of the freestream velocity).
 */
 #include <basic.h>
+#include <math_ops.h>
 #include <physicalmodels/chemistry.h>
 
 /*! 2D Navier Stokes equations */
@@ -293,6 +294,25 @@
     } \
   }
 
+/*! \def _NavierStokes2DCoeffViscosity_
+    Compute the viscosity coefficient given the temperature */
+#define _NavierStokes2DCoeffViscosity_(mu, T_norm, param) \
+  { \
+    double T_d = T_norm*param->Tref;  \
+    mu = raiseto(T_d/param->T0, 1.5)  \
+         * (param->T0 + param->TS)  \
+         / (T_d       + param->TS); \
+  }
+
+/*! \def _NavierStokes2DCoeffConductivity_
+    Compute the conductivity coefficient given the temperature */
+#define _NavierStokes2DCoeffConductivity_(kappa, T_norm, param) \
+  { \
+    double T_d = T_norm*param->Tref; \
+    mu = raiseto(T_d/param->T0, 1.5)                                   \
+         * (param->T0 + param->TA * exp(-param->TB/param->T0))       \
+         / (T_d       + param->TA * exp(-param->TB/T_d      )); \
+  }
 
 /*! \def NavierStokes2D
     \brief Structure containing variables and parameters specific to the 2D Navier Stokes equations.
@@ -308,20 +328,16 @@ typedef struct navierstokes2d_parameters {
   char    upw_choice[_MAX_STRING_SIZE_];  /*!< choice of upwinding */
   double  Re;                             /*!< Reynolds number */
   double  Pr;                             /*!< Prandtl  number */
-  double  Minf;                           /*!< Freestream Mach number */
-  double  C1,                             /*!< Sutherlands law constants */
-          C2;                             /*!< Sutherlands law constants */
-  double  R;                              /*!< universal Gas constant */
 
   int include_chem; /*!< Flag to include chemistry */
   void* chem; /*!< Photochemical reactions object */
 
-  // reference quantities for normalization
-  double L_ref; /*!< reference length */
-  double v_ref; /*!< reference speed */
-  double t_ref; /*!< reference time */
-  double rho_ref; /*!< reference density */
-  double P_ref; /*!< reference pressure */
+  // constants for computing viscosity and conductivity coefficients
+  double Tref; /*!< Reference temperature */
+  double T0; /*!< T_0 (in Kelvins) (viscoscity/conductivity coeff) */
+  double TS; /*!< T_S (in Kelvins) (viscoscity/conductivity coeff) */
+  double TA; /*!< T_A (in Kelvins) (viscoscity/conductivity coeff) */
+  double TB; /*!< T_A (in Kelvins) (viscoscity/conductivity coeff) */
 
 } NavierStokes2D;
 

@@ -194,13 +194,6 @@ typedef struct euler1d_parameters {
   int include_chem; /*!< Flag to include chemistry */
   void* chem; /*!< Photochemical reactions object */
 
-  // reference quantities for normalization
-  double L_ref; /*!< reference length */
-  double v_ref; /*!< reference speed */
-  double t_ref; /*!< reference time */
-  double rho_ref; /*!< reference density */
-  double P_ref; /*!< reference pressure */
-
 } Euler1D;
 
 /*! Function to initialize the 1D Euler module */

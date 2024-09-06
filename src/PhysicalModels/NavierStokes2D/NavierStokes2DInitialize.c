@@ -52,7 +52,11 @@ int NavierStokes2DPreStep (double*,void*,void*,double,double);
     gamma              | double       | #NavierStokes2D::gamma          | 1.4
     Pr                 | double       | #NavierStokes2D::Pr             | 0.72
     Re                 | double       | #NavierStokes2D::Re             | -1
-    Minf               | double       | #NavierStokes2D::Minf           | 1.0
+    T_ref              | double       | #NavierStokes2D::Tref           | 273.15 (Kelvin)
+    T_0                | double       | #NavierStokes2D::T0             | 275.0  (Kelvin)
+    T_S                | double       | #NavierStokes2D::TS             | 110.4  (Kelvin)
+    T_A                | double       | #NavierStokes2D::TA             | 245.4  (Kelvin)
+    T_B                | double       | #NavierStokes2D::TB             |  27.6  (Kelvin)
     upwinding          | char[]       | #NavierStokes2D::upw_choice     | "roe" (#_ROE_)
     include_chemistry  | char[]       | #NavierStokes2D::include_chem   | "no"
 
@@ -81,10 +85,11 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
   physics->gamma  = 1.4;
   physics->Pr     = 0.72;
   physics->Re     = -1;
-  physics->Minf   = 1.0;
-  physics->C1     = 1.458e-6;
-  physics->C2     = 110.4;
-  physics->R      = 1.0;
+  physics->Tref   = 273.15;
+  physics->T0     = 275.0;
+  physics->TS     = 110.4;
+  physics->TA     = 245.4;
+  physics->TB     = 27.6;
   strcpy(physics->upw_choice,"roe");
   char include_chem[_MAX_STRING_SIZE_] = "no";
 
@@ -108,10 +113,16 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
             ferr = fscanf(in,"%lf",&physics->Pr);       if (ferr != 1) return(1);
           } else if (!strcmp(word,"Re")) {
             ferr = fscanf(in,"%lf",&physics->Re);       if (ferr != 1) return(1);
-          } else if (!strcmp(word,"Minf")) {
-            ferr = fscanf(in,"%lf",&physics->Minf);     if (ferr != 1) return(1);
-          } else if (!strcmp(word,"R")) {
-            ferr = fscanf(in,"%lf",&physics->R);        if (ferr != 1) return(1);
+          } else if (!strcmp(word,"T_ref")) {
+            ferr = fscanf(in,"%lf",&physics->Tref);       if (ferr != 1) return(1);
+          } else if (!strcmp(word,"T_0")) {
+            ferr = fscanf(in,"%lf",&physics->T0);       if (ferr != 1) return(1);
+          } else if (!strcmp(word,"T_S")) {
+            ferr = fscanf(in,"%lf",&physics->TS);       if (ferr != 1) return(1);
+          } else if (!strcmp(word,"T_A")) {
+            ferr = fscanf(in,"%lf",&physics->TA);       if (ferr != 1) return(1);
+          } else if (!strcmp(word,"T_B")) {
+            ferr = fscanf(in,"%lf",&physics->TB);       if (ferr != 1) return(1);
           } else if (!strcmp(word,"include_chemistry")) {
             ferr = fscanf(in,"%s",include_chem);        if (ferr != 1) return(1);
           } else if (strcmp(word,"end")) {
@@ -135,12 +146,12 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
   MPIBroadcast_double    (&physics->gamma       ,1                ,0,&mpi->world);
   MPIBroadcast_double    (&physics->Pr          ,1                ,0,&mpi->world);
   MPIBroadcast_double    (&physics->Re          ,1                ,0,&mpi->world);
-  MPIBroadcast_double    (&physics->Minf        ,1                ,0,&mpi->world);
-  MPIBroadcast_double    (&physics->R           ,1                ,0,&mpi->world);
+  MPIBroadcast_double    (&physics->Tref        ,1                ,0,&mpi->world);
+  MPIBroadcast_double    (&physics->T0          ,1                ,0,&mpi->world);
+  MPIBroadcast_double    (&physics->TS          ,1                ,0,&mpi->world);
+  MPIBroadcast_double    (&physics->TA          ,1                ,0,&mpi->world);
+  MPIBroadcast_double    (&physics->TB          ,1                ,0,&mpi->world);
   MPIBroadcast_integer   (&physics->include_chem,1                ,0,&mpi->world);
-
-  /* Scaling the Reynolds number with the M_inf */
-  physics->Re /= physics->Minf;
 
   /* initializing physical model-specific functions */
   solver->PreStep               = NavierStokes2DPreStep;
@@ -176,22 +187,10 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
     ChemistryInitialize( solver,
                          physics->chem,
                          mpi,
-                         physics->gamma,
-                         &physics->L_ref,
-                         &physics->v_ref,
-                         &physics->t_ref,
-                         &physics->P_ref,
-                         &physics->rho_ref );
-    if (!mpi->rank) {
-      printf("Reference quantities:\n");
-      printf("    Length: %1.4e (m)\n", physics->L_ref);
-      printf("    Time: %1.4e (s)\n", physics->t_ref);
-      printf("    Speed: %1.4e (m s^{-1})\n", physics->v_ref);
-      printf("    Density: %1.4e (kg m^{-3})\n", physics->rho_ref);
-      printf("    Pressure: %1.4e (Pa)\n", physics->P_ref);
-    }
+                         physics->gamma );
+    Chemistry* chem = (Chemistry*) physics->chem;
+    physics->Tref = chem->Ti;
   }
-
 
   count++;
   return(0);
