@@ -5,6 +5,11 @@
 #include <math.h>
 #include <string.h>
 
+double raiseto(double x, double a)
+{
+  return exp(a*log(x));
+}
+
 int main()
 {
   // Constants
@@ -12,6 +17,8 @@ int main()
   const double gamma = 1.4; // specific heat ratio
   const double NA = 6.02214076e23; // Avogadro's number
   const double kB = 1.380649e-23; // [J K^{-1}]; Boltzmann's constant
+  const double M_O2 = 0.032; // [kg]; O2 molar mass
+  const double R = NA*kB/M_O2; // Specific gas constant
 
   // Setup parameters
 
@@ -20,28 +27,36 @@ int main()
   const double kUV = 2 * pi / lambda_UV; //pump beam wave vector
   const double kg = 2 * kUV * sin(theta); // grating wave vector
 
-  const double f_CO2 = 0.04; // CO2 fraction
+  const double f_CO2 = 0.0; // CO2 fraction
   const double f_O2 = 1.0 - f_CO2; // O2 fraction
   const double Ptot = 101325.0; // [Pa]; total gas pressure
   const double Ti = 288; // [K]; initial temperature
-  const double M_O2 = 0.032; // [kg]; O2 molar mass
   const double n_O2 = f_O2 * Ptot / (kB * Ti); // [m^{-3}]; initial O2 concentration
   const double rho_O2 = n_O2 * M_O2 / NA; // kg
-  const double cs = sqrt(gamma*Ptot/rho_O2); // [m s^{-1}]; speed of sound
+  const double cs = sqrt(gamma*R*Ti); // [m s^{-1}]; speed of sound
 
   // Normalization
   const double L_ref = 1.0/kg;
-  const double v_ref = cs;
+  const double T_ref = Ti;
+  const double rho_ref = Ptot/(R*T_ref);
+  const double v_ref = sqrt(gamma*R*T_ref); // [m s^{-1}]; speed of sound
   const double t_ref = L_ref / v_ref;
-  const double rho_ref = rho_O2;
   const double P_ref = rho_O2 * v_ref * v_ref;
+
+  printf("Constants (in SI units):\n");
+  printf("  gamma: %1.4e (m)\n", gamma);
+  printf("  Avogradro number: %1.4e (m)\n", NA);
+  printf("  Boltzmann constant: %1.4e (m)\n", kB);
+  printf("  Specific gas constant: %1.4e (m)\n", R);
   printf("Reference quantities:\n");
   printf("  Length: %1.4e (m)\n", L_ref);
-  printf("  Time: %1.4e (s)\n", t_ref);
-  printf("  Speed: %1.4e (m s^{-1})\n", v_ref);
+  printf("  Temperature: %1.4e (m)\n", T_ref);
   printf("  Density: %1.4e (kg m^{-3})\n", rho_ref);
+  printf("  Speed: %1.4e (m s^{-1})\n", v_ref);
+  printf("  Time: %1.4e (s)\n", t_ref);
   printf("  Pressure: %1.4e (Pa)\n", P_ref);
   printf("Other important quantities:\n");
+  printf("  Speed of sound: %1.4e\n", cs);
   printf("  lambda_ac (acoustic spatial period): %1.4e (m)\n", (2*pi/kg) );
   printf("    normalized lambda_ac: %1.4e\n", (2*pi/kg)/L_ref );
   printf("  tau_ac (acoustic time period): %1.4e (s)\n", (2*pi/kg)/cs );
@@ -57,9 +72,9 @@ int main()
   printf("  normalized xmin, xmax: %1.4e, %1.4e\n", xmin, xmax);
   printf("  xmin/lambda_ac, xmax/lambda_ac: %1.4e, %1.4e\n", xmin/((2*pi/kg)/L_ref), xmax/((2*pi/kg)/L_ref));
 
-  // uniform flow parameters
-  double rho0 = 1.0;
-  double p0 = 1.0;
+  // uniform flow parameters (normalized)
+  double rho0 = rho_O2 / rho_ref;
+  double p0 = Ptot / P_ref;
   double uvel0 = 0.0;
   double vvel0 = 0.0;
   printf("Initial flow: rho = %1.4e, p = %1.4e, (u, v) = (%1.4e, %1.4e)\n", rho0, p0, uvel0, vvel0);
