@@ -1,7 +1,5 @@
 begin
 	gamma             1.4
 	upwinding         rf-char
-  Re                146.5
-  Pr                0.671
   include_chemistry yes
 end

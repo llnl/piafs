@@ -1,9 +1,9 @@
-2D NAVIER-STOKES EQUATIONS FOR COMPRESSIBLE FLOWS
+2D NAVIER-STOKES EQUATIONS FOR COMPRESSIBLE FLOWS (Inviscid)
 
-  d   [ rho   ]   d   [   rho*u    ]    d  [   rho*v   ]                    [     0       ]
-  --  [ rho*u ] + --  [rho*u*u + p ] +  -- [  rho*u*v  ] =  viscous terms + [     0       ]
-  dt  [ rho*v ]   dx  [   rho*u*v  ]    dy [rho*v*v + p]                    [     0       ]
-      [   e   ]       [   (e+p)*u  ]       [  (e+p)v   ]                    [ Q/(gamma-1) ]
+  d   [ rho   ]   d   [   rho*u    ]    d  [   rho*v   ]    [     0       ]
+  --  [ rho*u ] + --  [rho*u*u + p ] +  -- [  rho*u*v  ] =  [     0       ]
+  dt  [ rho*v ]   dx  [   rho*u*v  ]    dy [rho*v*v + p]    [     0       ]
+      [   e   ]       [   (e+p)*u  ]       [  (e+p)v   ]    [ Q/(gamma-1) ]
 
   rho   - density
   u     - x-velocity
@@ -22,9 +22,6 @@ Non-Dimensionalization:
 
   See aux/init.C for normalization
 
-  Reynolds number = 146.5
-  Prandtl number = 0.671
-
 Domain:
 
   -2.5 lambda_ac <= x <= 2.5 lambda_ac
@@ -41,7 +38,7 @@ Initial Solution:
     rho  = 1.0
     u    = 0.0
     v    = 0.0
-    p    = 1.0/gamma
+    p    = 1.0
 
     (uniform flow)
 
