@@ -23,5 +23,29 @@ int Euler1DSource(
   MPIVariables  *mpi = (MPIVariables*) m;
   Euler1D       *param  = (Euler1D*) solver->physics;
 
-  return(0);
+  _ArraySetValue_(source, _MODEL_NVARS_*solver->npoints_local_wghosts, 0.0);
+
+  if (param->include_chem) {
+
+    Chemistry *chem = (Chemistry*) param->chem;
+
+    int *dim    = solver->dim_local;
+    int ghosts  = solver->ghosts;
+    int ndims   = solver->ndims;
+
+    int index[ndims];
+    int done = 0; _ArraySetValue_(index,ndims,0);
+    while (!done) {
+      int p; _ArrayIndex1D_(ndims,dim,index,ghosts,p);
+      double rho, v, e, P, c, dxinv, local_cfl;
+      _Euler1DGetFlowVar_((u+_MODEL_NVARS_*p),rho,v,e,P,param);
+
+      source[_MODEL_NVARS_*p + 2] = chem->Qv[p]/(param->gamma-1.0);
+
+      _ArrayIncrementIndex_(ndims,dim,index,done);
+    }
+
+  }
+
+  return 0;
 }

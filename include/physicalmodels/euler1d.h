@@ -7,7 +7,7 @@
   \f{equation}{
     \frac {\partial} {\partial t} \left[\begin{array}{c} \rho \\ \rho u \\ e \end{array}\right]
   + \frac {\partial} {\partial x} \left[\begin{array}{c} \rho u \\ \rho u^2 + p \\ (e+p) u\end{array}\right]
-  = \left[\begin{array}{c} 0 \\ -\rho g \\ -\rho u g \end{array}\right]
+  = \left[\begin{array}{c} 0 \\ 0 \\ Q \end{array}\right]
   \f}
   where
   \f{equation}{
@@ -17,21 +17,11 @@
   Reference for the governing equations:
   + Laney, C. B., Computational Gasdynamics, Cambridge University Press, 1998
 */
-/*
-  d   [ rho   ]   d   [   rho*u    ]\n
-  --  [ rho*u ] + --  [rho*u*u + p ] = 0\n
-  dt  [   e   ]   dx  [ (e+p)*u    ]\n
-
-  Equation of state:
-           p         1
-    e = -------  +   - rho * u^2
-        gamma-1      2
-
-*/
 
 #include <basic.h>
 #include <math.h>
 #include <matops.h>
+#include <physicalmodels/chemistry.h>
 
 /*! \def _EULER_1D_
     1D Euler equations
@@ -196,8 +186,21 @@
  *  specific to the 1D Euler equations.
 */
 typedef struct euler1d_parameters {
-  double  gamma;        /*!< Ratio of heat capacities (\f$\gamma\f$) */
-  char    upw_choice[_MAX_STRING_SIZE_]; /*!< Choice of upwinding scheme.\sa #_ROE_,#_LLF_,#_RF_,#_SWFS_ */
+
+  double gamma; /*!< Ratio of heat capacities (\f$\gamma\f$) */
+  /*! Choice of upwinding scheme.\sa #_ROE_,#_LLF_,#_RF_,#_SWFS_ */
+  char upw_choice[_MAX_STRING_SIZE_];
+
+  int include_chem; /*!< Flag to include chemistry */
+  void* chem; /*!< Photochemical reactions object */
+
+  // reference quantities for normalization
+  double L_ref; /*!< reference length */
+  double v_ref; /*!< reference speed */
+  double t_ref; /*!< reference time */
+  double rho_ref; /*!< reference density */
+  double P_ref; /*!< reference pressure */
+
 } Euler1D;
 
 /*! Function to initialize the 1D Euler module */

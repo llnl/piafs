@@ -26,6 +26,9 @@ int    Euler1DRoeAverage        (double*,double*,double*,void*);
 int    Euler1DLeftEigenvectors  (double*,double*,void*,int);
 int    Euler1DRightEigenvectors (double*,double*,void*,int);
 
+int    Euler1DWriteChem (void*,void*,double);
+int    Euler1DPreStep (double*,void*,void*,double,double);
+
 /*! Function to initialize the 1D inviscid Euler equations (#Euler1D) module:
     Sets the default parameters, read in and set physics-related parameters,
     and set the physics-related function pointers in #HyPar.
@@ -46,6 +49,16 @@ int    Euler1DRightEigenvectors (double*,double*,void*,int);
     ------------------ | ------------ | ----------------------------- | ------------------------
     gamma              | double       | #Euler1D::gamma               | 1.4
     upwinding          | char[]       | #Euler1D::upw_choice          | "roe" (#_ROE_)
+    lambda_UB          | double       | #Euler1D::lambda_UB           | 2.48e-7 (248 nm)
+    theta              | double       | #Euler1D::theta               | 0.17*pi/180 radians
+    f_CO2              | double       | #Euler1D::f_CO2               | 0
+    f_O3               | double       | #Euler1D::f_O3                | 0.005
+    Ptot               | double       | #Euler1D::Ptot                | 101325 Pa
+    Ti                 | double       | #Euler1D::Ti                  | 288 K
+    Lz                 | double       | #Euler1D::Lz                  | 0.03 (30 mm)
+    z_mm               | double       | #Euler1D::z_mm                | 0
+    nz                 | int          | #Euler1D::nz                  | 20
+    t_pulse            | int          | #Euler1D::t_pulse             | 1e-8 s (10 nanoseconds)
 
     \b Note: "physics.inp" is \b optional; if absent, default values will be used.
 */
@@ -57,7 +70,7 @@ int Euler1DInitialize(
   HyPar         *solver  = (HyPar*)         s;
   MPIVariables  *mpi     = (MPIVariables*)  m;
   Euler1D       *physics = (Euler1D*)       solver->physics;
-  int           ferr, d;
+  int           ferr;
 
   static int count = 0;
 
@@ -71,10 +84,13 @@ int Euler1DInitialize(
   }
 
   /* default values */
-  physics->gamma      = 1.4;
+  physics->gamma = 1.4;
   strcpy(physics->upw_choice,"roe");
+  physics->include_chem = 0;
+  physics->chem = NULL;
 
   /* reading physical model specific inputs */
+  char include_chem[_MAX_STRING_SIZE_] = "no";
   if (!mpi->rank) {
     FILE *in;
     if (!count) printf("Reading physical model inputs from file \"physics.inp\".\n");
@@ -92,6 +108,9 @@ int Euler1DInitialize(
           } else if (!strcmp(word,"upwinding")) {
             ferr = fscanf(in,"%s",physics->upw_choice);
             if (ferr != 1) return(1);
+          } else if (!strcmp(word,"include_chemistry")) {
+            ferr = fscanf(in,"%s",include_chem);
+            if (ferr != 1) return(1);
           } else if (strcmp(word,"end")) {
             char useless[_MAX_STRING_SIZE_];
             ferr = fscanf(in,"%s",useless); if (ferr != 1) return(ferr);
@@ -103,16 +122,20 @@ int Euler1DInitialize(
         fprintf(stderr,"Error: Illegal format in file \"physics.inp\".\n");
         return(1);
       }
+      fclose(in);
     }
-    fclose(in);
   }
 
+  physics->include_chem = (!strcmp(include_chem,"yes"));
+
 #ifndef serial
-  IERR MPIBroadcast_double    (&physics->gamma    ,1,0,&mpi->world);                  CHECKERR(ierr);
-  IERR MPIBroadcast_character (physics->upw_choice,_MAX_STRING_SIZE_,0,&mpi->world);  CHECKERR(ierr);
+  MPIBroadcast_character (physics->upw_choice   ,_MAX_STRING_SIZE_,0,&mpi->world);
+  MPIBroadcast_double    (&physics->gamma       ,1,0,&mpi->world);
+  MPIBroadcast_integer   (&physics->include_chem,1,0,&mpi->world);
 #endif
 
   /* initializing physical model-specific functions */
+  solver->PreStep            = Euler1DPreStep;
   solver->ComputeCFL         = Euler1DComputeCFL;
   solver->FFunction          = Euler1DFlux;
   solver->SFunction          = Euler1DSource;
@@ -129,6 +152,28 @@ int Euler1DInitialize(
   solver->AveragingFunction     = Euler1DRoeAverage;
   solver->GetLeftEigenvectors   = Euler1DLeftEigenvectors;
   solver->GetRightEigenvectors  = Euler1DRightEigenvectors;
+  solver->PhysicsOutput         = Euler1DWriteChem;
+
+  if (physics->include_chem) {
+    physics->chem = (Chemistry*) calloc (1, sizeof(Chemistry));
+    ChemistryInitialize( solver,
+                         physics->chem,
+                         mpi,
+                         physics->gamma,
+                         &physics->L_ref,
+                         &physics->v_ref,
+                         &physics->t_ref,
+                         &physics->P_ref,
+                         &physics->rho_ref );
+    if (!mpi->rank) {
+      printf("Reference quantities:\n");
+      printf("    Length: %1.4e (m)\n", physics->L_ref);
+      printf("    Time: %1.4e (s)\n", physics->t_ref);
+      printf("    Speed: %1.4e (m s^{-1})\n", physics->v_ref);
+      printf("    Density: %1.4e (kg m^{-3})\n", physics->rho_ref);
+      printf("    Pressure: %1.4e (Pa)\n", physics->P_ref);
+    }
+  }
 
   count++;
   return(0);

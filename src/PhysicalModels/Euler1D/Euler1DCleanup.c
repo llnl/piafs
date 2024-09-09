@@ -10,5 +10,12 @@
 int Euler1DCleanup( void *s /*!< Solver object of type #HyPar */ )
 {
   Euler1D *param  = (Euler1D*) s;
-  return(0);
+
+  if (param->include_chem) {
+    Chemistry *chem = param->chem;
+    ChemistryCleanup(chem);
+    free(chem);
+  }
+
+  return 0;
 }

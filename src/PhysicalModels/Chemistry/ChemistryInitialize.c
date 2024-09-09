@@ -1,0 +1,326 @@
+/*! @file ChemistryInitialize.c
+    @author Debojyoti Ghosh, Albertine Oudin
+    @brief Initialize the chemistry module.
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <basic.h>
+#include <arrayfunctions.h>
+#include <physicalmodels/chemistry.h>
+#include <mpivars.h>
+#include <hypar.h>
+
+void ChemistrySetPhotonDensity(void*,void*,void*,double);
+
+/*! Function to initialize the photochemistry (#Chemistry) module:
+    Sets the default parameters, read in and set chemistry-related parameters.
+
+    This file reads the file "chemistry.inp" that must have the following format:
+
+        begin
+            <keyword>   <value>
+            <keyword>   <value>
+            <keyword>   <value>
+            ...
+            <keyword>   <value>
+        end
+
+    where the list of keywords are:
+
+    Keyword name       | Type         | Variable                      | Default value
+    ------------------ | ------------ | ----------------------------- | ------------------------
+    lambda_UV          | double       | #Chemistry::lambda_UB           | 2.48e-7 (248 nm)
+    theta              | double       | #Chemistry::theta               | 0.17*pi/180 radians
+    f_CO2              | double       | #Chemistry::f_CO2               | 0
+    f_O3               | double       | #Chemistry::f_O3                | 0.005
+    Ptot               | double       | #Chemistry::Ptot                | 101325 Pa
+    Ti                 | double       | #Chemistry::Ti                  | 288 K
+    Lz                 | double       | #Chemistry::Lz                  | 0.03 (30 mm)
+    z_mm               | double       | #Chemistry::z_mm                | 0
+    nz                 | int          | #Chemistry::nz                  | 20
+    t_pulse            | double       | #Chemistry::t_pulse             | 1e-8 s (10 nanoseconds)
+    k0a                | double       | #Chemistry::k0a                 | 0.9*3.3e-13 s^{-1}
+    k0b                | double       | #Chemistry::k0a                 | 0.1*3.3e-13 s^{-1}
+    k1a                | double       | #Chemistry::k1a                 | 0.8*3.95e-13 s^{-1}
+    k1b                | double       | #Chemistry::k1a                 | 0.2*3.95e-13 s^{-1}
+    k2a                | double       | #Chemistry::k2a                 | 1.2e-16 s^{-1}
+    k2b                | double       | #Chemistry::k2a                 | 1.2e-16 s^{-1}
+    F0                 | double       | #Chemistry::F0                  | 2000 J/m^2
+    sO3                | double       | #Chemistry::F0                  | 1.1e-21 m^2
+    time_scheme        | double       | #Chemistry::ti_scheme           | RK4
+
+    \b Note: "chemistry.inp" is \b optional; if absent, default values will be used.
+*/
+int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
+                         void *p, /*!< Chemistry object of type #Chemistry */
+                         void *m, /*!< Object of type #MPIVariables containing MPI-related info */
+                         double gamma, /*!< Specific heat ratio */
+                         double* a_L_ref, /*!< reference length */
+                         double* a_v_ref, /*!< reference speed */
+                         double* a_t_ref,  /*!< reference time */
+                         double* a_P_ref,  /*!< reference pressure */
+                         double* a_r_ref   /*!< reference density */ )
+{
+  HyPar         *solver  = (HyPar*)         s;
+  MPIVariables  *mpi     = (MPIVariables*)  m;
+  Chemistry     *chem    = (Chemistry*)     p;
+  int           ferr;
+
+  static int count = 0;
+
+  /* default values */
+  chem->pi = 4.0*atan(1.0);
+  chem->NA = 6.02214076e23;
+  chem->kB = 1.380649e-23;
+  chem->c = 3.0e8; // m s^{-1}
+  chem->h = 6.62607015e-34; // J s
+  chem->e = 1.60217663e-19; // Coulombs
+
+  chem->lambda_UV = 2.48e-7; // [m] (248 nm) - pump wavelength
+  chem->theta = 0.17 * chem->pi / 180; // radians; half angle between probe beams
+
+  chem->f_CO2 = 0.0; // CO2 fraction
+  chem->f_O3 = 0.005; // O3 fraction
+  chem->Ptot = 101325.0; // [Pa]; total gas pressure
+  chem->Ti = 288; // [K]; initial temperature
+  chem->M_O2 = 0.032; // [kg]; O2 molar mass
+
+  chem->t_pulse = 10*1e-9; // 10 nanoseconds
+  chem->Lz = 0.03; // 30 milimeters
+  chem->z_mm = 0.0;
+  chem->nz = 22;
+
+  chem->k0a = 0.9 * 3.3e-13; // s^{-1}
+  chem->k0b = 0.1 * 3.3e-13; // s^{-1}
+  chem->k1a = 0.8 * 3.95e-17; // s^{-1}
+  chem->k1b = 0.2 * 3.95e-17; // s^{-1}
+  chem->k2a = 1.2e-16; // s^{-1}
+  chem->k2b = 1.2e-16; // s^{-1}
+
+  chem->F0 = 2000; // J m^{-2}
+  chem->sO3 = 1.1e-21; // m^2
+
+  strcpy(chem->ti_scheme, "RK4");
+
+  /* reading physical model specific inputs */
+  if (!mpi->rank) {
+    FILE *in;
+    if (!count) printf("Reading physical model inputs from file \"chemistry.inp\".\n");
+    in = fopen("chemistry.inp","r");
+    if (!in) printf("Warning: File \"chemistry.inp\" not found. Using default values.\n");
+    else {
+      char word[_MAX_STRING_SIZE_];
+      ferr = fscanf(in,"%s",word); if (ferr != 1) return(1);
+      if (!strcmp(word, "begin")){
+        while (strcmp(word, "end")){
+          ferr = fscanf(in,"%s",word); if (ferr != 1) return(1);
+          if (!strcmp(word,"lambda_UV")) {
+            ferr = fscanf(in,"%lf",&chem->lambda_UV);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"t_pulse")) {
+            ferr = fscanf(in,"%lf",&chem->t_pulse);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"theta")) {
+            ferr = fscanf(in,"%lf",&chem->theta);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"f_CO2")) {
+            ferr = fscanf(in,"%lf",&chem->f_CO2);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"f_O3")) {
+            ferr = fscanf(in,"%lf",&chem->f_O3);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"Ptot")) {
+            ferr = fscanf(in,"%lf",&chem->Ptot);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"Ti")) {
+            ferr = fscanf(in,"%lf",&chem->Ti);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"Lz")) {
+            ferr = fscanf(in,"%lf",&chem->Lz);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"z_mm")) {
+            ferr = fscanf(in,"%lf",&chem->z_mm);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"nz")) {
+            ferr = fscanf(in,"%d",&chem->nz);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k0a")) {
+            ferr = fscanf(in,"%lf",&chem->k0a);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k1a")) {
+            ferr = fscanf(in,"%lf",&chem->k1a);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k2a")) {
+            ferr = fscanf(in,"%lf",&chem->k2a);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k0b")) {
+            ferr = fscanf(in,"%lf",&chem->k0b);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k1b")) {
+            ferr = fscanf(in,"%lf",&chem->k1b);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k2b")) {
+            ferr = fscanf(in,"%lf",&chem->k2b);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"F0")) {
+            ferr = fscanf(in,"%lf",&chem->F0);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"sO3")) {
+            ferr = fscanf(in,"%lf",&chem->sO3);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"time_scheme")) {
+            ferr = fscanf(in,"%s",chem->ti_scheme);
+            if (ferr != 1) return(1);
+          } else if (strcmp(word,"end")) {
+            char useless[_MAX_STRING_SIZE_];
+            ferr = fscanf(in,"%s",useless); if (ferr != 1) return(ferr);
+            printf("Warning: keyword %s in file \"chemistry.inp\" with value %s not ",word,useless);
+            printf("recognized or extraneous. Ignoring.\n");
+          }
+        }
+      } else {
+        fprintf(stderr,"Error: Illegal format in file \"chemistry.inp\".\n");
+        return(1);
+      }
+      fclose(in);
+    }
+  }
+
+#ifndef serial
+  IERR MPIBroadcast_double    (&chem->lambda_UV,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->theta    ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->f_CO2    ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->f_O3     ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->Ptot     ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->Ti       ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->Lz       ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->z_mm     ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->t_pulse  ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_integer   (&chem->nz       ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k0a      ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k1a      ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k2a      ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k0b      ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k1b      ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k2b      ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->F0       ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->sO3      ,1,0,&mpi->world);                  CHECKERR(ierr);
+
+  IERR MPIBroadcast_character (chem->ti_scheme,_MAX_STRING_SIZE_,0,&mpi->world);  CHECKERR(ierr);
+#endif
+
+  /* compute some basic quantities */
+  chem->kUV = 2 * chem->pi / chem->lambda_UV;
+  chem->kg = 2 * chem->kUV * sin(chem->theta);
+  chem->f_O2 = 1.0 - chem->f_CO2;
+  chem->n_O2 = chem->f_O2 * chem->Ptot / (chem->kB * chem->Ti);
+  chem->n_O3 = chem->f_O3 * chem->Ptot / (chem->kB * chem->Ti);
+  chem->rho_O2 = chem->n_O2 * chem->M_O2 / chem->NA;
+  chem->cs = sqrt(gamma*chem->Ptot/chem->rho_O2);
+
+  /* compute reference quantities */
+  chem->L_ref = 1.0/chem->kg;
+  chem->v_ref = chem->cs;
+  chem->t_ref = chem->L_ref / chem->v_ref;
+  chem->rho_ref = chem->rho_O2;
+  chem->P_ref = chem->rho_O2 * chem->v_ref * chem->v_ref;
+  if (a_L_ref) *a_L_ref = chem->L_ref;
+  if (a_v_ref) *a_v_ref = chem->v_ref;
+  if (a_t_ref) *a_t_ref = chem->t_ref;
+  if (a_P_ref) *a_P_ref = chem->P_ref;
+  if (a_r_ref) *a_r_ref = chem->rho_ref;
+
+  /* compute some important stuff */
+  chem->t_pulse_norm = chem->t_pulse / chem->t_ref;
+  double rate_norm_fac = chem->kg*chem->cs / chem->n_O2;
+  chem->k0a_norm = chem->k0a / rate_norm_fac;
+  chem->k1a_norm = chem->k1a / rate_norm_fac;
+  chem->k2a_norm = chem->k2a / rate_norm_fac;
+  chem->k0b_norm = chem->k0b / rate_norm_fac;
+  chem->k1b_norm = chem->k1b / rate_norm_fac;
+  chem->k2b_norm = chem->k2b / rate_norm_fac;
+  chem->I0 = chem->F0/chem->t_pulse;
+  chem->nu = chem->c / chem->lambda_UV;
+
+  double Ei = chem->Ptot/((gamma-1.0)*chem->n_O2);
+
+  chem->q0a_norm = 0.73 * chem->e/Ei;
+  chem->q0b_norm = 2.8  * chem->e/Ei;
+
+  chem->q1a_norm = 0.29 * chem->e/Ei;
+  chem->q1b_norm = 0.84 * chem->e/Ei;
+
+  chem->q2a_norm = 4.3  * chem->e/Ei;
+  chem->q2b_norm = 0.81 * chem->e/Ei;
+
+  chem->dz = chem->Lz / chem->nz;
+  chem->z_i = (int)(ceil(chem->z_mm*0.001 * chem->nz / chem->Lz));
+
+  if (!mpi->rank) {
+    printf("Photo-Chemistry:\n");
+    printf("    Pump wavelength: %1.4e [m]\n", chem->lambda_UV);
+    printf("    Beam half angle: %1.4e [radians]\n", chem->theta);
+    printf("    Pump beam wavenumber: %1.4e [m^{-1}]\n", chem->kUV);
+    printf("    Grating wavenumber: %1.4e [m^{-1}]\n", chem->kg);
+    printf("    CO2 fraction: %1.4e\n", chem->f_CO2);
+    printf("    O2 fraction: %1.4e\n", chem->f_O2);
+    printf("    O3 fraction: %1.4e\n", chem->f_O3);
+    printf("    Pressure: %1.4e [Pa]\n", chem->Ptot);
+    printf("    Temperature: %1.4e [K]\n", chem->Ti);
+    printf("    O2 molar mass: %1.4e [kg]\n", chem->M_O2);
+    printf("    O2 number density: %1.4e [m^{-3}]\n", chem->n_O2);
+    printf("    O3 number density: %1.4e [m^{-3}]\n", chem->n_O3);
+    printf("    O2 mass density: %1.4e [kg m^{-3}]\n", chem->rho_O2);
+    printf("    Sound speed: %1.4e [kg m^{-3}]\n", chem->cs);
+    printf("    Pulse duration: %1.4e (s), %1.4e (normalized)\n",
+                chem->t_pulse, chem->t_pulse_norm );
+    printf("    Gas length: %1.4e [m]\n", chem->Lz);
+    printf("    Number of z-layers: %d\n", chem->nz);
+    printf("    Z-location: %1.4e [m] (z_i = %d)\n", chem->z_mm*1e-3,chem->z_i);
+    printf("    lambda_ac (acoustic spatial period): %1.4e (m)\n", (2*chem->pi/chem->kg) );
+    printf("      normalized lambda_ac: %1.4e\n", (2*chem->pi/chem->kg)/chem->L_ref );
+    printf("    tau_ac (acoustic time period): %1.4e (s)\n", (2*chem->pi/chem->kg)/chem->cs );
+    printf("      normalized tau_ac: %1.4e (s)\n", ((2*chem->pi/chem->kg)/chem->cs)/chem->t_ref );
+    printf("    Reaction rates:\n");
+    printf("        k0a = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k0a, chem->k0a_norm);
+    printf("        k0b = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k0b, chem->k0b_norm);
+    printf("        k1a = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k1a, chem->k1a_norm);
+    printf("        k1b = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k1b, chem->k1b_norm);
+    printf("        k2a = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k2a, chem->k2a_norm);
+    printf("        k2b = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k2b, chem->k2b_norm);
+    printf("    F0: %1.4e [J m^{-2}]\n", chem->F0);
+    printf("    I0: %1.4e [J m^{-2} s^{-1}]\n", chem->I0);
+    printf("    nu: %1.4e [s^{-1}]\n", chem->nu);
+    printf("    Reaction ODE solver: %s\n", chem->ti_scheme);
+  }
+
+  int nz = chem->z_i + 1;
+  chem->nspecies = 6;
+  chem->nv_O2    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
+  chem->nv_O3    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
+  chem->nv_O3old = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
+  chem->nv_1D    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
+  chem->nv_1Dg   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
+  chem->nv_1Sg   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
+  chem->nv_hnu   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
+  chem->Qv       = (double*) calloc (solver->npoints_local_wghosts   , sizeof(double));
+
+  int i;
+  _ArraySetValue_ (chem->Qv,     solver->npoints_local_wghosts,    0.0);
+  _ArraySetValue_ (chem->nv_O2,  solver->npoints_local_wghosts*nz, 1.0);
+  _ArraySetValue_ (chem->nv_O3,  solver->npoints_local_wghosts*nz, chem->n_O3 / chem->n_O2);
+  _ArraySetValue_ (chem->nv_1D,  solver->npoints_local_wghosts*nz, 0.0);
+  _ArraySetValue_ (chem->nv_1Dg, solver->npoints_local_wghosts*nz, 0.0);
+  _ArraySetValue_ (chem->nv_1Sg, solver->npoints_local_wghosts*nz, 0.0);
+  _ArraySetValue_ (chem->nv_hnu, solver->npoints_local_wghosts*nz, 0.0);
+
+  _ArrayCopy1D_   (chem->nv_O3, chem->nv_O3old, solver->npoints_local_wghosts*nz);
+
+  // set initial photon density
+  ChemistrySetPhotonDensity( solver, chem, mpi, 0.0 );
+
+  count++;
+  return 0;
+}
