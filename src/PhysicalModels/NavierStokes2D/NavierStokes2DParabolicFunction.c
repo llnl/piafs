@@ -121,13 +121,15 @@ int NavierStokes2DParabolicFunction(
       uy   = (QDerivY+p)[1];
       vy   = (QDerivY+p)[2];
 
-      /* calculate viscosity coeff based on Sutherland's law */
-      double mu = raiseto(T, 0.76);
+      /* calculate viscosity and conductivity coeffs */
+      double mu = 0.0, kappa = 0.0;
+      _NavierStokes2DCoeffViscosity_(mu, T, physics);
+      _NavierStokes2DCoeffConductivity_(kappa, T, physics);
 
       double tau_xx, tau_xy, qx;
-      tau_xx = two_third * (mu*inv_Re) * (2*ux - vy);
-      tau_xy = (mu*inv_Re) * (uy + vx);
-      qx     = ( (mu*inv_Re) * inv_gamma_m1 * inv_Pr ) * Tx;
+      tau_xx = two_third * (mu * inv_Re) * (2*ux - vy);
+      tau_xy = (mu * inv_Re) * (uy + vx);
+      qx     = ( kappa * inv_Re * inv_gamma_m1 * inv_Pr ) * Tx;
 
       (FViscous+p)[0] = 0.0;
       (FViscous+p)[1] = tau_xx;
@@ -162,13 +164,15 @@ int NavierStokes2DParabolicFunction(
       uy   = (QDerivY+p)[1];
       vy   = (QDerivY+p)[2];
 
-      /* calculate viscosity coeff based on Sutherland's law */
-      double mu = raiseto(T, 0.76);
+      /* calculate viscosity and conductivity coeffs */
+      double mu = 0.0, kappa = 0.0;
+      _NavierStokes2DCoeffViscosity_(mu, T, physics);
+      _NavierStokes2DCoeffConductivity_(kappa, T, physics);
 
       double tau_yx, tau_yy, qy;
-      tau_yx = (mu*inv_Re) * (uy + vx);
-      tau_yy = two_third * (mu*inv_Re) * (-ux + 2*vy);
-      qy     = ( (mu*inv_Re) * inv_gamma_m1 * inv_Pr ) * Ty;
+      tau_yx = (mu * inv_Re) * (uy + vx);
+      tau_yy = two_third * (mu * inv_Re) * (-ux + 2*vy);
+      qy     = ( kappa * inv_Re * inv_gamma_m1 * inv_Pr ) * Ty;
 
       (FViscous+p)[0] = 0.0;
       (FViscous+p)[1] = tau_yx;

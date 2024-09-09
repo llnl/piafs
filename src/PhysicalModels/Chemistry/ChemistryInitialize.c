@@ -56,12 +56,7 @@ void ChemistrySetPhotonDensity(void*,void*,void*,double);
 int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
                          void *p, /*!< Chemistry object of type #Chemistry */
                          void *m, /*!< Object of type #MPIVariables containing MPI-related info */
-                         double gamma, /*!< Specific heat ratio */
-                         double* a_L_ref, /*!< reference length */
-                         double* a_v_ref, /*!< reference speed */
-                         double* a_t_ref,  /*!< reference time */
-                         double* a_P_ref,  /*!< reference pressure */
-                         double* a_r_ref   /*!< reference density */ )
+                         double gamma /*!< Specific heat ratio */ )
 {
   HyPar         *solver  = (HyPar*)         s;
   MPIVariables  *mpi     = (MPIVariables*)  m;
@@ -77,6 +72,8 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->c = 3.0e8; // m s^{-1}
   chem->h = 6.62607015e-34; // J s
   chem->e = 1.60217663e-19; // Coulombs
+  chem->M_O2 = 0.032; // [kg]; O2 molar mass
+  chem->R = chem->NA*chem->kB/chem->M_O2;
 
   chem->lambda_UV = 2.48e-7; // [m] (248 nm) - pump wavelength
   chem->theta = 0.17 * chem->pi / 180; // radians; half angle between probe beams
@@ -85,7 +82,6 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->f_O3 = 0.005; // O3 fraction
   chem->Ptot = 101325.0; // [Pa]; total gas pressure
   chem->Ti = 288; // [K]; initial temperature
-  chem->M_O2 = 0.032; // [kg]; O2 molar mass
 
   chem->t_pulse = 10*1e-9; // 10 nanoseconds
   chem->Lz = 0.03; // 30 milimeters
@@ -218,7 +214,7 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->n_O2 = chem->f_O2 * chem->Ptot / (chem->kB * chem->Ti);
   chem->n_O3 = chem->f_O3 * chem->Ptot / (chem->kB * chem->Ti);
   chem->rho_O2 = chem->n_O2 * chem->M_O2 / chem->NA;
-  chem->cs = sqrt(gamma*chem->Ptot/chem->rho_O2);
+  chem->cs = sqrt(gamma*chem->R*chem->Ti);
 
   /* compute reference quantities */
   chem->L_ref = 1.0/chem->kg;
@@ -226,11 +222,6 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->t_ref = chem->L_ref / chem->v_ref;
   chem->rho_ref = chem->rho_O2;
   chem->P_ref = chem->rho_O2 * chem->v_ref * chem->v_ref;
-  if (a_L_ref) *a_L_ref = chem->L_ref;
-  if (a_v_ref) *a_v_ref = chem->v_ref;
-  if (a_t_ref) *a_t_ref = chem->t_ref;
-  if (a_P_ref) *a_P_ref = chem->P_ref;
-  if (a_r_ref) *a_r_ref = chem->rho_ref;
 
   /* compute some important stuff */
   chem->t_pulse_norm = chem->t_pulse / chem->t_ref;
@@ -259,6 +250,14 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->z_i = (int)(ceil(chem->z_mm*0.001 * chem->nz / chem->Lz));
 
   if (!mpi->rank) {
+    printf("Constants:\n");
+    printf("    Avogadro number: %1.4e [m]\n", chem->NA);
+    printf("    Boltzmann constant: %1.4e [m]\n", chem->kB);
+    printf("    Speed of light: %1.4e [m]\n", chem->c);
+    printf("    Planck's constant: %1.4e [m]\n", chem->h);
+    printf("    Elementary charge: %1.4e [m]\n", chem->e);
+    printf("    O2 molar mass: %1.4e [kg]\n", chem->M_O2);
+    printf("    Specific gas constant: %1.4e [m]\n", chem->R);
     printf("Photo-Chemistry:\n");
     printf("    Pump wavelength: %1.4e [m]\n", chem->lambda_UV);
     printf("    Beam half angle: %1.4e [radians]\n", chem->theta);
@@ -269,7 +268,6 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
     printf("    O3 fraction: %1.4e\n", chem->f_O3);
     printf("    Pressure: %1.4e [Pa]\n", chem->Ptot);
     printf("    Temperature: %1.4e [K]\n", chem->Ti);
-    printf("    O2 molar mass: %1.4e [kg]\n", chem->M_O2);
     printf("    O2 number density: %1.4e [m^{-3}]\n", chem->n_O2);
     printf("    O3 number density: %1.4e [m^{-3}]\n", chem->n_O3);
     printf("    O2 mass density: %1.4e [kg m^{-3}]\n", chem->rho_O2);
@@ -294,6 +292,13 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
     printf("    I0: %1.4e [J m^{-2} s^{-1}]\n", chem->I0);
     printf("    nu: %1.4e [s^{-1}]\n", chem->nu);
     printf("    Reaction ODE solver: %s\n", chem->ti_scheme);
+    printf("Reference quantities:\n");
+    printf("    Length: %1.4e (m)\n", chem->L_ref);
+    printf("    Time: %1.4e (s)\n", chem->t_ref);
+    printf("    Speed: %1.4e (m s^{-1})\n", chem->v_ref);
+    printf("    Density: %1.4e (kg m^{-3})\n", chem->rho_ref);
+    printf("    Pressure: %1.4e (Pa)\n", chem->P_ref);
+    printf("    Temperature: %1.4e (Pa)\n", chem->Ti);
   }
 
   int nz = chem->z_i + 1;

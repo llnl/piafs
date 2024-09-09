@@ -7,7 +7,7 @@
   \f{equation}{
     \frac {\partial} {\partial t} \left[\begin{array}{c} \rho \\ \rho u \\ e \end{array}\right]
   + \frac {\partial} {\partial x} \left[\begin{array}{c} \rho u \\ \rho u^2 + p \\ (e+p) u\end{array}\right]
-  = \left[\begin{array}{c} 0 \\ 0 \\ Q \end{array}\right]
+  = \left[\begin{array}{c} 0 \\ 0 \\ \frac{Q}{\gamma-1} \end{array}\right]
   \f}
   where
   \f{equation}{
@@ -193,13 +193,6 @@ typedef struct euler1d_parameters {
 
   int include_chem; /*!< Flag to include chemistry */
   void* chem; /*!< Photochemical reactions object */
-
-  // reference quantities for normalization
-  double L_ref; /*!< reference length */
-  double v_ref; /*!< reference speed */
-  double t_ref; /*!< reference time */
-  double rho_ref; /*!< reference density */
-  double P_ref; /*!< reference pressure */
 
 } Euler1D;
 

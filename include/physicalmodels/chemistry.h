@@ -88,6 +88,7 @@ typedef struct chemistry_parameters {
   double c; /*!< speed of light */
   double h; /*!< Planck's constant */
   double e; /*!< elementary charge */
+  double R; /*!< specific gas constant */
 
   // Physical setup;
   double lambda_UV; /*!< pump wavelength in meters */
@@ -166,7 +167,7 @@ typedef struct chemistry_parameters {
 } Chemistry;
 
 /*! Function to initialize the chemistry object */
-int ChemistryInitialize(void*,void*,void*,double,double*,double*,double*,double*,double*);
+int ChemistryInitialize(void*,void*,void*,double);
 /*! Function to cleanup the chemistry object */
 int ChemistryCleanup(void*);
 /*! Function to write reacting species to file */

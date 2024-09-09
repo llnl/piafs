@@ -3,10 +3,10 @@ Python script to create plots from the solution of a
 PIAFS2D simulation.
 
 - if op_overwrite is set to "no", a plot is generated
-for each reacting species and each
+for each variable (solution vector component) and each
 simulation time for which the solution is available.
 - if op_overwrite is set to "yes", a single plot is
-created for for each reacting species.
+created for for each variable (solution vector component).
 - solution must be in binary format
 
 Make sure the environment variable "PIAFS2D_DIR" is set
@@ -30,8 +30,9 @@ import modPIAFS2DUtils as piafs2dutils
 
 font = {'size':22}
 matplotlib.rc('font', **font)
+colormap='jet'
 
-figsize=(15,9)
+figsize=(12,10)
 plt_dir_name='plots'
 
 '''
@@ -57,13 +58,13 @@ if chem_inp_data:
   z_i = int(z_mm*0.001*nz/L_z)
 nz = z_i + 1
 
-
 print('Number of z-layers: ', nz)
 
 if solver_inp_data['op_file_format'] != 'binary':
     raise Exception("op_file_format must be 'binary' in solver.inp.")
 
 ndims = int(solver_inp_data['ndims'][0])
+nvars = int(solver_inp_data['nvars'][0])
 size = np.int32(solver_inp_data['size'])
 
 nspecies = 6
@@ -106,33 +107,44 @@ for zi in range(nz):
     '''
     Load simulation data (solution snapshots)
     '''
-    x,solution_snapshots = piafs2dutils.getSolutionSnapshots( sim_path,
-                                                              nsims,
-                                                              n_snapshots,
-                                                              ndims,
-                                                              nspecies,
-                                                              size,
-                                                              op_prefix )
+    grid, solution_snapshots = piafs2dutils.getSolutionSnapshots( sim_path,
+                                                                nsims,
+                                                                n_snapshots,
+                                                                ndims,
+                                                                nspecies,
+                                                                size,
+                                                                op_prefix )
     solution_snapshots = np.float32(solution_snapshots)
     n_snapshots = solution_snapshots.shape[0]
     print('  number of snapshots = ', n_snapshots)
+    x = grid[:size[0]]
+    y = grid[size[0]:]
+    print('2D Domain:');
+    print(' x: ', np.min(x), np.max(x))
+    print(' x.shape: ', x.shape)
+    print(' y: ', np.min(y), np.max(y))
+    print(' y.shape: ', y.shape)
+    y2d, x2d = np.meshgrid(y, x)
   
     for var in range(nspecies):
       for i in range(n_snapshots):
-        fig = plt.figure(figsize=figsize)
-        ax = plt.axes()
-        ax.set( xlim=(np.min(x), np.max(x)),
-                ylim=(np.min(solution_snapshots[:,var::nspecies]),
-                      np.max(solution_snapshots[:,var::nspecies]) ) )
         for s in range(nsims):
-            solution_snapshots_sim = solution_snapshots[s*n_snapshots:(s+1)*n_snapshots]
-            ax.plot(x, solution_snapshots_sim[i, var::nspecies], lw=2)
-        ax.set_title('species {:}, t={:.3}'.format(var,i*dt_snapshots))
-        plt.grid(visible=True, linestyle=':', linewidth=1)
-        plt_fname = plt_dir_name+'/fig_'+f'z{zi:02d}'+'_'+f'{var:02d}'+'_'+f'{i:05d}'+'.png'
-        print('Saving %s' % plt_fname)
-        plt.savefig(plt_fname)
-        plt.close()
+          fig = plt.figure(figsize=figsize)
+          ax = plt.axes()
+          ax.set( xlim=(np.min(x), np.max(x)),
+                  ylim=(np.min(y), np.max(y)) )
+          solution_snapshots_sim = solution_snapshots[s*n_snapshots:(s+1)*n_snapshots]
+          sol2d = np.transpose(solution_snapshots_sim.reshape(n_snapshots,size[1],size[0],nspecies))
+          plot = ax.pcolor(x2d, y2d, sol2d[var,:,:,i], cmap=colormap)
+          ax.set_title('species {:}, t={:.3}'.format(var,i*dt_snapshots))
+          fig.colorbar(plot, ax=ax)
+          if nsims > 1:
+            plt_fname = plt_dir_name+'/fig_'+f'z{zi:02d}'+'_'+f'{s:02d}'+'_'+f'{var:02d}'+'_'+f'{i:05d}'+'.png'
+          else:
+            plt_fname = plt_dir_name+'/fig_'+f'z{zi:02d}'+'_'+f'{var:02d}'+'_'+f'{i:05d}'+'.png'
+          print('Saving %s' % plt_fname)
+          plt.savefig(plt_fname)
+          plt.close()
   
   else:
   
@@ -152,28 +164,37 @@ for zi in range(nz):
     '''
     Load simulation data (solution snapshots)
     '''
-    x,solution_snapshots = piafs2dutils.getSolutionSnapshots( sim_path,
-                                                              nsims,
-                                                              n_snapshots,
-                                                              ndims,
-                                                              nspecies,
-                                                              size,
-                                                              op_prefix )
+    grid,solution_snapshots = piafs2dutils.getSolutionSnapshots(  sim_path,
+                                                                nsims,
+                                                                n_snapshots,
+                                                                ndims,
+                                                                nspecies,
+                                                                size )
     solution_snapshots = np.float32(solution_snapshots)
+    x = grid[:size[0]]
+    y = grid[size[0]:]
+    print('2D Domain:');
+    print(' x: ', np.min(x), np.max(x))
+    print(' x.shape: ', x.shape)
+    print(' y: ', np.min(y), np.max(y))
+    print(' y.shape: ', y.shape)
+    y2d, x2d = np.meshgrid(y, x)
   
     for var in range(nspecies):
-      fig = plt.figure(figsize=figsize)
-      ax = plt.axes()
-      ax.set( xlim=(np.min(x), np.max(x)),
-              ylim=(np.min(solution_snapshots[:,var::nspecies]),
-                    np.max(solution_snapshots[:,var::nspecies]) ) )
       for s in range(nsims):
-          solution_snapshots_sim = solution_snapshots[s*n_snapshots:(s+1)*n_snapshots]
-          ax.plot(x, solution_snapshots_sim[0, var::nspecies], lw=2)
-      ax.set_title('species {:}, t={:.3}'.format(var,t_final))
-      plt.grid(visible=True, linestyle=':', linewidth=1)
-      plt_fname = plt_dir_name+'/fig_'+f'z{zi:02d}'+'_'+f'{var:02d}'+'.png'
-      print('Saving %s' % plt_fname)
-      plt.savefig(plt_fname)
-      plt.close()
-
+        fig = plt.figure(figsize=figsize)
+        ax = plt.axes()
+        ax.set( xlim=(np.min(x), np.max(x)),
+                ylim=(np.min(y), np.max(y)) )
+        solution_snapshots_sim = solution_snapshots[s*n_snapshots:(s+1)*n_snapshots]
+        sol2d = np.transpose(solution_snapshots_sim.reshape(size[1],size[0],nspecies))
+        plot = ax.pcolor(x2d, y2d, sol2d[var,:,:], cmap=colormap)
+        ax.set_title('species {:}, t={:.3}'.format(var,t_final))
+        fig.colorbar(plot, ax=ax)
+        if nsims > 1:
+          plt_fname = plt_dir_name+'/fig_'+f'z{zi:02d}'+'_'+f'{s:02d}'+'_'+f'{var:02d}'+'.png'
+        else:
+            plt_fname = plt_dir_name+'/fig_'+f'z{zi:02d}'+'_'+f'{var:02d}'+'.png'
+        print('Saving %s' % plt_fname)
+        plt.savefig(plt_fname)
+        plt.close()
