@@ -101,7 +101,7 @@ if solver_inp_data['op_overwrite'] == 'no':
         rho = cons_sol[0,:]
         u = cons_sol[1,:] / cons_sol[0,:]
         pressure = 0.4 * (cons_sol[2,:] - 0.5*cons_sol[1,:]*cons_sol[1,:]/cons_sol[0,:])
-        temperature = pressure / rho
+        temperature = 1.4 * pressure / rho
 
         fig = plt.figure(figsize=figsize)
         ax = plt.axes()
@@ -178,7 +178,7 @@ else:
       rho = cons_sol[0,:]
       u = cons_sol[1,:] / cons_sol[0,:]
       pressure = 0.4 * (cons_sol[2,:] - 0.5*cons_sol[1,:]*cons_sol[1,:]/cons_sol[0,:])
-      temperature = pressure / rho
+      temperature = 1.4 * pressure / rho
 
       fig = plt.figure(figsize=figsize)
       ax = plt.axes()
