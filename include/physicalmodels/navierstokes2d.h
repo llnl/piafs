@@ -309,9 +309,9 @@
 #define _NavierStokes2DCoeffConductivity_(kappa, T_norm, param) \
   { \
     double T_d = T_norm*param->Tref; \
-    mu = raiseto(T_d/param->T0, 1.5)                                   \
-         * (param->T0 + param->TA * exp(-param->TB/param->T0))       \
-         / (T_d       + param->TA * exp(-param->TB/T_d      )); \
+    kappa = raiseto(T_d/param->T0, 1.5)                                   \
+            * (param->T0 + param->TA * exp(-param->TB/param->T0))       \
+            / (T_d       + param->TA * exp(-param->TB/T_d      )); \
   }
 
 /*! \def NavierStokes2D
