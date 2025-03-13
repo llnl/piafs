@@ -22,7 +22,8 @@
     double n_1D = u[2]; \
     double n_1Dg = u[3]; \
     double n_1Sg = u[4]; \
-    double n_hnu = u[5]; \
+    double n_CO2 = u[5]; \
+    double n_hnu = u[6]; \
     \
     double k0a = chem->k0a_norm; \
     double k0b = chem->k0b_norm; \
@@ -30,11 +31,15 @@
     double k1b = chem->k1b_norm; \
     double k2a = chem->k2a_norm; \
     double k2b = chem->k2b_norm; \
+    double k3a = chem->k3a_norm; \
+    double k3b = chem->k3b_norm; \
+    double k4  = chem->k4_norm; \
     \
-    /* O3  */ f[0] = -(k0a+k0b)*n_hnu*n_O3 - (k2a+k2b)*n_O3*n_1D; \
-    /* 1D  */ f[1] = k0a*n_hnu*n_O3 - (k1a+k1b)*n_1D*n_O2; \
+    /* O3  */ f[0] = -(k0a+k0b)*n_hnu*n_O3 - (k2a+k2b)*n_O3*n_1D - (k3a+k3b)*n_O3*n_1Sg; \
+    /* 1D  */ f[1] = k0a*n_hnu*n_O3 - (k1a+k1b)*n_1D*n_O2 - (k2a+k2b)*n_1D*n_O3 - k4*n_1D*n_CO2; \
     /* 1Dg */ f[2] = k0a*n_hnu*n_O3 + k1b*n_1D*n_O2; \
-    /* 1Sg */ f[3] = k1a*n_1D*n_O2; \
+    /* 1Sg */ f[3] = k1a*n_1D*n_O2 - (k3a+k3b)*n_O3*n_1Sg; \
+    /* CO2 */ f[4] = 0.0; \
   }
 
 /*! \def _ChemistrySetQ_
@@ -48,7 +53,8 @@
     double n_1D = u[2]; \
     double n_1Dg = u[3]; \
     double n_1Sg = u[4]; \
-    double n_hnu = u[5]; \
+    double n_CO2 = u[5]; \
+    double n_hnu = u[6]; \
     \
     double k0a = chem->k0a_norm; \
     double k0b = chem->k0b_norm; \
@@ -56,6 +62,9 @@
     double k1b = chem->k1b_norm; \
     double k2a = chem->k2a_norm; \
     double k2b = chem->k2b_norm; \
+    double k3a = chem->k3a_norm; \
+    double k3b = chem->k3b_norm; \
+    double k4  = chem->k4_norm; \
     \
     double q0a = chem->q0a_norm; \
     double q0b = chem->q0b_norm; \
@@ -63,10 +72,15 @@
     double q1b = chem->q1b_norm; \
     double q2a = chem->q2a_norm; \
     double q2b = chem->q2b_norm; \
+    double q3a = chem->q3a_norm; \
+    double q3b = chem->q3b_norm; \
+    double q4  = chem->q4_norm; \
     \
     Q =   (q0a*k0a +q0b*k0b) * n_hnu * n_O3 \
         + (q1a*k1a +q1b*k1b) * n_O2 * n_1D \
-        + (q2a*k2a +q2b*k2b) * n_O3 * n_1D; \
+        + (q2a*k2a +q2b*k2b) * n_O3 * n_1D \
+        + (q3a*k3a +q3b*k3b) * n_O3 * n_1Sg \
+        + q4*k4 * n_1D * n_CO2; \
   }
 
 /*! \def Chemistry
@@ -104,6 +118,7 @@ typedef struct chemistry_parameters {
   double M_O2; /*!< O2 molar mass in kg */
   double n_O2; /*!< initial O2 concentration in m^{-3} */
   double n_O3; /*!< initial O3 concentration in m^{-3} */
+  double n_CO2; /*!< initial CO2 concentration in m^{-3} */
   double rho_O2; /*!< O2 density */
   double cs; /*!< speed of sound */
 
@@ -130,12 +145,18 @@ typedef struct chemistry_parameters {
   double k1b; /*!< reaction rate */
   double k2a; /*!< reaction rate */
   double k2b; /*!< reaction rate */
+  double k3a; /*!< reaction rate */
+  double k3b; /*!< reaction rate */
+  double k4;  /*!< reaction rate */
   double k0a_norm; /*!< normalized reaction rate */
   double k0b_norm; /*!< normalized reaction rate */
   double k1a_norm; /*!< normalized reaction rate */
   double k1b_norm; /*!< normalized reaction rate */
   double k2a_norm; /*!< normalized reaction rate */
   double k2b_norm; /*!< normalized reaction rate */
+  double k3a_norm; /*!< normalized reaction rate */
+  double k3b_norm; /*!< normalized reaction rate */
+  double k4_norm;  /*!< normalized reaction rate */
 
   // heating rates
   double q0a_norm; /*!< normalized heating rate */
@@ -144,6 +165,9 @@ typedef struct chemistry_parameters {
   double q1b_norm; /*!< normalized heating rate */
   double q2a_norm; /*!< normalized heating rate */
   double q2b_norm; /*!< normalized heating rate */
+  double q3a_norm; /*!< normalized heating rate */
+  double q3b_norm; /*!< normalized heating rate */
+  double q4_norm;  /*!< normalized heating rate */
 
   // beam parameters
   double F0; /*!< Fluence [J/m^2] */
@@ -158,6 +182,7 @@ typedef struct chemistry_parameters {
   double* nv_1D; /*!< number density of O(1D) */
   double* nv_1Dg; /*!< number density of O(1-Delta_g) */
   double* nv_1Sg; /*!< number density of O(1-Sigma_g ) */
+  double* nv_CO2; /*!< number density of CO2 */
   double* nv_hnu; /*!< number density of h-nu (photons) */
 
   double* Qv; /*!< heating source term for Euler/NS equations */
