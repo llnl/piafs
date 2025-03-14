@@ -17,13 +17,14 @@
 */
 #define _ChemistrySetRHS_(f, u, chem) \
   { \
-    double n_O2 = u[0]; \
-    double n_O3 = u[1]; \
-    double n_1D = u[2]; \
+    double n_O2  = u[0]; \
+    double n_O3  = u[1]; \
+    double n_1D  = u[2]; \
     double n_1Dg = u[3]; \
-    double n_1Sg = u[4]; \
-    double n_CO2 = u[5]; \
-    double n_hnu = u[6]; \
+    double n_3Su = u[4]; \
+    double n_1Sg = u[5]; \
+    double n_CO2 = u[6]; \
+    double n_hnu = u[7]; \
     \
     double k0a = chem->k0a_norm; \
     double k0b = chem->k0b_norm; \
@@ -34,12 +35,31 @@
     double k3a = chem->k3a_norm; \
     double k3b = chem->k3b_norm; \
     double k4  = chem->k4_norm; \
+    double k5  = chem->k5_norm; \
+    double k6  = chem->k6_norm; \
     \
-    /* O3  */ f[0] = -(k0a+k0b)*n_hnu*n_O3 - (k2a+k2b)*n_O3*n_1D - (k3a+k3b)*n_O3*n_1Sg; \
-    /* 1D  */ f[1] = k0a*n_hnu*n_O3 - (k1a+k1b)*n_1D*n_O2 - (k2a+k2b)*n_1D*n_O3 - k4*n_1D*n_CO2; \
-    /* 1Dg */ f[2] = k0a*n_hnu*n_O3 + k1b*n_1D*n_O2; \
-    /* 1Sg */ f[3] = k1a*n_1D*n_O2 - (k3a+k3b)*n_O3*n_1Sg; \
-    /* CO2 */ f[4] = 0.0; \
+    /* O3  */ f[0] = - (k0a+k0b) * n_hnu * n_O3  \
+                     - (k2a+k2b) * n_O3  * n_1D  \
+                     - (k3a+k3b) * n_O3  * n_1Sg \
+                     - k5        * n_O3  * n_3Su \
+                     - k6        * n_1Dg * n_O3; \
+    \
+    /* 1D  */ f[1] =   k0a       * n_hnu * n_O3   \
+                     - (k1a+k1b) * n_1D  * n_O2   \
+                     - (k2a+k2b) * n_1D  * n_O3   \
+                     - k4        * n_1D  * n_CO2; \
+    \
+    /* 1Dg */ f[2] =    k0a * n_hnu * n_O3  \
+                      + k5  * n_O3  * n_3Su \
+                      - k6  * n_1Dg * n_O3; \
+    \
+    /* 3Su */ f[3] =    k2a * n_O3 * n_1D   \
+                      - k5  * n_O3 * n_3Su; \
+    \
+    /* 1Sg */ f[4] =    k1a       * n_1D * n_O2 \
+                      - (k3a+k3b) * n_O3 * n_1Sg; \
+    \
+    /* CO2 */ f[5] = 0.0; \
   }
 
 /*! \def _ChemistrySetQ_
@@ -48,13 +68,14 @@
 */
 #define _ChemistrySetQ_(Q, u, chem) \
   { \
-    double n_O2 = u[0]; \
-    double n_O3 = u[1]; \
-    double n_1D = u[2]; \
+    double n_O2  = u[0]; \
+    double n_O3  = u[1]; \
+    double n_1D  = u[2]; \
     double n_1Dg = u[3]; \
-    double n_1Sg = u[4]; \
-    double n_CO2 = u[5]; \
-    double n_hnu = u[6]; \
+    double n_3Su = u[4]; \
+    double n_1Sg = u[5]; \
+    double n_CO2 = u[6]; \
+    double n_hnu = u[7]; \
     \
     double k0a = chem->k0a_norm; \
     double k0b = chem->k0b_norm; \
@@ -65,6 +86,8 @@
     double k3a = chem->k3a_norm; \
     double k3b = chem->k3b_norm; \
     double k4  = chem->k4_norm; \
+    double k5  = chem->k5_norm; \
+    double k6  = chem->k6_norm; \
     \
     double q0a = chem->q0a_norm; \
     double q0b = chem->q0b_norm; \
@@ -75,12 +98,16 @@
     double q3a = chem->q3a_norm; \
     double q3b = chem->q3b_norm; \
     double q4  = chem->q4_norm; \
+    double q5  = chem->q5_norm; \
+    double q6  = chem->q6_norm; \
     \
-    Q =   (q0a*k0a +q0b*k0b) * n_hnu * n_O3 \
-        + (q1a*k1a +q1b*k1b) * n_O2 * n_1D \
-        + (q2a*k2a +q2b*k2b) * n_O3 * n_1D \
-        + (q3a*k3a +q3b*k3b) * n_O3 * n_1Sg \
-        + q4*k4 * n_1D * n_CO2; \
+    Q =   (q0a*k0a +q0b*k0b) * n_hnu * n_O3  \
+        + (q1a*k1a +q1b*k1b) * n_O2  * n_1D  \
+        + (q2a*k2a +q2b*k2b) * n_O3  * n_1D  \
+        + (q3a*k3a +q3b*k3b) * n_O3  * n_1Sg \
+        + q4*k4              * n_1D  * n_CO2 \
+        + q5*k5              * n_O3  * n_3Su \
+        + q6*k6              * n_1Dg * n_O3; \
   }
 
 /*! \def Chemistry
@@ -148,6 +175,8 @@ typedef struct chemistry_parameters {
   double k3a; /*!< reaction rate */
   double k3b; /*!< reaction rate */
   double k4;  /*!< reaction rate */
+  double k5;  /*!< reaction rate */
+  double k6;  /*!< reaction rate */
   double k0a_norm; /*!< normalized reaction rate */
   double k0b_norm; /*!< normalized reaction rate */
   double k1a_norm; /*!< normalized reaction rate */
@@ -157,6 +186,8 @@ typedef struct chemistry_parameters {
   double k3a_norm; /*!< normalized reaction rate */
   double k3b_norm; /*!< normalized reaction rate */
   double k4_norm;  /*!< normalized reaction rate */
+  double k5_norm;  /*!< normalized reaction rate */
+  double k6_norm;  /*!< normalized reaction rate */
 
   // heating rates
   double q0a_norm; /*!< normalized heating rate */
@@ -168,6 +199,8 @@ typedef struct chemistry_parameters {
   double q3a_norm; /*!< normalized heating rate */
   double q3b_norm; /*!< normalized heating rate */
   double q4_norm;  /*!< normalized heating rate */
+  double q5_norm;  /*!< normalized heating rate */
+  double q6_norm;  /*!< normalized heating rate */
 
   // beam parameters
   double F0; /*!< Fluence [J/m^2] */
@@ -181,6 +214,7 @@ typedef struct chemistry_parameters {
   double* nv_O3old; /*!< number density of O3 (previous timestep) */
   double* nv_1D; /*!< number density of O(1D) */
   double* nv_1Dg; /*!< number density of O(1-Delta_g) */
+  double* nv_3Su; /*!< number density of O(3-Sigma_u ) */
   double* nv_1Sg; /*!< number density of O(1-Sigma_g ) */
   double* nv_CO2; /*!< number density of CO2 */
   double* nv_hnu; /*!< number density of h-nu (photons) */
