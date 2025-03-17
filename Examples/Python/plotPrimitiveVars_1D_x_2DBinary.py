@@ -113,6 +113,7 @@ if solver_inp_data['op_overwrite'] == 'no':
       uvel = cons_sol[1,:,:,:] / cons_sol[0,:,:,:]
       vvel = cons_sol[2,:,:,:] / cons_sol[0,:,:,:]
       pressure = 0.4 * (cons_sol[3,:,:,:] - 0.5*(cons_sol[1,:,:,:]*cons_sol[1,:,:,:]+cons_sol[2,:,:,:]*cons_sol[2,:,:,:])/cons_sol[0,:,:,:])
+      temperature = 1.4 * pressure / rho
 
       fig = plt.figure(figsize=figsize)
       ax = plt.axes()
@@ -132,6 +133,17 @@ if solver_inp_data['op_overwrite'] == 'no':
       ax.set_title('pressure, t={:.3}'.format(i*dt_snapshots))
       plt.grid(visible=True, linestyle=':', linewidth=1)
       plt_fname = plt_dir_name+'/fig_pressure'+'_'+f'{i:05d}'+'.png'
+      print('Saving %s' % plt_fname)
+      plt.savefig(plt_fname)
+      plt.close()
+
+      fig = plt.figure(figsize=figsize)
+      ax = plt.axes()
+      ax.set( xlim=(np.min(x), np.max(x)),ylim=(np.min(temperature),np.max(temperature) ) )
+      ax.plot(x, temperature[:,j0,i], lw=2)
+      ax.set_title('temperature, t={:.3}'.format(i*dt_snapshots))
+      plt.grid(visible=True, linestyle=':', linewidth=1)
+      plt_fname = plt_dir_name+'/fig_temperature'+'_'+f'{i:05d}'+'.png'
       print('Saving %s' % plt_fname)
       plt.savefig(plt_fname)
       plt.close()
@@ -178,6 +190,7 @@ else:
     uvel = cons_sol[1,:,:] / cons_sol[0,:,:]
     vvel = cons_sol[2,:,:] / cons_sol[0,:,:]
     pressure = 0.4 * (cons_sol[3,:,:] - 0.5*(cons_sol[1,:,:]*cons_sol[1,:,:]+cons_sol[2,:,:]*cons_sol[2,:,:])/cons_sol[0,:,:])
+    temperature = 1.4 * pressure / rho
 
     fig = plt.figure(figsize=figsize)
     ax = plt.axes()
@@ -190,7 +203,6 @@ else:
     plt.savefig(plt_fname)
     plt.close()
 
-
     fig = plt.figure(figsize=figsize)
     ax = plt.axes()
     ax.set( xlim=(np.min(x), np.max(x)),ylim=(np.min(pressure),np.max(pressure) ) )
@@ -198,6 +210,18 @@ else:
     ax.set_title('pressure, t={:.3}'.format(t_final))
     plt.grid(visible=True, linestyle=':', linewidth=1)
     plt_fname = plt_dir_name+'/fig_pressure.png'
+    print('Saving %s' % plt_fname)
+    plt.savefig(plt_fname)
+    plt.close()
+
+
+    fig = plt.figure(figsize=figsize)
+    ax = plt.axes()
+    ax.set( xlim=(np.min(x), np.max(x)),ylim=(np.min(temperature),np.max(temperature) ) )
+    ax.plot(x, temperature[:,j0], lw=2)
+    ax.set_title('temperature, t={:.3}'.format(t_final))
+    plt.grid(visible=True, linestyle=':', linewidth=1)
+    plt_fname = plt_dir_name+'/fig_temperature.png'
     print('Saving %s' % plt_fname)
     plt.savefig(plt_fname)
     plt.close()

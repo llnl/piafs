@@ -94,6 +94,11 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->k1b = 0.2 * 3.95e-17; // s^{-1}
   chem->k2a = 1.2e-16; // s^{-1}
   chem->k2b = 1.2e-16; // s^{-1}
+  chem->k3a = 1.2e-17; // s^{-1}
+  chem->k3b = 1.0e-17; // s^{-1}
+  chem->k4  = 1.1e-16; // s^{-1}
+  chem->k5  = 2.0e-16; // s^{-1}
+  chem->k6  = 0.2*3.0e-17; // s^{-1}
 
   chem->F0 = 2000; // J m^{-2}
   chem->sO3 = 1.1e-21; // m^2
@@ -151,6 +156,9 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
           } else if (!strcmp(word,"k2a")) {
             ferr = fscanf(in,"%lf",&chem->k2a);
             if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k3a")) {
+            ferr = fscanf(in,"%lf",&chem->k3a);
+            if (ferr != 1) return(1);
           } else if (!strcmp(word,"k0b")) {
             ferr = fscanf(in,"%lf",&chem->k0b);
             if (ferr != 1) return(1);
@@ -159,6 +167,18 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
             if (ferr != 1) return(1);
           } else if (!strcmp(word,"k2b")) {
             ferr = fscanf(in,"%lf",&chem->k2b);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k3b")) {
+            ferr = fscanf(in,"%lf",&chem->k3b);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k4")) {
+            ferr = fscanf(in,"%lf",&chem->k4);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k5")) {
+            ferr = fscanf(in,"%lf",&chem->k5);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"k6")) {
+            ferr = fscanf(in,"%lf",&chem->k6);
             if (ferr != 1) return(1);
           } else if (!strcmp(word,"F0")) {
             ferr = fscanf(in,"%lf",&chem->F0);
@@ -198,9 +218,14 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   IERR MPIBroadcast_double    (&chem->k0a      ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->k1a      ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->k2a      ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k3a      ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->k0b      ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->k1b      ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->k2b      ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k3b      ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k4       ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k5       ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->k6       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->F0       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->sO3      ,1,0,&mpi->world);                  CHECKERR(ierr);
 
@@ -210,9 +235,10 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   /* compute some basic quantities */
   chem->kUV = 2 * chem->pi / chem->lambda_UV;
   chem->kg = 2 * chem->kUV * sin(chem->theta);
-  chem->f_O2 = 1.0 - chem->f_CO2;
+  chem->f_O2 = 1.0 - chem->f_CO2 - chem->f_O3;
   chem->n_O2 = chem->f_O2 * chem->Ptot / (chem->kB * chem->Ti);
   chem->n_O3 = chem->f_O3 * chem->Ptot / (chem->kB * chem->Ti);
+  chem->n_CO2 = chem->f_CO2 * chem->Ptot / (chem->kB * chem->Ti);
   chem->rho_O2 = chem->n_O2 * chem->M_O2 / chem->NA;
   chem->cs = sqrt(gamma*chem->R*chem->Ti);
 
@@ -229,9 +255,14 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->k0a_norm = chem->k0a / rate_norm_fac;
   chem->k1a_norm = chem->k1a / rate_norm_fac;
   chem->k2a_norm = chem->k2a / rate_norm_fac;
+  chem->k3a_norm = chem->k3a / rate_norm_fac;
   chem->k0b_norm = chem->k0b / rate_norm_fac;
   chem->k1b_norm = chem->k1b / rate_norm_fac;
   chem->k2b_norm = chem->k2b / rate_norm_fac;
+  chem->k3b_norm = chem->k3b / rate_norm_fac;
+  chem->k4_norm  = chem->k4  / rate_norm_fac;
+  chem->k5_norm  = chem->k5  / rate_norm_fac;
+  chem->k6_norm  = chem->k6  / rate_norm_fac;
   chem->I0 = chem->F0/chem->t_pulse;
   chem->nu = chem->c / chem->lambda_UV;
 
@@ -245,6 +276,13 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
 
   chem->q2a_norm = 4.3  * chem->e/Ei;
   chem->q2b_norm = 0.81 * chem->e/Ei;
+
+  chem->q3a_norm = 0.42 * chem->e/Ei;
+  chem->q3b_norm = 1.16 * chem->e/Ei;
+
+  chem->q4_norm  = 1.23 * chem->e/Ei;
+  chem->q5_norm  = 1.81 * chem->e/Ei;
+  chem->q6_norm  = 0.42 * chem->e/Ei;
 
   chem->dz = chem->Lz / chem->nz;
   chem->z_i = (int)(ceil(chem->z_mm*0.001 * chem->nz / chem->Lz));
@@ -266,6 +304,7 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
     printf("    CO2 fraction: %1.4e\n", chem->f_CO2);
     printf("    O2 fraction: %1.4e\n", chem->f_O2);
     printf("    O3 fraction: %1.4e\n", chem->f_O3);
+    printf("    CO2 fraction: %1.4e\n", chem->f_CO2);
     printf("    Pressure: %1.4e [Pa]\n", chem->Ptot);
     printf("    Temperature: %1.4e [K]\n", chem->Ti);
     printf("    O2 number density: %1.4e [m^{-3}]\n", chem->n_O2);
@@ -282,12 +321,17 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
     printf("    tau_ac (acoustic time period): %1.4e (s)\n", (2*chem->pi/chem->kg)/chem->cs );
     printf("      normalized tau_ac: %1.4e (s)\n", ((2*chem->pi/chem->kg)/chem->cs)/chem->t_ref );
     printf("    Reaction rates:\n");
-    printf("        k0a = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k0a, chem->k0a_norm);
-    printf("        k0b = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k0b, chem->k0b_norm);
-    printf("        k1a = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k1a, chem->k1a_norm);
-    printf("        k1b = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k1b, chem->k1b_norm);
-    printf("        k2a = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k2a, chem->k2a_norm);
-    printf("        k2b = %1.4e (s^{-1}), %1.4e (normalized)\n", chem->k2b, chem->k2b_norm);
+    printf("        k0a = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k0a, chem->k0a_norm);
+    printf("        k0b = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k0b, chem->k0b_norm);
+    printf("        k1a = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k1a, chem->k1a_norm);
+    printf("        k1b = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k1b, chem->k1b_norm);
+    printf("        k2a = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k2a, chem->k2a_norm);
+    printf("        k2b = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k2b, chem->k2b_norm);
+    printf("        k3a = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k3a, chem->k3a_norm);
+    printf("        k3b = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k3b, chem->k3b_norm);
+    printf("        k4  = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k4 , chem->k4_norm );
+    printf("        k5  = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k5 , chem->k5_norm );
+    printf("        k6  = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k6 , chem->k6_norm );
     printf("    F0: %1.4e [J m^{-2}]\n", chem->F0);
     printf("    I0: %1.4e [J m^{-2} s^{-1}]\n", chem->I0);
     printf("    nu: %1.4e [s^{-1}]\n", chem->nu);
@@ -302,13 +346,15 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   }
 
   int nz = chem->z_i + 1;
-  chem->nspecies = 6;
+  chem->nspecies = 8;
   chem->nv_O2    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_O3    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_O3old = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_1D    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_1Dg   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
+  chem->nv_3Su   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_1Sg   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
+  chem->nv_CO2   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_hnu   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->Qv       = (double*) calloc (solver->npoints_local_wghosts   , sizeof(double));
 
@@ -318,7 +364,9 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   _ArraySetValue_ (chem->nv_O3,  solver->npoints_local_wghosts*nz, chem->n_O3 / chem->n_O2);
   _ArraySetValue_ (chem->nv_1D,  solver->npoints_local_wghosts*nz, 0.0);
   _ArraySetValue_ (chem->nv_1Dg, solver->npoints_local_wghosts*nz, 0.0);
+  _ArraySetValue_ (chem->nv_3Su, solver->npoints_local_wghosts*nz, 0.0);
   _ArraySetValue_ (chem->nv_1Sg, solver->npoints_local_wghosts*nz, 0.0);
+  _ArraySetValue_ (chem->nv_CO2, solver->npoints_local_wghosts*nz, chem->n_CO2 / chem->n_O2);
   _ArraySetValue_ (chem->nv_hnu, solver->npoints_local_wghosts*nz, 0.0);
 
   _ArrayCopy1D_   (chem->nv_O3, chem->nv_O3old, solver->npoints_local_wghosts*nz);

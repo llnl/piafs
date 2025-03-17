@@ -95,8 +95,10 @@ int ChemistrySolve(  void*   s,    /*!< Solver object of type #HyPar */
       uchem[1] = params->nv_O3[nz*p+iz];
       uchem[2] = params->nv_1D[nz*p+iz];
       uchem[3] = params->nv_1Dg[nz*p+iz];
-      uchem[4] = params->nv_1Sg[nz*p+iz];
-      uchem[5] = params->nv_hnu[nz*p+iz];
+      uchem[4] = params->nv_3Su[nz*p+iz];
+      uchem[5] = params->nv_1Sg[nz*p+iz];
+      uchem[6] = params->nv_CO2[nz*p+iz];
+      uchem[7] = params->nv_hnu[nz*p+iz];
 
       params->nv_O3old[nz*p+iz] = params->nv_O3[nz*p+iz];
 
@@ -136,7 +138,9 @@ int ChemistrySolve(  void*   s,    /*!< Solver object of type #HyPar */
         params->nv_O3[nz*p+iz]  += a_dt*(f1[0]+2.0*f2[0]+2.0*f3[0]+f4[0])/6.0;
         params->nv_1D[nz*p+iz]  += a_dt*(f1[1]+2.0*f2[1]+2.0*f3[1]+f4[1])/6.0;
         params->nv_1Dg[nz*p+iz] += a_dt*(f1[2]+2.0*f2[2]+2.0*f3[2]+f4[2])/6.0;
-        params->nv_1Sg[nz*p+iz] += a_dt*(f1[3]+2.0*f2[3]+2.0*f3[3]+f4[3])/6.0;
+        params->nv_3Su[nz*p+iz] += a_dt*(f1[3]+2.0*f2[3]+2.0*f3[3]+f4[3])/6.0;
+        params->nv_1Sg[nz*p+iz] += a_dt*(f1[4]+2.0*f2[4]+2.0*f3[4]+f4[4])/6.0;
+        params->nv_CO2[nz*p+iz] += a_dt*(f1[5]+2.0*f2[5]+2.0*f3[5]+f4[5])/6.0;
 
       } else {
 
@@ -147,7 +151,9 @@ int ChemistrySolve(  void*   s,    /*!< Solver object of type #HyPar */
         params->nv_O3[nz*p+iz]  += a_dt * fchem[0];
         params->nv_1D[nz*p+iz]  += a_dt * fchem[1];
         params->nv_1Dg[nz*p+iz] += a_dt * fchem[2];
-        params->nv_1Sg[nz*p+iz] += a_dt * fchem[3];
+        params->nv_3Su[nz*p+iz] += a_dt * fchem[3];
+        params->nv_1Sg[nz*p+iz] += a_dt * fchem[4];
+        params->nv_CO2[nz*p+iz] += a_dt * fchem[5];
 
       }
 

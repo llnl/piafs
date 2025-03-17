@@ -1,11 +1,25 @@
-PIAFS2D - Compressible Euler/Navier-Stokes Solver
-------------------------------------------------------------------
+<div align="center">
+<img src="piafs.jpg" alt="PIAFS Logo">
+
+<p>
+PIAFS2D: Photochemically Induced Acousto-optics Fluid Simulations
+</p>
+
+[Overview](#Overview) -
+[Code](#Getting the Code) -
+[Documentation](#Documentation) -
+[Compiling](#Compiling) -
+[Running](#Running) -
+[Plotting](#Plotting) -
+
+</div>
+
+## Overview
 
 `PIAFS2D` is a finite-difference code to solve the compressible Euler/Navier-Stokes
-equations (with source terms) on Cartesian grids. 
+equations with chemical heating on Cartesian grids. 
 
-Getting the code
-----------------
+## Getting the Code
 
 (With SSH keys)
 ```
@@ -17,14 +31,11 @@ git clone ssh://git@czgitlab.llnl.gov:7999/piafs/piafs2d.git
 https://lc.llnl.gov/gitlab/piafs/piafs2d.git
 ```
 
-Documentation
--------------
+## Documentation
 
 Running `doxygen Doxyfile` will generate the documentation.
 
-
-Compiling
----------
+## Compiling
 
 After downloading or cloning the code, do the following:
 
@@ -48,9 +59,7 @@ Note:
 + The `-j <n>` is an optional argument that will use <n> threads for compiling the code.
   For example, `make -j 4`.
 
-
-Running
--------
+## Running
 
 Create a copy of an example from `Examples` directory in a new location (outside the PIAFS2D 
 directory), then follow these steps:
@@ -71,8 +80,7 @@ depending on the whether the file is `.c` or `.C`.
 + Run /path/to/piafs2d/bin/PIAFS2D either in serial or in parallel using `mpiexec` or `srun`.
 
 
-Plotting
---------
+## Plotting
 
 + If `op_file_format` is set to `binary` in `solver.inp`, the solution is written as a binary file.
   The Python scripts `Examples/Python/plotSolution*.py` can be used to generate plots. 

@@ -66,7 +66,7 @@ if solver_inp_data['op_file_format'] != 'binary':
 ndims = int(solver_inp_data['ndims'][0])
 size = np.int32(solver_inp_data['size'])
 
-nspecies = 6
+nspecies = 7
 
 if not os.path.exists(plt_dir_name):
       os.makedirs(plt_dir_name)

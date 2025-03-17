@@ -19,6 +19,9 @@ AC_ARG_ENABLE([omp],AS_HELP_STRING([--enable-omp],[Enable OpenMP threads]))
 AC_PROG_CC
 AC_PROG_CXX
 
+CFLAGS="$CFLAGS -Wno-alloc-size-larger-than"
+CXXFLAGS="$CXXFLAGS -Wno-alloc-size-larger-than"
+
 CFLAGS="$CFLAGS -I$includedir"
 if test "$GCC" = "yes" ; then
   CFLAGS="$CFLAGS -std=c99"
