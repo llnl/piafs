@@ -48,7 +48,7 @@ void ChemistrySetPhotonDensity(void*,void*,void*,double);
     k2a                | double       | #Chemistry::k2a                 | 1.2e-16 s^{-1}
     k2b                | double       | #Chemistry::k2a                 | 1.2e-16 s^{-1}
     F0                 | double       | #Chemistry::F0                  | 2000 J/m^2
-    sO3                | double       | #Chemistry::F0                  | 1.1e-21 m^2
+    sO3                | double       | #Chemistry::sO3                 | 1.1e-21 m^2
     time_scheme        | double       | #Chemistry::ti_scheme           | RK4
 
     \b Note: "chemistry.inp" is \b optional; if absent, default values will be used.
@@ -73,6 +73,7 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->h = 6.62607015e-34; // J s
   chem->e = 1.60217663e-19; // Coulombs
   chem->M_O2 = 0.032; // [kg]; O2 molar mass
+  chem->M_CO2 = 0.044; // [kg]; O2 molar mass
   chem->R = chem->NA*chem->kB/chem->M_O2;
 
   chem->lambda_UV = 2.48e-7; // [m] (248 nm) - pump wavelength
@@ -108,7 +109,7 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   /* reading physical model specific inputs */
   if (!mpi->rank) {
     FILE *in;
-    if (!count) printf("Reading physical model inputs from file \"chemistry.inp\".\n");
+    if (!count) printf("Reading chemical reaction inputs from file \"chemistry.inp\".\n");
     in = fopen("chemistry.inp","r");
     if (!in) printf("Warning: File \"chemistry.inp\" not found. Using default values.\n");
     else {
@@ -249,19 +250,18 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   /* compute some basic quantities */
   chem->kUV = 2 * chem->pi / chem->lambda_UV;
   chem->kg = 2 * chem->kUV * sin(chem->theta);
-  chem->f_O2 = 1.0 - chem->f_CO2 - chem->f_O3;
+  chem->f_O2 = 1.0 - chem->f_CO2;// - chem->f_O3;
   chem->n_O2 = chem->f_O2 * chem->Ptot / (chem->kB * chem->Ti);
   chem->n_O3 = chem->f_O3 * chem->Ptot / (chem->kB * chem->Ti);
   chem->n_CO2 = chem->f_CO2 * chem->Ptot / (chem->kB * chem->Ti);
-  chem->rho_O2 = chem->n_O2 * chem->M_O2 / chem->NA;
   chem->cs = sqrt(gamma*chem->R*chem->Ti);
 
   /* compute reference quantities */
   chem->L_ref = 1.0/chem->kg;
   chem->v_ref = chem->cs;
   chem->t_ref = chem->L_ref / chem->v_ref;
-  chem->rho_ref = chem->rho_O2;
-  chem->P_ref = chem->rho_O2 * chem->v_ref * chem->v_ref;
+  chem->rho_ref = chem->Ptot/(chem->R*chem->Ti);
+  chem->P_ref = chem->rho_ref * chem->v_ref * chem->v_ref;
 
   /* compute some important stuff */
   chem->t_pulse_norm = chem->t_pulse / chem->t_ref;
@@ -309,21 +309,21 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
     printf("    Planck's constant: %1.4e [m]\n", chem->h);
     printf("    Elementary charge: %1.4e [m]\n", chem->e);
     printf("    O2 molar mass: %1.4e [kg]\n", chem->M_O2);
+    printf("    CO2 molar mass: %1.4e [kg]\n", chem->M_CO2);
     printf("    Specific gas constant: %1.4e [m]\n", chem->R);
     printf("Photo-Chemistry:\n");
     printf("    Pump wavelength: %1.4e [m]\n", chem->lambda_UV);
     printf("    Beam half angle: %1.4e [radians]\n", chem->theta);
     printf("    Pump beam wavenumber: %1.4e [m^{-1}]\n", chem->kUV);
     printf("    Grating wavenumber: %1.4e [m^{-1}]\n", chem->kg);
-    printf("    CO2 fraction: %1.4e\n", chem->f_CO2);
     printf("    O2 fraction: %1.4e\n", chem->f_O2);
     printf("    O3 fraction: %1.4e\n", chem->f_O3);
     printf("    CO2 fraction: %1.4e\n", chem->f_CO2);
     printf("    Pressure: %1.4e [Pa]\n", chem->Ptot);
     printf("    Temperature: %1.4e [K]\n", chem->Ti);
-    printf("    O2 number density: %1.4e [m^{-3}]\n", chem->n_O2);
-    printf("    O3 number density: %1.4e [m^{-3}]\n", chem->n_O3);
-    printf("    O2 mass density: %1.4e [kg m^{-3}]\n", chem->rho_O2);
+    printf("    O2 number density:  %1.4e [m^{-3}]\n", chem->n_O2);
+    printf("    O3 number density:  %1.4e [m^{-3}]\n", chem->n_O3);
+    printf("    CO2 number density: %1.4e [m^{-3}]\n", chem->n_CO2);
     printf("    Sound speed: %1.4e [kg m^{-3}]\n", chem->cs);
     printf("    Pulse duration: %1.4e (s), %1.4e (normalized)\n",
                 chem->t_pulse, chem->t_pulse_norm );
