@@ -250,7 +250,7 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   /* compute some basic quantities */
   chem->kUV = 2 * chem->pi / chem->lambda_UV;
   chem->kg = 2 * chem->kUV * sin(chem->theta);
-  chem->f_O2 = 1.0 - chem->f_CO2;// - chem->f_O3;
+  chem->f_O2 = 1.0 - chem->f_CO2 - chem->f_O3;
   chem->n_O2 = chem->f_O2 * chem->Ptot / (chem->kB * chem->Ti);
   chem->n_O3 = chem->f_O3 * chem->Ptot / (chem->kB * chem->Ti);
   chem->n_CO2 = chem->f_CO2 * chem->Ptot / (chem->kB * chem->Ti);
