@@ -232,6 +232,20 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   IERR MPIBroadcast_character (chem->ti_scheme,_MAX_STRING_SIZE_,0,&mpi->world);  CHECKERR(ierr);
 #endif
 
+  /* sanity checks */
+  if ((chem->f_CO2 > 1.0) || (chem->f_CO2 < 0.0)) {
+    fprintf(stderr,"ERROR in ChemistryInitialize(): f_CO2 is not between 0.0 and 1.0 !!!\n");
+    return 1;
+  }
+  if ((chem->f_O3 > 1.0) || (chem->f_O3 < 0.0)) {
+    fprintf(stderr,"ERROR in ChemistryInitialize(): f_O3 is not between 0.0 and 1.0 !!!\n");
+    return 1;
+  }
+  if ((chem->f_CO2 + chem->f_O3) > 1.0) {
+    fprintf(stderr,"ERROR in ChemistryInitialize(): f_CO2 + f_O3 > 1.0 !!!\n");
+    return 1;
+  }
+
   /* compute some basic quantities */
   chem->kUV = 2 * chem->pi / chem->lambda_UV;
   chem->kg = 2 * chem->kUV * sin(chem->theta);
