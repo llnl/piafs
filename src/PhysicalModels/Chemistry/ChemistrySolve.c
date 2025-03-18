@@ -173,8 +173,10 @@ int ChemistrySolve(  void*   s,    /*!< Solver object of type #HyPar */
     uchem[1] = params->nv_O3[nz*p+params->z_i];
     uchem[2] = params->nv_1D[nz*p+params->z_i];
     uchem[3] = params->nv_1Dg[nz*p+params->z_i];
-    uchem[4] = params->nv_1Sg[nz*p+params->z_i];
-    uchem[5] = params->nv_hnu[nz*p+params->z_i];
+    uchem[4] = params->nv_3Su[nz*p+params->z_i];
+    uchem[5] = params->nv_1Sg[nz*p+params->z_i];
+    uchem[6] = params->nv_CO2[nz*p+params->z_i];
+    uchem[7] = params->nv_hnu[nz*p+params->z_i];
 
     _ChemistrySetQ_(params->Qv[p], uchem, params);
 
