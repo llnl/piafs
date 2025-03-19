@@ -61,9 +61,10 @@ int ChemistryWriteSpecies(  void*   s,    /*!< Solver object of type #HyPar */
       species_arr[nspecies*p+1] = params->nv_O3[nz*p+iz];
       species_arr[nspecies*p+2] = params->nv_1D[nz*p+iz];
       species_arr[nspecies*p+3] = params->nv_1Dg[nz*p+iz];
-      species_arr[nspecies*p+4] = params->nv_1Sg[nz*p+iz];
-      species_arr[nspecies*p+5] = params->nv_CO2[nz*p+iz];
-      species_arr[nspecies*p+6] = params->nv_hnu[nz*p+iz];
+      species_arr[nspecies*p+4] = params->nv_3Su[nz*p+iz];
+      species_arr[nspecies*p+5] = params->nv_1Sg[nz*p+iz];
+      species_arr[nspecies*p+6] = params->nv_CO2[nz*p+iz];
+      species_arr[nspecies*p+7] = params->nv_hnu[nz*p+iz];
       _ArrayIncrementIndex_(solver->ndims,bounds,index,done);
     }
 

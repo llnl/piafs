@@ -143,10 +143,10 @@ typedef struct chemistry_parameters {
   double Ptot; /*!< total gas pressure in Pascals */
   double Ti; /*!< initial temperature in Kelvin */
   double M_O2; /*!< O2 molar mass in kg */
+  double M_CO2; /*!< CO2 molar mass in kg */
   double n_O2; /*!< initial O2 concentration in m^{-3} */
   double n_O3; /*!< initial O3 concentration in m^{-3} */
   double n_CO2; /*!< initial CO2 concentration in m^{-3} */
-  double rho_O2; /*!< O2 density */
   double cs; /*!< speed of sound */
 
   // reference quantities for normalization
