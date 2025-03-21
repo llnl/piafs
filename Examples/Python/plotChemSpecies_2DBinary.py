@@ -67,7 +67,7 @@ ndims = int(solver_inp_data['ndims'][0])
 nvars = int(solver_inp_data['nvars'][0])
 size = np.int32(solver_inp_data['size'])
 
-nspecies = 7
+nspecies = 8
 
 if not os.path.exists(plt_dir_name):
       os.makedirs(plt_dir_name)

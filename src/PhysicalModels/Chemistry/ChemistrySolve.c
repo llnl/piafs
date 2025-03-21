@@ -40,7 +40,9 @@ int ChemistrySetPhotonDensity( void*   s,    /*!< Solver object of type #HyPar *
       double x;
       _GetCoordinate_(0,index[0],dim,ghosts,solver->x,x);
 
-      double I0 = params->I0 * (1.0 + cos((x-x0)*params->L_ref*params->kg));
+      double I0 = params->I0 * ( params->IA
+                                 + params->IB * cos(   params->kg * params->L_ref
+                                                     * (x-x0) * (1.0 - params->IC*(x-x0)) ));
       double c = params->c;
       double h = params->h;
       double nu = params->nu;

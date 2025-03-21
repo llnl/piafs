@@ -104,6 +104,10 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->F0 = 2000; // J m^{-2}
   chem->sO3 = 1.1e-21; // m^2
 
+  chem->IA = 1.0;
+  chem->IB = 1.0;
+  chem->IC = 0.0;
+
   strcpy(chem->ti_scheme, "RK4");
 
   /* reading physical model specific inputs */
@@ -187,6 +191,15 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
           } else if (!strcmp(word,"sO3")) {
             ferr = fscanf(in,"%lf",&chem->sO3);
             if (ferr != 1) return(1);
+          } else if (!strcmp(word,"IA")) {
+            ferr = fscanf(in,"%lf",&chem->IA);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"IB")) {
+            ferr = fscanf(in,"%lf",&chem->IB);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"IC")) {
+            ferr = fscanf(in,"%lf",&chem->IC);
+            if (ferr != 1) return(1);
           } else if (!strcmp(word,"time_scheme")) {
             ferr = fscanf(in,"%s",chem->ti_scheme);
             if (ferr != 1) return(1);
@@ -229,6 +242,9 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   IERR MPIBroadcast_double    (&chem->k6       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->F0       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->sO3      ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->IA       ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->IB       ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->IC       ,1,0,&mpi->world);                  CHECKERR(ierr);
 
   IERR MPIBroadcast_character (chem->ti_scheme,_MAX_STRING_SIZE_,0,&mpi->world);  CHECKERR(ierr);
 #endif
@@ -348,6 +364,8 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
     printf("        k6  = %1.4e (m^3 s^{-1}), %1.4e (normalized)\n", chem->k6 , chem->k6_norm );
     printf("    F0: %1.4e [J m^{-2}]\n", chem->F0);
     printf("    I0: %1.4e [J m^{-2} s^{-1}]\n", chem->I0);
+    printf("    Intensity function parameters: %1.4e, %1.4e, %1.4e\n", chem->IA, chem->IB, chem->IC);
+    printf("        IO * (IA + IB * cos( kg * x * (1-IC*x) ) )\n");
     printf("    nu: %1.4e [s^{-1}]\n", chem->nu);
     printf("    Reaction ODE solver: %s\n", chem->ti_scheme);
     printf("Reference quantities:\n");
