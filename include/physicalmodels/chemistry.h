@@ -205,6 +205,9 @@ typedef struct chemistry_parameters {
   // beam parameters
   double F0; /*!< Fluence [J/m^2] */
   double I0; /*!< intensity */
+  double IA; /*!< intensity function parameter */
+  double IB; /*!< intensity function parameter */
+  double IC; /*!< intensity function parameter */
   double nu; /*!< */
   double sO3; /*!< Ozone absorbtion cross-section [m^2] */
 
