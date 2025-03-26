@@ -123,13 +123,27 @@
 typedef struct chemistry_parameters {
 
   // Some constants
-  double pi; /*!< Pi */
-  double NA; /*!< Avogadro's number */
-  double kB; /*!< Boltzman's constant */
-  double c; /*!< speed of light */
-  double h; /*!< Planck's constant */
-  double e; /*!< elementary charge */
-  double R; /*!< specific gas constant */
+  double pi;      /*!< Pi */
+  double NA;      /*!< Avogadro's number */
+  double kB;      /*!< Boltzman's constant */
+  double c;       /*!< speed of light */
+  double h;       /*!< Planck's constant */
+  double e;       /*!< elementary charge */
+  double Cp_O2;   /*!< Heat capacity for O2 */
+  double Cv_O2;   /*!< Heat capacity for O2 */
+  double Cp_CO2;  /*!< Heat capacity for CO2 */
+  double Cv_CO2;  /*!< Heat capacity for CO2 */
+  double Cp;      /*!< Heat capacity */
+  double Cv;      /*!< Heat capacity */
+  double R;       /*!< specific gas constant */
+  double gamma;   /*!< specific heat ratio */
+
+  double mu0_O2; // Reference viscosity for O2 @275K
+  double kappa0_O2; // Reference conductivity for CO2 @275K
+  double mu0_CO2; // Reference viscosity for CO2 @275K
+  double kappa0_CO2; // Reference conductivity for CO2 @275K
+  double mu0; // reference viscosity @275K
+  double kappa0; // reference conductivity @275K
 
   // Physical setup;
   double lambda_UV; /*!< pump wavelength in meters */
@@ -229,7 +243,7 @@ typedef struct chemistry_parameters {
 } Chemistry;
 
 /*! Function to initialize the chemistry object */
-int ChemistryInitialize(void*,void*,void*,double);
+int ChemistryInitialize(void*,void*,void*);
 /*! Function to cleanup the chemistry object */
 int ChemistryCleanup(void*);
 /*! Function to write reacting species to file */
