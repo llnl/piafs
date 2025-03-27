@@ -224,6 +224,7 @@ typedef struct chemistry_parameters {
   double IC; /*!< intensity function parameter */
   double nu; /*!< */
   double sO3; /*!< Ozone absorbtion cross-section [m^2] */
+  double* imap; /*!< Array of intensity values read in from file */
 
   int nspecies; /*!< number of reacting species */
   double* nv_O2; /*!< number density of O2 */

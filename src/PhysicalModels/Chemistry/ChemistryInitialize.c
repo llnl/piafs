@@ -8,6 +8,7 @@
 #include <string.h>
 #include <basic.h>
 #include <arrayfunctions.h>
+#include <io.h>
 #include <physicalmodels/chemistry.h>
 #include <mpivars.h>
 #include <hypar.h>
@@ -430,6 +431,39 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   _ArraySetValue_ (chem->nv_hnu, solver->npoints_local_wghosts*nz, 0.0);
 
   _ArrayCopy1D_   (chem->nv_O3, chem->nv_O3old, solver->npoints_local_wghosts*nz);
+
+  /* allocate array to hold the bottom topography field */
+  chem->imap = (double*) calloc (solver->npoints_local_wghosts, sizeof(double));
+  /* read topography from provided file, if available */
+  int read_flag = 0;
+  char fname_root[_MAX_STRING_SIZE_] = "imap";
+  if (!mpi->rank) {
+    printf("ChemistryInitialize(): reading intensity map from file.\n");
+  }
+  ReadArray( solver->ndims, 1, solver->dim_global, solver->dim_local, solver->ghosts,
+             solver, mpi, NULL, chem->imap, fname_root, &read_flag);
+  if (!read_flag) {
+
+    if (!mpi->rank) {
+      printf("ChemistryInitialize(): could not read intensity map from file; setting it as:.\n");
+      printf("ChemistryInitialize():      IA + IB * cos( kg * x * (1-IC*x) )                \n");
+    }
+
+    // get xmin of the domain
+    double x0 = 0.0;
+    _GetCoordinate_(0,0,solver->dim_local,solver->ghosts,solver->x,x0);
+    MPIMin_double(&x0, &x0, 1, &mpi->world);
+
+    int index[solver->ndims];
+    int done = 0; _ArraySetValue_(index,solver->ndims,0);
+    while (!done) {
+      int p; _ArrayIndex1D_(solver->ndims,solver->dim_local,index,solver->ghosts,p);
+      double x; _GetCoordinate_(0,index[0],solver->dim_local,solver->ghosts,solver->x,x);
+      chem->imap[p] = chem->IA + chem->IB * cos( chem->kg * chem->L_ref*(x-x0)*(1.0-chem->IC*(x-x0)) );
+      _ArrayIncrementIndex_(solver->ndims,solver->dim_local,index,done);
+
+    }
+  }
 
   // set initial photon density
   ChemistrySetPhotonDensity( solver, chem, mpi, 0.0 );

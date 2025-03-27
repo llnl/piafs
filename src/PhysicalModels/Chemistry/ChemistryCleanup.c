@@ -19,6 +19,7 @@
   free(param->nv_1Sg);
   free(param->nv_CO2);
   free(param->nv_hnu);
+  free(param->imap);
 
   return 0;
 }
