@@ -14,12 +14,14 @@ int main()
 {
   // Constants
   double pi = 4.0*atan(1.0); // pi
-  double gamma = 1.4; // specific heat ratio
   double NA = 6.02214076e23; // Avogadro's number
   double kB = 1.380649e-23; // [J K^{-1}]; Boltzmann's constant
   double M_O2 = 0.032; // [kg]; O2 molar mass
   double M_CO2 = 0.044; // [kg]; O2 molar mass
-  double R = NA*kB/M_O2; // Specific gas constant
+  double Cp_O2 = 918.45; // [J kg^{-1} K^{-1}]; O2 Cp
+  double Cv_O2 = 650.0; // [J kg^{-1} K^{-1}]; O2 Cv
+  double Cp_CO2 = 842.86; // [J kg^{-1} K^{-1}]; CO2 Cp
+  double Cv_CO2 = 654.5; // [J kg^{-1} K^{-1}]; CO2 Cv
 
   // Setup parameters
 
@@ -33,8 +35,10 @@ int main()
   double Ptot = 101325.0; // [Pa]; total gas pressure
   double Ti = 288; // [K]; initial temperature
 
-  double mu_0 = 1.92e-5; // @275K
-  double kappa_0 = 2.59e-2; // @275K
+  double mu0_O2 = 1.99e-5; // @275K
+  double kappa0_O2 = 2.70e-2; // @275K
+  double mu0_CO2 = 1.45e-5; // @275K
+  double kappa0_CO2 = 1.58e-2; // @275K
   double T0 = 275.0;
   double TS = 110.4;
   double TA = 245.4;
@@ -83,12 +87,14 @@ int main()
     fprintf(stderr,"ERROR in ChemistryInitialize(): f_O3 is not between 0.0 and 1.0 !!!\n");
     return 1;
   }
-  if ((f_CO2 + f_O3) > 1.0) {
-    fprintf(stderr,"ERROR in ChemistryInitialize(): f_CO2 + f_O3 > 1.0 !!!\n");
-    return 1;
-  }
 
-  double f_O2 = 1.0 - f_CO2 - f_O3; // O2 fraction
+  double f_O2 = 1.0 - f_CO2; // O2 fraction
+
+  double R = NA*kB/(f_O2*M_O2 + f_CO2*M_CO2); // Specific gas constant
+  double Cp = f_O2*Cp_O2 + f_CO2*Cp_CO2;
+  double Cv = f_O2*Cv_O2 + f_CO2*Cv_CO2;
+  double gamma = Cp/Cv;
+
   double n_O2 = f_O2 * Ptot / (kB * Ti); // [m^{-3}]; initial O2 concentration
   double n_O3 = f_O3 * Ptot / (kB * Ti); // [m^{-3}]; initial O3 concentration
   double n_CO2 = f_CO2 * Ptot / (kB * Ti); // [m^{-3}]; initial CO2 concentration
@@ -96,6 +102,8 @@ int main()
   double rho_CO2 = n_CO2 * M_CO2 / NA; // kg
   double cs = sqrt(gamma*R*Ti); // [m s^{-1}]; speed of sound
 
+  double mu_0 = f_O2*mu0_O2 + f_CO2*mu0_CO2;
+  double kappa_0 = f_O2*kappa0_O2 + f_CO2*kappa0_CO2;
   double mu_ref = mu_0 * raiseto(Ti/T0, 1.5) * ((T0+TS)/(Ti+TS));
   double kappa_ref = kappa_0 * raiseto(Ti/T0, 1.5) * ((T0+TA*exp(-TB/T0))/(Ti+TA*exp(-TB/Ti)));
 

@@ -8,6 +8,7 @@
 #include <string.h>
 #include <basic.h>
 #include <arrayfunctions.h>
+#include <io.h>
 #include <physicalmodels/chemistry.h>
 #include <mpivars.h>
 #include <hypar.h>
@@ -29,8 +30,8 @@ void ChemistrySetPhotonDensity(void*,void*,void*,double);
 
     where the list of keywords are:
 
-    Keyword name       | Type         | Variable                      | Default value
-    ------------------ | ------------ | ----------------------------- | ------------------------
+    Keyword name       | Type         | Variable                        | Default value
+    ------------------ | ------------ | ------------------------------- | ------------------------
     lambda_UV          | double       | #Chemistry::lambda_UB           | 2.48e-7 (248 nm)
     theta              | double       | #Chemistry::theta               | 0.17*pi/180 radians
     f_CO2              | double       | #Chemistry::f_CO2               | 0
@@ -47,16 +48,23 @@ void ChemistrySetPhotonDensity(void*,void*,void*,double);
     k1b                | double       | #Chemistry::k1a                 | 0.2*3.95e-13 s^{-1}
     k2a                | double       | #Chemistry::k2a                 | 1.2e-16 s^{-1}
     k2b                | double       | #Chemistry::k2a                 | 1.2e-16 s^{-1}
+    k3a                | double       | #Chemistry::k3a                 | 1.2e-17 s^{-1}
+    k3b                | double       | #Chemistry::k3a                 | 1.0e-17 s^{-1}
+    k4                 | double       | #Chemistry::k4                  | 1.1e-16 s^{-1}
+    k5                 | double       | #Chemistry::k5                  | 2.0e-16 s^{-1}
+    k6                 | double       | #Chemistry::k6                  | 0.2*3.0e-17 s^{-1}
     F0                 | double       | #Chemistry::F0                  | 2000 J/m^2
     sO3                | double       | #Chemistry::sO3                 | 1.1e-21 m^2
+    IA                 | double       | #Chemistry::IA                  | 1.0
+    IB                 | double       | #Chemistry::IB                  | 1.0
+    IC                 | double       | #Chemistry::IC                  | 0.0
     time_scheme        | double       | #Chemistry::ti_scheme           | RK4
 
     \b Note: "chemistry.inp" is \b optional; if absent, default values will be used.
 */
-int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
-                         void *p, /*!< Chemistry object of type #Chemistry */
-                         void *m, /*!< Object of type #MPIVariables containing MPI-related info */
-                         double gamma /*!< Specific heat ratio */ )
+int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
+                         void*  p, /*!< Chemistry object of type #Chemistry */
+                         void*  m  /*!< Object of type #MPIVariables containing MPI-related info */ )
 {
   HyPar         *solver  = (HyPar*)         s;
   MPIVariables  *mpi     = (MPIVariables*)  m;
@@ -74,7 +82,14 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->e = 1.60217663e-19; // Coulombs
   chem->M_O2 = 0.032; // [kg]; O2 molar mass
   chem->M_CO2 = 0.044; // [kg]; O2 molar mass
-  chem->R = chem->NA*chem->kB/chem->M_O2;
+  chem->Cp_O2 = 918.45; // [J kg^{-1} K^{-1}]; O2 Cp
+  chem->Cv_O2 = 650.0; // [J kg^{-1} K^{-1}]; O2 Cv
+  chem->Cp_CO2 = 842.86; // [J kg^{-1} K^{-1}]; CO2 Cp
+  chem->Cv_CO2 = 654.5; // [J kg^{-1} K^{-1}]; CO2 Cv
+  chem->mu0_O2 = 1.99e-5; // @275K
+  chem->kappa0_O2 = 2.70e-2; // @275K
+  chem->mu0_CO2 = 1.45e-5; // @275K
+  chem->kappa0_CO2 = 1.58e-2; // @275K
 
   chem->lambda_UV = 2.48e-7; // [m] (248 nm) - pump wavelength
   chem->theta = 0.17 * chem->pi / 180; // radians; half angle between probe beams
@@ -258,19 +273,26 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
     fprintf(stderr,"ERROR in ChemistryInitialize(): f_O3 is not between 0.0 and 1.0 !!!\n");
     return 1;
   }
-  if ((chem->f_CO2 + chem->f_O3) > 1.0) {
-    fprintf(stderr,"ERROR in ChemistryInitialize(): f_CO2 + f_O3 > 1.0 !!!\n");
-    return 1;
-  }
+
+  /* compute O2 fraction */
+  chem->f_O2 = 1.0 - chem->f_CO2;
+
+  /* compute gas properties */
+  chem->R = chem->NA*chem->kB / (chem->f_O2*chem->M_O2 + chem->f_CO2*chem->M_CO2);
+  chem->Cp = chem->f_O2*chem->Cp_O2 + chem->f_CO2*chem->Cp_CO2;
+  chem->Cv = chem->f_O2*chem->Cv_O2 + chem->f_CO2*chem->Cv_CO2;
+  chem->gamma = chem->Cp / chem->Cv;
+
+  chem->mu0    = chem->f_O2*chem->mu0_O2    + chem->f_CO2*chem->mu0_CO2;
+  chem->kappa0 = chem->f_O2*chem->kappa0_O2 + chem->f_CO2*chem->kappa0_CO2;
 
   /* compute some basic quantities */
   chem->kUV = 2 * chem->pi / chem->lambda_UV;
   chem->kg = 2 * chem->kUV * sin(chem->theta);
-  chem->f_O2 = 1.0 - chem->f_CO2 - chem->f_O3;
   chem->n_O2 = chem->f_O2 * chem->Ptot / (chem->kB * chem->Ti);
   chem->n_O3 = chem->f_O3 * chem->Ptot / (chem->kB * chem->Ti);
   chem->n_CO2 = chem->f_CO2 * chem->Ptot / (chem->kB * chem->Ti);
-  chem->cs = sqrt(gamma*chem->R*chem->Ti);
+  chem->cs = sqrt(chem->gamma*chem->R*chem->Ti);
 
   /* compute reference quantities */
   chem->L_ref = 1.0/chem->kg;
@@ -296,7 +318,7 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   chem->I0 = chem->F0/chem->t_pulse;
   chem->nu = chem->c / chem->lambda_UV;
 
-  double Ei = chem->Ptot/((gamma-1.0)*chem->n_O2);
+  double Ei = chem->Ptot/((chem->gamma-1.0)*chem->n_O2);
 
   chem->q0a_norm = 0.73 * chem->e/Ei;
   chem->q0b_norm = 2.8  * chem->e/Ei;
@@ -327,6 +349,13 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
     printf("    O2 molar mass: %1.4e [kg]\n", chem->M_O2);
     printf("    CO2 molar mass: %1.4e [kg]\n", chem->M_CO2);
     printf("    Specific gas constant: %1.4e [m]\n", chem->R);
+    printf("    Specific heat ratio: %1.4e\n", chem->gamma);
+    printf("    Reference viscosity of  O2 @275K: %1.4e [kg m^{-1} s^{-1}]\n", chem->mu0_O2 );
+    printf("    Reference viscosity of CO2 @275K: %1.4e [kg m^{-1} s^{-1}]\n", chem->mu0_CO2);
+    printf("    Reference conductivity of  O2 @275K: %1.4e [W m^{-1} K^{-1}]\n", chem->kappa0_O2 );
+    printf("    Reference conductivity of CO2 @275K: %1.4e [W m^{-1} K^{-1}]\n", chem->kappa0_CO2);
+    printf("    Reference viscosity of gas mixture @275K: %1.4e [kg m^{-1} s^{-1}]\n", chem->mu0 );
+    printf("    Reference conductivity of gas mixture @275K: %1.4e [kg m^{-1} s^{-1}]\n", chem->kappa0 );
     printf("Photo-Chemistry:\n");
     printf("    Pump wavelength: %1.4e [m]\n", chem->lambda_UV);
     printf("    Beam half angle: %1.4e [radians]\n", chem->theta);
@@ -402,6 +431,39 @@ int ChemistryInitialize( void *s, /*!< Solver object of type #HyPar */
   _ArraySetValue_ (chem->nv_hnu, solver->npoints_local_wghosts*nz, 0.0);
 
   _ArrayCopy1D_   (chem->nv_O3, chem->nv_O3old, solver->npoints_local_wghosts*nz);
+
+  /* allocate array to hold the bottom topography field */
+  chem->imap = (double*) calloc (solver->npoints_local_wghosts, sizeof(double));
+  /* read topography from provided file, if available */
+  int read_flag = 0;
+  char fname_root[_MAX_STRING_SIZE_] = "imap";
+  if (!mpi->rank) {
+    printf("ChemistryInitialize(): reading intensity map from file.\n");
+  }
+  ReadArray( solver->ndims, 1, solver->dim_global, solver->dim_local, solver->ghosts,
+             solver, mpi, NULL, chem->imap, fname_root, &read_flag);
+  if (!read_flag) {
+
+    if (!mpi->rank) {
+      printf("ChemistryInitialize(): could not read intensity map from file; setting it as:.\n");
+      printf("ChemistryInitialize():      IA + IB * cos( kg * x * (1-IC*x) )                \n");
+    }
+
+    // get xmin of the domain
+    double x0 = 0.0;
+    _GetCoordinate_(0,0,solver->dim_local,solver->ghosts,solver->x,x0);
+    MPIMin_double(&x0, &x0, 1, &mpi->world);
+
+    int index[solver->ndims];
+    int done = 0; _ArraySetValue_(index,solver->ndims,0);
+    while (!done) {
+      int p; _ArrayIndex1D_(solver->ndims,solver->dim_local,index,solver->ghosts,p);
+      double x; _GetCoordinate_(0,index[0],solver->dim_local,solver->ghosts,solver->x,x);
+      chem->imap[p] = chem->IA + chem->IB * cos( chem->kg * chem->L_ref*(x-x0)*(1.0-chem->IC*(x-x0)) );
+      _ArrayIncrementIndex_(solver->ndims,solver->dim_local,index,done);
+
+    }
+  }
 
   // set initial photon density
   ChemistrySetPhotonDensity( solver, chem, mpi, 0.0 );

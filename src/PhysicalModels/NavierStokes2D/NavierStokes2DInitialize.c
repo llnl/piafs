@@ -186,10 +186,33 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
     physics->chem = (Chemistry*) calloc (1, sizeof(Chemistry));
     ChemistryInitialize( solver,
                          physics->chem,
-                         mpi,
-                         physics->gamma );
+                         mpi );
     Chemistry* chem = (Chemistry*) physics->chem;
+    physics->gamma = chem->gamma;
     physics->Tref = chem->Ti;
+
+    if (physics->Re > 0) {
+      if (!mpi->rank) {
+        printf("NavierStokes2DInitialize(): Computing Reynolds and Prandtl's number based on photochemistry setup; ignoring values in physics.inp.\n");
+      }
+      double mu_ref = chem->mu0 * raiseto(chem->Ti/physics->T0, 1.5) * ((physics->T0+physics->TS)/(chem->Ti+physics->TS));
+      double kappa_ref =  chem->kappa0
+                        * raiseto(chem->Ti/physics->T0, 1.5)
+                        * (  (physics->T0+physics->TA*exp(-physics->TB/physics->T0))
+                           / (chem->Ti+physics->TA*exp(-physics->TB/chem->Ti))    );
+      physics->Re = chem->rho_ref * chem->v_ref * chem->L_ref / mu_ref;
+      physics->Pr = chem->gamma*chem->R/(chem->gamma-1) * mu_ref / kappa_ref;
+    }
+  }
+
+  if (!mpi->rank) {
+    printf("NavierStokes2D parameters:\n");
+    printf("    gamma: %1.4e\n", physics->gamma);
+    printf("    Reynolds number: %1.4e\n", physics->Re);
+    printf("    Prandtl number: %1.4e\n", physics->Pr);
+    printf("    Reference temperature: %1.4e [K]\n", physics->Tref);
+    printf("    upwinding scheme: %s\n", physics->upw_choice);
+    printf("    include chemistry: %s\n", (physics->include_chem?"yes":"no"));
   }
 
   count++;
