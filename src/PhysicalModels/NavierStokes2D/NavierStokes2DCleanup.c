@@ -11,6 +11,10 @@
 int NavierStokes2DCleanup(void *s /*!< Object of type #NavierStokes2D*/)
 {
   NavierStokes2D  *param  = (NavierStokes2D*) s;
+  if (param->chem)  {
+      ChemistryCleanup(param->chem);
+      free(param->chem);
+  }
 
   return(0);
 }
