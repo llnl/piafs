@@ -25,8 +25,6 @@ int main()
 
   double lambda_UV = 2.48e-7; // [m] (248 nm) - pump wavelength
   double theta = 0.17 * pi / 180; // radians; half angle between probe beams
-  double kUV = 2 * pi / lambda_UV; //pump beam wave vector
-  double kg = 2 * kUV * sin(theta); // grating wave vector
 
   double f_CO2 = 0.0; // CO2 fraction
   double f_O3  = 0.05; // O3 fraction
@@ -85,6 +83,9 @@ int main()
     fprintf(stderr,"ERROR in ChemistryInitialize(): f_O3 is not between 0.0 and 1.0 !!!\n");
     return 1;
   }
+
+  double kUV = 2 * pi / lambda_UV; //pump beam wave vector
+  double kg = 2 * kUV * sin(theta); // grating wave vector
 
   double f_O2 = 1.0 - f_CO2; // O2 fraction
 

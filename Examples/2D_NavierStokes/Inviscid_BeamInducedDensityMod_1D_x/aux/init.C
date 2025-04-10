@@ -27,8 +27,6 @@ int main()
 
   double lambda_UV = 2.48e-7; // [m] (248 nm) - pump wavelength
   double theta = 0.17 * pi / 180; // radians; half angle between probe beams
-  double kUV = 2 * pi / lambda_UV; //pump beam wave vector
-  double kg = 2 * kUV * sin(theta); // grating wave vector
 
   double f_CO2 = 0.0; // CO2 fraction
   double f_O3  = 0.05; // O3 fraction
@@ -88,6 +86,9 @@ int main()
     return 1;
   }
 
+  double kUV = 2 * pi / lambda_UV; //pump beam wave vector
+  double kg = 2 * kUV * sin(theta); // grating wave vector
+
   double f_O2 = 1.0 - f_CO2; // O2 fraction
 
   double R = NA*kB/(f_O2*M_O2 + f_CO2*M_CO2); // Specific gas constant
@@ -124,6 +125,11 @@ int main()
   printf("  Avogradro number: %1.4e (m)\n", NA);
   printf("  Boltzmann constant: %1.4e (m)\n", kB);
   printf("  Specific gas constant: %1.4e (m)\n", R);
+  printf("Photo-Chemistry:\n");
+  printf("  Pump wavelength: %1.4e [m]\n", lambda_UV);
+  printf("  Beam half angle: %1.4e [radians]\n", theta);
+  printf("  Pump beam wavenumber: %1.4e [m^{-1}]\n", kUV);
+  printf("  Grating wavenumber: %1.4e [m^{-1}]\n", kg);
   printf("Reference quantities:\n");
   printf("  Length: %1.4e (m)\n", L_ref);
   printf("  Temperature: %1.4e (m)\n", T_ref);
