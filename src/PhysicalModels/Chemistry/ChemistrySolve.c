@@ -31,17 +31,15 @@ int ChemistrySetPhotonDensity( void*   s,    /*!< Solver object of type #HyPar *
     int p; _ArrayIndex1D_(solver->ndims,dim,index,ghosts,p);
 
     // first z-layer
-    if (a_t <= params->t_pulse_norm) {
-      double x;
-      _GetCoordinate_(0,index[0],dim,ghosts,solver->x,x);
-      double I0 = params->I0 * params->imap[p];
-      double c = params->c;
-      double h = params->h;
-      double nu = params->nu;
-      params->nv_hnu[nz*p+0] = I0 / (c*h*nu*params->n_O2);
-    } else {
-      params->nv_hnu[nz*p+0] = 0.0;
-    }
+    double x;
+    _GetCoordinate_(0,index[0],dim,ghosts,solver->x,x);
+    double sigma = params->t_pulse_norm/2.35482;
+    double I0 = params->I0 * exp( - (a_t - params->t_pulse_norm)*(a_t - params->t_pulse_norm) / 2 /sigma / sigma ) * params->imap[p];
+    //double I0 = params->I0 * params->imap[p];
+    double c = params->c;
+    double h = params->h;
+    double nu = params->nu;
+    params->nv_hnu[nz*p+0] = I0 / (c*h*nu*params->n_O2);
 
     // remaining z-layers
     int iz;
