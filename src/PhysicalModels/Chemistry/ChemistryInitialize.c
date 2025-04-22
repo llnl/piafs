@@ -369,7 +369,7 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
     printf("    O2 number density:  %1.4e [m^{-3}]\n", chem->n_O2);
     printf("    O3 number density:  %1.4e [m^{-3}]\n", chem->n_O3);
     printf("    CO2 number density: %1.4e [m^{-3}]\n", chem->n_CO2);
-    printf("    Sound speed: %1.4e [kg m^{-3}]\n", chem->cs);
+    printf("    Sound speed: %1.4e [m s^{-1}]\n", chem->cs);
     printf("    Pulse duration: %1.4e (s), %1.4e (normalized)\n",
                 chem->t_pulse, chem->t_pulse_norm );
     printf("    Gas length: %1.4e [m]\n", chem->Lz);

@@ -78,7 +78,10 @@ int ChemistryWriteSpecies(  void*   s,    /*!< Solver object of type #HyPar */
                  solver,
                  mpi,
                  fname_root );
+
+    free(species_arr);
   }
+
 
   return 0;
 }
