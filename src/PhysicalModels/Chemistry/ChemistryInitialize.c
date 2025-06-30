@@ -432,9 +432,9 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
 
   _ArrayCopy1D_   (chem->nv_O3, chem->nv_O3old, solver->npoints_local_wghosts*nz);
 
-  /* allocate array to hold the bottom topography field */
+  /* allocate array to hold the beam intensity field */
   chem->imap = (double*) calloc (solver->npoints_local_wghosts, sizeof(double));
-  /* read topography from provided file, if available */
+  /* read beam intensity from provided file, if available */
   int read_flag = 0;
   char fname_root[_MAX_STRING_SIZE_] = "imap";
   if (!mpi->rank) {
