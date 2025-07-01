@@ -42,6 +42,10 @@ int main()
   double TA = 245.4;
   double TB = 27.6;
 
+  double Lz = 0.03; // 30 milimeters
+  double z_mm = 0.0;
+  int nz = 22;
+
   FILE *chem_in;
   printf("Reading chemical reaction inputs from file \"chemistry.inp\".\n");
   chem_in = fopen("chemistry.inp","r");
@@ -64,6 +68,12 @@ int main()
           fscanf(chem_in,"%lf",&Ptot);
         } else if (!strcmp(word,"Ti")) {
           fscanf(chem_in,"%lf",&Ti);
+        } else if (!strcmp(word,"Lz")) {
+          fscanf(chem_in,"%lf",&Lz);
+        } else if (!strcmp(word,"z_mm")) {
+          fscanf(chem_in,"%lf",&z_mm);
+        } else if (!strcmp(word,"nz")) {
+          fscanf(chem_in,"%d",&nz);
         } else if (strcmp(word,"end")) {
           char useless[100];
           fscanf(chem_in,"%s",useless);
@@ -120,6 +130,11 @@ int main()
   double Re = rho_ref * v_ref * L_ref / mu_ref;
   double Pr = gamma*R/(gamma-1) * mu_ref / kappa_ref;
 
+  // compute z location
+  double dz = Lz / nz;
+  int z_i = (int)(ceil(z_mm*0.001 * nz / Lz));
+  nz = z_i + 1;
+
   printf("Constants (in SI units):\n");
   printf("  gamma: %1.4e (m)\n", gamma);
   printf("  Avogradro number: %1.4e (m)\n", NA);
@@ -156,6 +171,9 @@ int main()
   printf("  CO2 number density: %1.4e [m^{-3}]\n", n_CO2);
   printf("  O2 mass density: %1.4e [kg m^{-3}]\n", rho_O2);
   printf("  CO2 mass density: %1.4e [kg m^{-3}]\n", rho_CO2);
+  printf("  Gas length: %1.4e [m]\n", Lz);
+  printf("  Z-location: %1.4e [m] (z_i = %d)\n", z_mm*1e-3,z_i);
+  printf("  Number of z-layers: %d\n", nz);
 
   // domain
   double k_aw = 1; // normalized acoustic wave vector
@@ -175,7 +193,7 @@ int main()
   printf("Initial flow: rho = %1.4e, p = %1.4e, (u, v) = (%1.4e, %1.4e)\n", rho0, p0, uvel0, vvel0);
 
   printf("\n");
-	int NI, NJ, ndims;
+	int NI, NJ, ndims, nvars;
   char ip_file_type[50]; strcpy(ip_file_type,"ascii");
 
   std::ifstream in;
@@ -189,7 +207,8 @@ int main()
     if (!strcmp(word, "begin")){
       while (strcmp(word, "end")){
         in >> word;
-        if (!strcmp(word, "ndims"))     in >> ndims;
+        if (!strcmp(word, "ndims")) in >> ndims;
+        else if (!strcmp(word, "nvars")) in >> nvars;
         else if (!strcmp(word, "size")) in >> NI >> NJ;
         else if (!strcmp(word, "ip_file_type")) in >> ip_file_type;
       }
@@ -199,7 +218,7 @@ int main()
   }
   in.close();
   if (ndims != 2) {
-    std::cout << "ndims is not 2 in solver.inp. this code is to generate 2D exact solution\n";
+    std::cout << "**ERROR**\n  ndims is not 2 in solver.inp. this code is to generate 2D exact solution\n";
     return(0);
   }
 	std::cout << "Grid:" << NI << " X " << NJ << " points\n";
@@ -208,16 +227,15 @@ int main()
 	double dx = (xmax - xmin) / ((double)NI-1);
 	double dy = dx;
 
-	double *x, *y, *u0, *u1, *u2, *u3;
-  FILE *out;
+  // allocate flow arrays
+	double* x   = (double*) calloc (NI   , sizeof(double));
+	double* y   = (double*) calloc (NJ   , sizeof(double));
+	double* u0  = (double*) calloc (NI*NJ, sizeof(double));
+	double* u1  = (double*) calloc (NI*NJ, sizeof(double));
+	double* u2  = (double*) calloc (NI*NJ, sizeof(double));
+	double* u3  = (double*) calloc (NI*NJ, sizeof(double));
 
-	x   = (double*) calloc (NI   , sizeof(double));
-	y   = (double*) calloc (NJ   , sizeof(double));
-	u0  = (double*) calloc (NI*NJ, sizeof(double));
-	u1  = (double*) calloc (NI*NJ, sizeof(double));
-	u2  = (double*) calloc (NI*NJ, sizeof(double));
-	u3  = (double*) calloc (NI*NJ, sizeof(double));
-
+  // set initial flow quantities
 	for (i = 0; i < NI; i++){
   	for (j = 0; j < NJ; j++){
 
@@ -233,13 +251,52 @@ int main()
 	  }
 	}
 
+  // allocate reacting species arrays
+  double* nv_O2    = (double*) calloc (NI*NJ*nz, sizeof(double));
+  double* nv_O3    = (double*) calloc (NI*NJ*nz, sizeof(double));
+  double* nv_1D    = (double*) calloc (NI*NJ*nz, sizeof(double));
+  double* nv_1Dg   = (double*) calloc (NI*NJ*nz, sizeof(double));
+  double* nv_3Su   = (double*) calloc (NI*NJ*nz, sizeof(double));
+  double* nv_1Sg   = (double*) calloc (NI*NJ*nz, sizeof(double));
+  double* nv_CO2   = (double*) calloc (NI*NJ*nz, sizeof(double));
+
+  // set initial reacting species quantities
+  for (i = 0; i < NI; i++){
+  	for (j = 0; j < NJ; j++){
+      int idx = NJ*i + j;
+      int iz;
+      for (iz = 0; iz < nz; iz++) {
+        nv_O2 [nz*idx + iz] = 1.0;
+        nv_O3 [nz*idx + iz] = n_O3 / n_O2;
+        nv_1D [nz*idx + iz] = 0.0;
+        nv_1Dg[nz*idx + iz] = 0.0;
+        nv_3Su[nz*idx + iz] = 0.0;
+        nv_1Sg[nz*idx + iz] = 0.0;
+        nv_CO2[nz*idx + iz] = n_CO2 / n_O2;
+      }
+    }
+  }
+
+  // check
+  const int n_species = 7; // O2, O3, 1D, 1Dg, 3Su, 1Sg, CO2
+  const int n_ns_vars = 4;
+  const int n_chem_vars = nz * n_species;
+  if (nvars != n_ns_vars + n_chem_vars) {
+    printf("\n**ERROR**\n  nvars in solver.inp is %d; it MUST be set to %d\n",
+           nvars, n_ns_vars + n_chem_vars);
+    return 1;
+  }
+
+  FILE *out;
   if (!strcmp(ip_file_type,"ascii")) {
     printf("Writing ASCII initial solution file initial.inp\n");
     out = fopen("initial.inp","w");
+    // write x-coordinates
     for (i = 0; i < NI; i++)  fprintf(out,"%lf ",x[i]);
     fprintf(out,"\n");
     for (j = 0; j < NJ; j++)  fprintf(out,"%lf ",y[j]);
     fprintf(out,"\n");
+    // write flow variables
     for (j = 0; j < NJ; j++)  {
       for (i = 0; i < NI; i++)  {
         int p = NJ*i + j;
@@ -268,6 +325,59 @@ int main()
       }
     }
     fprintf(out,"\n");
+    // write reacting species
+    int iz;
+    for (iz = 0; iz < nz; iz++) {
+      for (j = 0; j < NJ; j++)  {
+        for (i = 0; i < NI; i++)  {
+          int p = NJ*i + j;
+          fprintf(out,"%lf ",nv_O2[nz*p+iz]);
+        }
+      }
+      fprintf(out,"\n");
+      for (j = 0; j < NJ; j++)  {
+        for (i = 0; i < NI; i++)  {
+          int p = NJ*i + j;
+          fprintf(out,"%lf ",nv_O3[nz*p+iz]);
+        }
+      }
+      fprintf(out,"\n");
+      for (j = 0; j < NJ; j++)  {
+        for (i = 0; i < NI; i++)  {
+          int p = NJ*i + j;
+          fprintf(out,"%lf ",nv_1D[nz*p+iz]);
+        }
+      }
+      fprintf(out,"\n");
+      for (j = 0; j < NJ; j++)  {
+        for (i = 0; i < NI; i++)  {
+          int p = NJ*i + j;
+          fprintf(out,"%lf ",nv_1Dg[nz*p+iz]);
+        }
+      }
+      fprintf(out,"\n");
+      for (j = 0; j < NJ; j++)  {
+        for (i = 0; i < NI; i++)  {
+          int p = NJ*i + j;
+          fprintf(out,"%lf ",nv_3Su[nz*p+iz]);
+        }
+      }
+      fprintf(out,"\n");
+      for (j = 0; j < NJ; j++)  {
+        for (i = 0; i < NI; i++)  {
+          int p = NJ*i + j;
+          fprintf(out,"%lf ",nv_1Sg[nz*p+iz]);
+        }
+      }
+      fprintf(out,"\n");
+      for (j = 0; j < NJ; j++)  {
+        for (i = 0; i < NI; i++)  {
+          int p = NJ*i + j;
+          fprintf(out,"%lf ",nv_CO2[nz*p+iz]);
+        }
+      }
+      fprintf(out,"\n");
+    }
     fclose(out);
 
   } else if ((!strcmp(ip_file_type,"binary")) || (!strcmp(ip_file_type,"bin"))) {
@@ -276,18 +386,28 @@ int main()
     out = fopen("initial.inp","wb");
     fwrite(x,sizeof(double),NI,out);
     fwrite(y,sizeof(double),NJ,out);
-    double *U = (double*) calloc (4*NI*NJ,sizeof(double));
+    double *U = (double*) calloc (nvars*NI*NJ,sizeof(double));
     for (i=0; i < NI; i++) {
       for (j = 0; j < NJ; j++) {
         int p = NJ*i + j;
         int q = NI*j + i;
-        U[4*q+0] = u0[p];
-        U[4*q+1] = u1[p];
-        U[4*q+2] = u2[p];
-        U[4*q+3] = u3[p];
+        U[nvars*q+0] = u0[p];
+        U[nvars*q+1] = u1[p];
+        U[nvars*q+2] = u2[p];
+        U[nvars*q+3] = u3[p];
+        int iz;
+        for (iz = 0; iz < nz; iz++) {
+          U[nvars*q+n_ns_vars+iz*n_species+0] = nv_O2 [p*nz+iz];
+          U[nvars*q+n_ns_vars+iz*n_species+1] = nv_O3 [p*nz+iz];
+          U[nvars*q+n_ns_vars+iz*n_species+2] = nv_1D [p*nz+iz];
+          U[nvars*q+n_ns_vars+iz*n_species+3] = nv_1Dg[p*nz+iz];
+          U[nvars*q+n_ns_vars+iz*n_species+4] = nv_3Su[p*nz+iz];
+          U[nvars*q+n_ns_vars+iz*n_species+5] = nv_1Sg[p*nz+iz];
+          U[nvars*q+n_ns_vars+iz*n_species+6] = nv_CO2[p*nz+iz];
+        }
       }
     }
-    fwrite(U,sizeof(double),4*NI*NJ,out);
+    fwrite(U,sizeof(double),nvars*NI*NJ,out);
     free(U);
     fclose(out);
   }
@@ -299,6 +419,14 @@ int main()
 	free(u1);
 	free(u2);
 	free(u3);
+
+  free(nv_O2);
+  free(nv_O3);
+  free(nv_1D);
+  free(nv_1Dg);
+  free(nv_3Su);
+  free(nv_1Sg);
+  free(nv_CO2);
 
 	return(0);
 }

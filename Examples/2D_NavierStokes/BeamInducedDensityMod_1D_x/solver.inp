@@ -1,6 +1,6 @@
 begin
 	ndims              2
-	nvars              4
+	nvars              11
 	size               256 4
 	ghost              3
 	n_iter             785
