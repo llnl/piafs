@@ -30,11 +30,11 @@
 
 /* define ndims and nvars for this model */
 #undef _MODEL_NDIMS_
-#undef _MODEL_NVARS_
+#undef _EU1D_NVARS_
 /*! Number of spatial dimensions */
 #define _MODEL_NDIMS_ 1
 /*! Number of variables per grid point */
-#define _MODEL_NVARS_ 3
+#define _EU1D_NVARS_ 3
 
 /* choices for upwinding schemes */
 /*! Roe upwinding scheme */
@@ -43,8 +43,6 @@
 #define _RF_      "rf-char"
 /*! Local Lax-Friedrich upwinding scheme */
 #define _LLF_     "llf-char"
-/*! Steger-Warming flux splitting */
-#define _SWFS_    "steger-warming"
 /*! Rusanov flux splitting */
 #define _RUSANOV_    "rusanov"
 
@@ -70,11 +68,17 @@
     Set the flux vector given the flow variables (density,
     velocity, pressure).
 */
-#define _Euler1DSetFlux_(f,rho,v,e,P) \
+#define _Euler1DSetFlux_(f,u,p) \
   { \
+    double rho,v,e,P; \
+    _Euler1DGetFlowVar_(u,rho,v,e,P,p); \
     f[0] = (rho) * (v); \
     f[1] = (rho) * (v) * (v) + (P); \
     f[2] = ((e) + (P)) * (v); \
+    int m_i; \
+    for (m_i = _EU1D_NVARS_; m_i < p->nvars; m_i++) { \
+        f[m_i] = v * u[m_i]; \
+    } \
   }
 
 /*! \def _Euler1DRoeAverage_
@@ -111,6 +115,10 @@
     uavg[0] = rho; \
     uavg[1] = rho*v; \
     uavg[2] = e; \
+    int m_i; \
+    for (m_i = _EU1D_NVARS_; m_i < p->nvars; m_i++) { \
+        uavg[m_i] = sqrt(uL[m_i]) * sqrt(uR[m_i]); \
+    } \
   }
 
 /*! \def _Euler1DEigenvalues_
@@ -121,16 +129,18 @@
 */
 #define _Euler1DEigenvalues_(u,D,p,dir) \
   { \
-    double gamma   = p->gamma; \
+    double gamma = p->gamma; \
     double rho,v,e,P,c; \
-    rho = u[0]; \
-    v   = u[1] / rho; \
-    e   = u[2]; \
-    P   = (e - 0.5*rho*v*v) * (gamma-1.0); \
+    _Euler1DGetFlowVar_(u,rho,v,e,P,p); \
     c = sqrt(gamma*P/rho); \
-    D[0*_MODEL_NVARS_+0] = v;      D[0*_MODEL_NVARS_+1] = 0;      D[0*_MODEL_NVARS_+2] = 0; \
-    D[1*_MODEL_NVARS_+0] = 0;      D[1*_MODEL_NVARS_+1] = (v-c);  D[1*_MODEL_NVARS_+2] = 0; \
-    D[2*_MODEL_NVARS_+0] = 0;      D[2*_MODEL_NVARS_+1] = 0;      D[2*_MODEL_NVARS_+2] = (v+c); \
+    _ArraySetValue_(D, p->nvars*p->nvars, 0.0); \
+    D[0*p->nvars+0] = v; \
+    D[1*p->nvars+1] = (v-c); \
+    D[2*p->nvars+2] = (v+c); \
+    int m_i; \
+    for (m_i = _EU1D_NVARS_; m_i < p->nvars; m_i++) { \
+      D[m_i*p->nvars+m_i] = v; \
+    } \
   }
 
 /*! \def _Euler1DLeftEigenvectors_
@@ -141,20 +151,22 @@
   { \
     double gamma = p->gamma; \
     double rho,v,e,P,c; \
-    rho = u[0]; \
-    v   = u[1] / rho; \
-    e   = u[2]; \
-    P   = (e - 0.5*rho*v*v) * (gamma-1.0); \
+    _Euler1DGetFlowVar_(u,rho,v,e,P,p); \
     c    = sqrt(gamma*P/rho); \
-    L[1*_MODEL_NVARS_+0] = ((gamma - 1)/(rho*c)) * (-(v*v)/2 - c*v/(gamma-1)); \
-    L[1*_MODEL_NVARS_+1] = ((gamma - 1)/(rho*c)) * (v + c/(gamma-1)); \
-    L[1*_MODEL_NVARS_+2] = ((gamma - 1)/(rho*c)) * (-1); \
-    L[0*_MODEL_NVARS_+0] = ((gamma - 1)/(rho*c)) * (rho*(-(v*v)/2+c*c/(gamma-1))/c); \
-    L[0*_MODEL_NVARS_+1] = ((gamma - 1)/(rho*c)) * (rho*v/c); \
-    L[0*_MODEL_NVARS_+2] = ((gamma - 1)/(rho*c)) * (-rho/c); \
-    L[2*_MODEL_NVARS_+0] = ((gamma - 1)/(rho*c)) * ((v*v)/2 - c*v/(gamma-1)); \
-    L[2*_MODEL_NVARS_+1] = ((gamma - 1)/(rho*c)) * (-v + c/(gamma-1)); \
-    L[2*_MODEL_NVARS_+2] = ((gamma - 1)/(rho*c)) * (1); \
+    _ArraySetValue_(L, p->nvars*p->nvars, 0.0); \
+    L[1*p->nvars+0] = ((gamma - 1)/(rho*c)) * (-(v*v)/2 - c*v/(gamma-1)); \
+    L[1*p->nvars+1] = ((gamma - 1)/(rho*c)) * (v + c/(gamma-1)); \
+    L[1*p->nvars+2] = ((gamma - 1)/(rho*c)) * (-1); \
+    L[0*p->nvars+0] = ((gamma - 1)/(rho*c)) * (rho*(-(v*v)/2+c*c/(gamma-1))/c); \
+    L[0*p->nvars+1] = ((gamma - 1)/(rho*c)) * (rho*v/c); \
+    L[0*p->nvars+2] = ((gamma - 1)/(rho*c)) * (-rho/c); \
+    L[2*p->nvars+0] = ((gamma - 1)/(rho*c)) * ((v*v)/2 - c*v/(gamma-1)); \
+    L[2*p->nvars+1] = ((gamma - 1)/(rho*c)) * (-v + c/(gamma-1)); \
+    L[2*p->nvars+2] = ((gamma - 1)/(rho*c)) * (1); \
+    int m_i; \
+    for (m_i = _EU1D_NVARS_; m_i < p->nvars; m_i++) { \
+      L[m_i*p->nvars+m_i] = 1.0; \
+    } \
   }
 
 /*! \def _Euler1DRightEigenvectors_
@@ -165,14 +177,16 @@
   { \
     double gamma   = p->gamma; \
     double rho,v,e,P,c; \
-    rho = u[0]; \
-    v   = u[1] / rho; \
-    e   = u[2]; \
-    P   = (e - 0.5*rho*v*v) * (gamma-1.0); \
+    _Euler1DGetFlowVar_(u,rho,v,e,P,p); \
     c    = sqrt(gamma*P/rho); \
-    R[0*_MODEL_NVARS_+1] = - rho/(2*c);  R[1*_MODEL_NVARS_+1] = -rho*(v-c)/(2*c); R[2*_MODEL_NVARS_+1] = -rho*((v*v)/2+(c*c)/(gamma-1)-c*v)/(2*c);  \
-    R[0*_MODEL_NVARS_+0] = 1;            R[1*_MODEL_NVARS_+0] = v;                R[2*_MODEL_NVARS_+0] = v*v / 2;                                   \
-    R[0*_MODEL_NVARS_+2] = rho/(2*c);    R[1*_MODEL_NVARS_+2] = rho*(v+c)/(2*c);  R[2*_MODEL_NVARS_+2] = rho*((v*v)/2+(c*c)/(gamma-1)+c*v)/(2*c);   \
+    _ArraySetValue_(R, p->nvars*p->nvars, 0.0); \
+    R[0*p->nvars+1] = - rho/(2*c);  R[1*p->nvars+1] = -rho*(v-c)/(2*c); R[2*p->nvars+1] = -rho*((v*v)/2+(c*c)/(gamma-1)-c*v)/(2*c);  \
+    R[0*p->nvars+0] = 1;            R[1*p->nvars+0] = v;                R[2*p->nvars+0] = v*v / 2;                                   \
+    R[0*p->nvars+2] = rho/(2*c);    R[1*p->nvars+2] = rho*(v+c)/(2*c);  R[2*p->nvars+2] = rho*((v*v)/2+(c*c)/(gamma-1)+c*v)/(2*c);   \
+    int m_i; \
+    for (m_i = _EU1D_NVARS_; m_i < p->nvars; m_i++) { \
+      R[m_i*p->nvars+m_i] = 1.0; \
+    } \
   }
 
 /*! \def Euler1D
@@ -193,6 +207,8 @@ typedef struct euler1d_parameters {
 
   int include_chem; /*!< Flag to include chemistry */
   void* chem; /*!< Photochemical reactions object */
+
+  int nvars; /*!< Number of variables per grid point */
 
 } Euler1D;
 

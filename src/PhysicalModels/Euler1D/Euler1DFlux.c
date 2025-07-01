@@ -26,7 +26,7 @@ int Euler1DFlux(
   int               *dim    = solver->dim_local;
   int               ghosts  = solver->ghosts;
   static const int  ndims   = _MODEL_NDIMS_;
-  static const int  nvars   = _MODEL_NVARS_;
+  const int         nvars   = param->nvars;
   static int        index[_MODEL_NDIMS_], bounds[_MODEL_NDIMS_], offset[_MODEL_NDIMS_];
 
   /* set bounds for array index to include ghost points */
@@ -38,8 +38,7 @@ int Euler1DFlux(
   while (!done) {
     int p; _ArrayIndex1DWO_(ndims,dim,index,offset,ghosts,p);
     double rho, v, e, P;
-    _Euler1DGetFlowVar_((u+nvars*p),rho,v,e,P,param);
-    _Euler1DSetFlux_((f+nvars*p),rho,v,e,P);
+    _Euler1DSetFlux_((f+nvars*p),(u+nvars*p),param);
     _ArrayIncrementIndex_(ndims,bounds,index,done);
   }
 

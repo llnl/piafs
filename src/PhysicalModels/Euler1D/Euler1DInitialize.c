@@ -19,7 +19,6 @@ int    Euler1DSource     (double*,double*,void*,void*,double);
 int    Euler1DUpwindRoe     (double*,double*,double*,double*,double*,double*,int,void*,double);
 int    Euler1DUpwindRF      (double*,double*,double*,double*,double*,double*,int,void*,double);
 int    Euler1DUpwindLLF     (double*,double*,double*,double*,double*,double*,int,void*,double);
-int    Euler1DUpwindSWFS    (double*,double*,double*,double*,double*,double*,int,void*,double);
 int    Euler1DUpwindRusanov (double*,double*,double*,double*,double*,double*,int,void*,double);
 
 int    Euler1DRoeAverage        (double*,double*,double*,void*);
@@ -63,10 +62,6 @@ int Euler1DInitialize(void *s, /*!< Solver object of type #HyPar */
 
   static int count = 0;
 
-  if (solver->nvars != _MODEL_NVARS_) {
-    fprintf(stderr,"Error in Euler1DInitialize(): nvars has to be %d.\n",_MODEL_NVARS_);
-    return(1);
-  }
   if (solver->ndims != _MODEL_NDIMS_) {
     fprintf(stderr,"Error in Euler1DInitialize(): ndims has to be %d.\n",_MODEL_NDIMS_);
     return(1);
@@ -113,9 +108,9 @@ int Euler1DInitialize(void *s, /*!< Solver object of type #HyPar */
       }
       fclose(in);
     }
-  }
 
-  physics->include_chem = (!strcmp(include_chem,"yes"));
+    physics->include_chem = (!strcmp(include_chem,"yes"));
+  }
 
 #ifndef serial
   MPIBroadcast_character (physics->upw_choice   ,_MAX_STRING_SIZE_,0,&mpi->world);
@@ -131,7 +126,6 @@ int Euler1DInitialize(void *s, /*!< Solver object of type #HyPar */
   if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = Euler1DUpwindRoe;
   else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = Euler1DUpwindRF;
   else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = Euler1DUpwindLLF;
-  else if (!strcmp(physics->upw_choice,_SWFS_   )) solver->Upwind = Euler1DUpwindSWFS;
   else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = Euler1DUpwindRusanov;
   else {
     if (!mpi->rank) fprintf(stderr,"Error in Euler1DInitialize(): %s is not a valid upwinding scheme.\n",
@@ -142,6 +136,8 @@ int Euler1DInitialize(void *s, /*!< Solver object of type #HyPar */
   solver->GetLeftEigenvectors   = Euler1DLeftEigenvectors;
   solver->GetRightEigenvectors  = Euler1DRightEigenvectors;
 
+  physics->nvars = _EU1D_NVARS_;
+
   if (physics->include_chem) {
     solver->PhysicsOutput = Euler1DWriteChem;
     physics->chem = (Chemistry*) calloc (1, sizeof(Chemistry));
@@ -150,6 +146,12 @@ int Euler1DInitialize(void *s, /*!< Solver object of type #HyPar */
                          mpi );
     Chemistry* chem = (Chemistry*) physics->chem;
     physics->gamma = chem->gamma;
+    physics->nvars += chem->n_reacting_species;
+  }
+
+  if (solver->nvars != physics->nvars) {
+    fprintf(stderr,"Error in Euler1DInitialize(): nvars has to be %d in solver.inp.\n",physics->nvars);
+    return(1);
   }
 
   if (!mpi->rank) {

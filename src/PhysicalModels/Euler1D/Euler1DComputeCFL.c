@@ -35,7 +35,7 @@ double Euler1DComputeCFL(
   while (!done) {
     int p; _ArrayIndex1D_(ndims,dim,index,ghosts,p);
     double rho, v, e, P, c, dxinv, local_cfl;
-    _Euler1DGetFlowVar_((u+_MODEL_NVARS_*p),rho,v,e,P,param);
+    _Euler1DGetFlowVar_((u+param->nvars*p),rho,v,e,P,param);
     _GetCoordinate_(0,index[0],dim,ghosts,solver->dxinv,dxinv); /* 1/dx */
     c = sqrt(param->gamma*P/rho); /* speed of sound */
     local_cfl = (absolute(v)+c)*dt*dxinv; /* local cfl for this grid point */
