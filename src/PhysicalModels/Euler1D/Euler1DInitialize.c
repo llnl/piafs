@@ -143,7 +143,8 @@ int Euler1DInitialize(void *s, /*!< Solver object of type #HyPar */
     physics->chem = (Chemistry*) calloc (1, sizeof(Chemistry));
     ChemistryInitialize( solver,
                          physics->chem,
-                         mpi );
+                         mpi,
+                         _EU1D_NVARS_);
     Chemistry* chem = (Chemistry*) physics->chem;
     physics->gamma = chem->gamma;
     physics->nvars += chem->n_reacting_species;

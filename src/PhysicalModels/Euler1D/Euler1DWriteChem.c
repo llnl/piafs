@@ -21,7 +21,7 @@ int Euler1DWriteChem(  void*   s,    /*!< Solver object of type #HyPar */
   MPIVariables *mpi    = (MPIVariables*)   m;
   Euler1D      *params = (Euler1D*) solver->physics;
 
-  if (params->include_chem) ChemistryWriteSpecies(solver, params->chem, mpi, a_t);
+  if (params->include_chem) ChemistryWriteSpecies(solver, solver->u, params->chem, mpi, a_t);
 
   return 0;
 }

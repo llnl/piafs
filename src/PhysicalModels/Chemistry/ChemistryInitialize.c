@@ -64,7 +64,8 @@ void ChemistrySetPhotonDensity(void*,void*,void*,double);
 */
 int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
                          void*  p, /*!< Chemistry object of type #Chemistry */
-                         void*  m  /*!< Object of type #MPIVariables containing MPI-related info */ )
+                         void*  m, /*!< Object of type #MPIVariables containing MPI-related info */
+                         const int n_flowvars /*!< Number of flow variables */ )
 {
   HyPar         *solver  = (HyPar*)         s;
   MPIVariables  *mpi     = (MPIVariables*)  m;
@@ -72,6 +73,9 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   int           ferr;
 
   static int count = 0;
+
+  /* Number of flow variables (Euler/Navier-Stokes) */
+  chem->n_flow_vars = n_flowvars;
 
   /* default values */
   chem->pi = 4.0*atan(1.0);
@@ -408,30 +412,19 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
 
   int nz = chem->z_i + 1;
   chem->nspecies = 8; // O2, O3, 1D, 1Dg, 3Su, 1Sg, CO2, hnu
-  chem->n_reacting_species = chem->nspecies - 1; // not include hnu
-  chem->nv_O2    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
-  chem->nv_O3    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
+  chem->n_reacting_species = (chem->nspecies - 1) * nz; // not include hnu
+  // define strides
+  chem->grid_stride = chem->n_flow_vars+chem->n_reacting_species;
+  chem->z_stride = chem->nspecies - 1;
+
+  // allocate arrays
   chem->nv_O3old = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
-  chem->nv_1D    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
-  chem->nv_1Dg   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
-  chem->nv_3Su   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
-  chem->nv_1Sg   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
-  chem->nv_CO2   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_hnu   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->Qv       = (double*) calloc (solver->npoints_local_wghosts   , sizeof(double));
 
   int i;
-  _ArraySetValue_ (chem->Qv,     solver->npoints_local_wghosts,    0.0);
-  _ArraySetValue_ (chem->nv_O2,  solver->npoints_local_wghosts*nz, 1.0);
-  _ArraySetValue_ (chem->nv_O3,  solver->npoints_local_wghosts*nz, chem->n_O3 / chem->n_O2);
-  _ArraySetValue_ (chem->nv_1D,  solver->npoints_local_wghosts*nz, 0.0);
-  _ArraySetValue_ (chem->nv_1Dg, solver->npoints_local_wghosts*nz, 0.0);
-  _ArraySetValue_ (chem->nv_3Su, solver->npoints_local_wghosts*nz, 0.0);
-  _ArraySetValue_ (chem->nv_1Sg, solver->npoints_local_wghosts*nz, 0.0);
-  _ArraySetValue_ (chem->nv_CO2, solver->npoints_local_wghosts*nz, chem->n_CO2 / chem->n_O2);
-  _ArraySetValue_ (chem->nv_hnu, solver->npoints_local_wghosts*nz, 0.0);
-
-  _ArrayCopy1D_   (chem->nv_O3, chem->nv_O3old, solver->npoints_local_wghosts*nz);
+  _ArraySetValue_ (chem->Qv,       solver->npoints_local_wghosts,    0.0);
+  _ArraySetValue_ (chem->nv_O3old, solver->npoints_local_wghosts*nz, chem->n_O3 / chem->n_O2);
 
   /* allocate array to hold the beam intensity field */
   chem->imap = (double*) calloc (solver->npoints_local_wghosts, sizeof(double));

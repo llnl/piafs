@@ -182,7 +182,8 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
     physics->chem = (Chemistry*) calloc (1, sizeof(Chemistry));
     ChemistryInitialize( solver,
                          physics->chem,
-                         mpi );
+                         mpi,
+                         _NS2D_NVARS_ );
     Chemistry* chem = (Chemistry*) physics->chem;
     physics->gamma = chem->gamma;
     physics->Tref = chem->Ti;

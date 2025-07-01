@@ -13,16 +13,17 @@
 #include <physicalmodels/chemistry.h>
 
 /*! Write out the reacting species data to file */
-int ChemistryWriteSpecies(  void*   s,    /*!< Solver object of type #HyPar */
-                            void*   p,    /*!< Object of type #Chemistry */
-                            void*   m,    /*!< MPI object of type #MPIVariables */
+int ChemistryWriteSpecies(  void*   a_s,  /*!< Solver object of type #HyPar */
+                            double* a_U,  /*!< Solution array */
+                            void*   a_p,  /*!< Object of type #Chemistry */
+                            void*   a_m,  /*!< MPI object of type #MPIVariables */
                             double  a_t   /*!< Current simulation time */ )
 {
-  HyPar        *solver = (HyPar*)        s;
-  MPIVariables *mpi    = (MPIVariables*) m;
-  Chemistry    *params = (Chemistry*)    p;
+  HyPar        *solver = (HyPar*)        a_s;
+  MPIVariables *mpi    = (MPIVariables*) a_m;
+  Chemistry    *chem   = (Chemistry*)    a_p;
 
-  int nz = params->z_i+1;
+  int nz = chem->z_i+1;
   int iz;
 
   for (iz = 0; iz < nz; iz++) {
@@ -42,7 +43,7 @@ int ChemistryWriteSpecies(  void*   s,    /*!< Solver object of type #HyPar */
       strcat(fname_root, "_");
     }
 
-    int nspecies = params->nspecies;
+    int nspecies = chem->nspecies;
     double* species_arr = (double*) calloc (solver->npoints_local_wghosts*nspecies, sizeof(double));
 
     int *dim    = solver->dim_local;
@@ -57,14 +58,10 @@ int ChemistryWriteSpecies(  void*   s,    /*!< Solver object of type #HyPar */
     int done = 0; _ArraySetValue_(index,solver->ndims,0);
     while (!done) {
       int p; _ArrayIndex1DWO_(solver->ndims,dim,index,offset,ghosts,p);
-      species_arr[nspecies*p+0] = params->nv_O2[nz*p+iz];
-      species_arr[nspecies*p+1] = params->nv_O3[nz*p+iz];
-      species_arr[nspecies*p+2] = params->nv_1D[nz*p+iz];
-      species_arr[nspecies*p+3] = params->nv_1Dg[nz*p+iz];
-      species_arr[nspecies*p+4] = params->nv_3Su[nz*p+iz];
-      species_arr[nspecies*p+5] = params->nv_1Sg[nz*p+iz];
-      species_arr[nspecies*p+6] = params->nv_CO2[nz*p+iz];
-      species_arr[nspecies*p+7] = params->nv_hnu[nz*p+iz];
+      _ArrayCopy1D_( (a_U + chem->grid_stride*p + chem->n_flow_vars + chem->z_stride*chem->z_i),
+                     (species_arr+nspecies*p),
+                     chem->z_stride );
+      species_arr[nspecies*p+(nspecies-1)] = chem->nv_hnu[nz*p+iz];
       _ArrayIncrementIndex_(solver->ndims,bounds,index,done);
     }
 

@@ -226,31 +226,28 @@ typedef struct chemistry_parameters {
   double sO3; /*!< Ozone absorbtion cross-section [m^2] */
   double* imap; /*!< Array of intensity values read in from file */
 
+  int n_flow_vars; /*!< number of flow variables */
   int nspecies; /*!< number of species */
-  int n_reacting_species; /*!< number of reacting species */
-  double* nv_O2; /*!< number density of O2 */
-  double* nv_O3; /*!< number density of O3 */
+  int n_reacting_species; /*!< number of reacting species that advects with flow */
   double* nv_O3old; /*!< number density of O3 (previous timestep) */
-  double* nv_1D; /*!< number density of O(1D) */
-  double* nv_1Dg; /*!< number density of O(1-Delta_g) */
-  double* nv_3Su; /*!< number density of O(3-Sigma_u ) */
-  double* nv_1Sg; /*!< number density of O(1-Sigma_g ) */
-  double* nv_CO2; /*!< number density of CO2 */
   double* nv_hnu; /*!< number density of h-nu (photons) */
 
   double* Qv; /*!< heating source term for Euler/NS equations */
 
   char ti_scheme[_MAX_STRING_SIZE_]; /*!< time integrator to use for reaction equations */
 
+  int grid_stride; /*!< grid stride */
+  int z_stride; /*!< z stride */
+
 } Chemistry;
 
 /*! Function to initialize the chemistry object */
-int ChemistryInitialize(void*,void*,void*);
+int ChemistryInitialize(void*,void*,void*,int);
 /*! Function to cleanup the chemistry object */
 int ChemistryCleanup(void*);
 /*! Function to write reacting species to file */
-int ChemistryWriteSpecies(void*,void*,void*,double);
+int ChemistryWriteSpecies(void*,double*,void*,void*,double);
 /*! Solve the reaction equations */
-int ChemistrySolve(void*,void*,void*,double,double);
+int ChemistrySolve(void*,double*,void*,void*,double,double);
 
 #endif
