@@ -35,11 +35,11 @@
 
 /* define ndims and nvars for this model */
 #undef _MODEL_NDIMS_
-#undef _MODEL_NVARS_
+#undef _NS2D_NVARS_
 /*! Number of spatial dimensions */
 #define _MODEL_NDIMS_ 2
-/*! Number of variables per grid point */
-#define _MODEL_NVARS_ 4
+/*! Number of Navier-Stokes variables per grid point */
+#define _NS2D_NVARS_ 4
 
 /* choices for upwinding schemes */
 /*! Roe's upwinding scheme */
@@ -48,8 +48,6 @@
 #define _RF_        "rf-char"
 /*! Characteristic-based local Lax-Friedrich scheme */
 #define _LLF_       "llf-char"
-/*! Steger-Warming flux splitting scheme */
-#define _SWFS_      "steger-warming"
 /*! Rusanov's upwinding scheme */
 #define _RUSANOV_   "rusanov"
 
@@ -62,8 +60,9 @@
 /*! \def _NavierStokes2DGetFlowVar_
  Get the flow variables from the conserved solution vector.
  \f{equation}{
-   {\bf u} = \left[\begin{array}{c} \rho \\ \rho u \\ \rho v \\ e \end{array}\right]
+   {\bf u} = \left[\begin{array}{c} \rho \\ \rho u \\ \rho v \\ e \\ \vdots \\ \phi_i \\ \vdots \end{array}\right]
  \f}
+ where \f$\phi_i\f$ are passively-advected scalars
 */
 #define _NavierStokes2DGetFlowVar_(u,rho,vx,vy,e,P,gamma) \
   { \
@@ -79,29 +78,38 @@
 /*! \def _NavierStokes2DSetFlux_
   Compute the flux vector, given the flow variables
   \f{eqnarray}{
-    dir = x, & {\bf f}\left({\bf u}\right) = \left[\begin{array}{c} \rho u \\ \rho u^2 + p \\ \rho u v \\ (e+p)u \end{array}\right], \\
-    dir = y, & {\bf f}\left({\bf u}\right) = \left[\begin{array}{c} \rho v \\ \rho u v \\ \rho v^2 + p \\ (e+p)v \end{array}\right]
+    dir = x, & {\bf f}\left({\bf u}\right) = \left[\begin{array}{c} \rho u \\ \rho u^2 + p \\ \rho u v \\ (e+p)u \\ \vdots \\ u \phi_i \\ \vdots \end{array}\right], \\
+    dir = y, & {\bf f}\left({\bf u}\right) = \left[\begin{array}{c} \rho v \\ \rho u v \\ \rho v^2 + p \\ (e+p)v \\ \vdots \\ v \phi_i \\ \vdots \end{array}\right]
   \f}
 */
-#define _NavierStokes2DSetFlux_(f,rho,vx,vy,e,P,dir) \
+#define _NavierStokes2DSetFlux_(f,u,gamma,nvars,dir) \
   { \
+    double rho, vx, vy, e, P; \
+    _NavierStokes2DGetFlowVar_(u,rho,vx,vy,e,P,gamma); \
+    int m_i;\
     if (dir == _XDIR_) { \
       f[0] = rho * vx; \
       f[1] = rho * vx * vx + P; \
       f[2] = rho * vx * vy; \
       f[3] = (e + P) * vx; \
+      for (m_i = _NS2D_NVARS_; m_i < nvars; m_i++) { \
+          f[m_i] = vx * u[m_i]; \
+      } \
     } else if (dir == _YDIR_) { \
       f[0] = rho * vy; \
       f[1] = rho * vy * vx; \
       f[2] = rho * vy * vy + P; \
       f[3] = (e + P) * vy; \
+      for (m_i = _NS2D_NVARS_; m_i < nvars; m_i++) { \
+          f[m_i] = vy * u[m_i]; \
+      } \
     } \
   }
 
 /*! \def _NavierStokes2DRoeAverage_
   Compute the Roe-average of two solutions.
 */
-#define _NavierStokes2DRoeAverage_(uavg,uL,uR,gamma) \
+#define _NavierStokes2DRoeAverage_(uavg,uL,uR,nvars,gamma) \
   { \
     double  rho ,vx, vy, e ,P ,H ,csq, vsq; \
     double  rhoL,vxL,vyL,eL,PL,HL,cLsq,vsqL; \
@@ -136,6 +144,10 @@
     uavg[1] = rho*vx; \
     uavg[2] = rho*vy; \
     uavg[3] = e; \
+    int m_i; \
+    for (m_i = _NS2D_NVARS_; m_i < nvars; m_i++) { \
+        uavg[m_i] = sqrt(uL[m_i]) * sqrt(uR[m_i]); \
+    } \
   }
 
 /*! \def _NavierStokes2DEigenvalues_
@@ -143,30 +155,29 @@
   as a matrix D whose diagonal values are the eigenvalues. Admittedly, this is inefficient. The matrix D is stored in
   a row-major format.
 */
-#define _NavierStokes2DEigenvalues_(u,D,gamma,dir) \
+#define _NavierStokes2DEigenvalues_(u,D,gamma,nvars,dir) \
   { \
     double  rho,vx,vy,e,P,c,vn,vsq; \
-    rho = u[0]; \
-    vx  = u[1] / rho; \
-    vy  = u[2] / rho; \
-    e   = u[3]; \
-    vsq  = (vx*vx) + (vy*vy); \
-    P   = (e - 0.5*rho*vsq) * (gamma-1.0); \
-    c    = sqrt(gamma*P/rho); \
+    _NavierStokes2DGetFlowVar_(u,rho,vx,vy,e,P,gamma); \
+    vsq = (vx*vx) + (vy*vy); \
+    c = sqrt(gamma*P/rho); \
     if      (dir == _XDIR_) vn = vx; \
     else if (dir == _YDIR_) vn = vy; \
-    else               vn = 0.0; \
+    else                    vn = 0.0; \
+    _ArraySetValue_(D, nvars*nvars, 0.0); \
+    D[0*nvars+0] = vn-c; \
     if (dir == _XDIR_) {\
-      D[0*_MODEL_NVARS_+0] = vn-c;   D[0*_MODEL_NVARS_+1] = 0;    D[0*_MODEL_NVARS_+2] = 0;      D[0*_MODEL_NVARS_+3] = 0; \
-      D[1*_MODEL_NVARS_+0] = 0;      D[1*_MODEL_NVARS_+1] = vn+c; D[1*_MODEL_NVARS_+2] = 0;      D[1*_MODEL_NVARS_+3] = 0; \
-      D[2*_MODEL_NVARS_+0] = 0;      D[2*_MODEL_NVARS_+1] = 0;    D[2*_MODEL_NVARS_+2] = vn;     D[2*_MODEL_NVARS_+3] = 0; \
-      D[3*_MODEL_NVARS_+0] = 0;      D[3*_MODEL_NVARS_+1] = 0;    D[3*_MODEL_NVARS_+2] = 0;      D[3*_MODEL_NVARS_+3] = vn; \
+      D[1*nvars+1] = vn+c; \
+      D[2*nvars+2] = vn;\
     } else if (dir == _YDIR_) { \
-      D[0*_MODEL_NVARS_+0] = vn-c;   D[0*_MODEL_NVARS_+1] = 0;    D[0*_MODEL_NVARS_+2] = 0;      D[0*_MODEL_NVARS_+3] = 0; \
-      D[1*_MODEL_NVARS_+0] = 0;      D[1*_MODEL_NVARS_+1] = vn;   D[1*_MODEL_NVARS_+2] = 0;      D[1*_MODEL_NVARS_+3] = 0; \
-      D[2*_MODEL_NVARS_+0] = 0;      D[2*_MODEL_NVARS_+1] = 0;    D[2*_MODEL_NVARS_+2] = vn+c;   D[2*_MODEL_NVARS_+3] = 0; \
-      D[3*_MODEL_NVARS_+0] = 0;      D[3*_MODEL_NVARS_+1] = 0;    D[3*_MODEL_NVARS_+2] = 0;      D[3*_MODEL_NVARS_+3] = vn; \
+      D[1*nvars+1] = vn; \
+      D[2*nvars+2] = vn+c; \
     }\
+    D[3*nvars+3] = vn; \
+    int m_i; \
+    for (m_i = _NS2D_NVARS_; m_i < nvars; m_i++) { \
+      D[m_i*nvars+m_i] = vn; \
+    } \
   }
 
 /*! \def _NavierStokes2DLeftEigenvectors_
@@ -177,57 +188,58 @@
   + Rohde, "Eigenvalues and eigenvectors of the Euler equations in general geometries", AIAA Paper 2001-2609,
     http://dx.doi.org/10.2514/6.2001-2609
 */
-#define _NavierStokes2DLeftEigenvectors_(u,L,ga,dir) \
+#define _NavierStokes2DLeftEigenvectors_(u,L,ga,nvars,dir) \
   { \
-    double  ga_minus_one=ga-1.0; \
-    double  rho,vx,vy,e,P,a,un,ek,vsq; \
-    double  nx = 0,ny = 0; \
-    rho = u[0]; \
-    vx  = u[1] / rho; \
-    vy  = u[2] / rho; \
-    e   = u[3]; \
+    double ga_minus_one=ga-1.0; \
+    double rho,vx,vy,e,P,a,un,ek,vsq; \
+    _NavierStokes2DGetFlowVar_(u,rho,vx,vy,e,P,ga); \
+    double nx = 0,ny = 0; \
     vsq  = (vx*vx) + (vy*vy); \
-    P   = (e - 0.5*rho*vsq) * (ga-1.0); \
     ek = 0.5 * (vx*vx + vy*vy); \
     a = sqrt(ga * P / rho); \
+    _ArraySetValue_(L, nvars*nvars, 0.0); \
     if (dir == _XDIR_) { \
       un = vx; \
       nx = 1.0; \
-      L[0*_MODEL_NVARS_+0] = (ga_minus_one*ek + a*un) / (2*a*a); \
-      L[0*_MODEL_NVARS_+1] = ((-ga_minus_one)*vx - a*nx) / (2*a*a); \
-      L[0*_MODEL_NVARS_+2] = ((-ga_minus_one)*vy - a*ny) / (2*a*a); \
-      L[0*_MODEL_NVARS_+3] = ga_minus_one / (2*a*a); \
-      L[3*_MODEL_NVARS_+0] = (a*a - ga_minus_one*ek) / (a*a); \
-      L[3*_MODEL_NVARS_+1] = (ga_minus_one*vx) / (a*a); \
-      L[3*_MODEL_NVARS_+2] = (ga_minus_one*vy) / (a*a); \
-      L[3*_MODEL_NVARS_+3] = (-ga_minus_one) / (a*a); \
-      L[1*_MODEL_NVARS_+0] = (ga_minus_one*ek - a*un) / (2*a*a); \
-      L[1*_MODEL_NVARS_+1] = ((-ga_minus_one)*vx + a*nx) / (2*a*a); \
-      L[1*_MODEL_NVARS_+2] = ((-ga_minus_one)*vy + a*ny) / (2*a*a); \
-      L[1*_MODEL_NVARS_+3] = ga_minus_one / (2*a*a); \
-      L[2*_MODEL_NVARS_+0] = (vy - un*ny) / nx; \
-      L[2*_MODEL_NVARS_+1] = ny; \
-      L[2*_MODEL_NVARS_+2] = (ny*ny - 1.0) / nx; \
-      L[2*_MODEL_NVARS_+3] = 0.0; \
+      L[0*nvars+0] = (ga_minus_one*ek + a*un) / (2*a*a); \
+      L[0*nvars+1] = ((-ga_minus_one)*vx - a*nx) / (2*a*a); \
+      L[0*nvars+2] = ((-ga_minus_one)*vy - a*ny) / (2*a*a); \
+      L[0*nvars+3] = ga_minus_one / (2*a*a); \
+      L[3*nvars+0] = (a*a - ga_minus_one*ek) / (a*a); \
+      L[3*nvars+1] = (ga_minus_one*vx) / (a*a); \
+      L[3*nvars+2] = (ga_minus_one*vy) / (a*a); \
+      L[3*nvars+3] = (-ga_minus_one) / (a*a); \
+      L[1*nvars+0] = (ga_minus_one*ek - a*un) / (2*a*a); \
+      L[1*nvars+1] = ((-ga_minus_one)*vx + a*nx) / (2*a*a); \
+      L[1*nvars+2] = ((-ga_minus_one)*vy + a*ny) / (2*a*a); \
+      L[1*nvars+3] = ga_minus_one / (2*a*a); \
+      L[2*nvars+0] = (vy - un*ny) / nx; \
+      L[2*nvars+1] = ny; \
+      L[2*nvars+2] = (ny*ny - 1.0) / nx; \
+      L[2*nvars+3] = 0.0; \
     } else if (dir == _YDIR_) {  \
       un = vy;  \
       ny = 1.0; \
-      L[0*_MODEL_NVARS_+0] = (ga_minus_one*ek+a*un) / (2*a*a); \
-      L[0*_MODEL_NVARS_+1] = ((1.0-ga)*vx - a*nx) / (2*a*a); \
-      L[0*_MODEL_NVARS_+2] = ((1.0-ga)*vy - a*ny) / (2*a*a); \
-      L[0*_MODEL_NVARS_+3] = ga_minus_one / (2*a*a); \
-      L[3*_MODEL_NVARS_+0] = (a*a-ga_minus_one*ek) / (a*a); \
-      L[3*_MODEL_NVARS_+1] = ga_minus_one*vx / (a*a); \
-      L[3*_MODEL_NVARS_+2] = ga_minus_one*vy / (a*a); \
-      L[3*_MODEL_NVARS_+3] = (1.0 - ga) / (a*a); \
-      L[2*_MODEL_NVARS_+0] = (ga_minus_one*ek-a*un) / (2*a*a); \
-      L[2*_MODEL_NVARS_+1] = ((1.0-ga)*vx + a*nx) / (2*a*a); \
-      L[2*_MODEL_NVARS_+2] = ((1.0-ga)*vy + a*ny) / (2*a*a); \
-      L[2*_MODEL_NVARS_+3] = ga_minus_one / (2*a*a); \
-      L[1*_MODEL_NVARS_+0] = (un*nx-vx) / ny; \
-      L[1*_MODEL_NVARS_+1] = (1.0 - nx*nx) / ny; \
-      L[1*_MODEL_NVARS_+2] = - nx; \
-      L[1*_MODEL_NVARS_+3] = 0; \
+      L[0*nvars+0] = (ga_minus_one*ek+a*un) / (2*a*a); \
+      L[0*nvars+1] = ((1.0-ga)*vx - a*nx) / (2*a*a); \
+      L[0*nvars+2] = ((1.0-ga)*vy - a*ny) / (2*a*a); \
+      L[0*nvars+3] = ga_minus_one / (2*a*a); \
+      L[3*nvars+0] = (a*a-ga_minus_one*ek) / (a*a); \
+      L[3*nvars+1] = ga_minus_one*vx / (a*a); \
+      L[3*nvars+2] = ga_minus_one*vy / (a*a); \
+      L[3*nvars+3] = (1.0 - ga) / (a*a); \
+      L[2*nvars+0] = (ga_minus_one*ek-a*un) / (2*a*a); \
+      L[2*nvars+1] = ((1.0-ga)*vx + a*nx) / (2*a*a); \
+      L[2*nvars+2] = ((1.0-ga)*vy + a*ny) / (2*a*a); \
+      L[2*nvars+3] = ga_minus_one / (2*a*a); \
+      L[1*nvars+0] = (un*nx-vx) / ny; \
+      L[1*nvars+1] = (1.0 - nx*nx) / ny; \
+      L[1*nvars+2] = - nx; \
+      L[1*nvars+3] = 0; \
+    } \
+    int m_i; \
+    for (m_i = _NS2D_NVARS_; m_i < nvars; m_i++) { \
+      L[m_i*nvars+m_i] = 1.0; \
     } \
   }
 
@@ -239,58 +251,59 @@
   + Rohde, "Eigenvalues and eigenvectors of the Euler equations in general geometries", AIAA Paper 2001-2609,
     http://dx.doi.org/10.2514/6.2001-2609
 */
-#define _NavierStokes2DRightEigenvectors_(u,R,ga,dir) \
+#define _NavierStokes2DRightEigenvectors_(u,R,ga,nvars,dir) \
   { \
-    double  ga_minus_one = ga-1.0; \
-    double  rho,vx,vy,e,P,un,ek,a,h0,vsq; \
-    double  nx = 0,ny = 0; \
-    rho = u[0]; \
-    vx  = u[1] / rho; \
-    vy  = u[2] / rho; \
-    e   = u[3]; \
+    double ga_minus_one = ga-1.0; \
+    double rho,vx,vy,e,P,un,ek,a,h0,vsq; \
+    _NavierStokes2DGetFlowVar_(u,rho,vx,vy,e,P,ga); \
+    double nx = 0,ny = 0; \
     vsq  = (vx*vx) + (vy*vy); \
-    P   = (e - 0.5*rho*vsq) * (ga-1.0); \
     ek   = 0.5 * (vx*vx + vy*vy); \
     a    = sqrt(ga * P / rho); \
     h0   = a*a / ga_minus_one + ek; \
+    _ArraySetValue_(R, nvars*nvars, 0.0); \
     if (dir == _XDIR_) { \
       un = vx; \
       nx = 1.0; \
-      R[0*_MODEL_NVARS_+0] = 1.0; \
-      R[1*_MODEL_NVARS_+0] = vx - a*nx; \
-      R[2*_MODEL_NVARS_+0] = vy - a*ny; \
-      R[3*_MODEL_NVARS_+0] = h0 - a*un; \
-      R[0*_MODEL_NVARS_+3] = 1.0; \
-      R[1*_MODEL_NVARS_+3] = vx; \
-      R[2*_MODEL_NVARS_+3] = vy; \
-      R[3*_MODEL_NVARS_+3] = ek; \
-      R[0*_MODEL_NVARS_+1] = 1.0; \
-      R[1*_MODEL_NVARS_+1] = vx + a*nx; \
-      R[2*_MODEL_NVARS_+1] = vy + a*ny; \
-      R[3*_MODEL_NVARS_+1] = h0 + a*un; \
-      R[0*_MODEL_NVARS_+2] = 0.0; \
-      R[1*_MODEL_NVARS_+2] = ny; \
-      R[2*_MODEL_NVARS_+2] = -nx; \
-      R[3*_MODEL_NVARS_+2] = vx*ny - vy*nx; \
+      R[0*nvars+0] = 1.0; \
+      R[1*nvars+0] = vx - a*nx; \
+      R[2*nvars+0] = vy - a*ny; \
+      R[3*nvars+0] = h0 - a*un; \
+      R[0*nvars+3] = 1.0; \
+      R[1*nvars+3] = vx; \
+      R[2*nvars+3] = vy; \
+      R[3*nvars+3] = ek; \
+      R[0*nvars+1] = 1.0; \
+      R[1*nvars+1] = vx + a*nx; \
+      R[2*nvars+1] = vy + a*ny; \
+      R[3*nvars+1] = h0 + a*un; \
+      R[0*nvars+2] = 0.0; \
+      R[1*nvars+2] = ny; \
+      R[2*nvars+2] = -nx; \
+      R[3*nvars+2] = vx*ny - vy*nx; \
     } else if (dir == _YDIR_) { \
       un = vy; \
       ny = 1.0; \
-      R[0*_MODEL_NVARS_+0] = 1.0; \
-      R[1*_MODEL_NVARS_+0] = vx - a*nx; \
-      R[2*_MODEL_NVARS_+0] = vy - a*ny; \
-      R[3*_MODEL_NVARS_+0] = h0 - a*un; \
-      R[0*_MODEL_NVARS_+3] = 1.0; \
-      R[1*_MODEL_NVARS_+3] = vx; \
-      R[2*_MODEL_NVARS_+3] = vy; \
-      R[3*_MODEL_NVARS_+3] = ek; \
-      R[0*_MODEL_NVARS_+2] = 1.0; \
-      R[1*_MODEL_NVARS_+2] = vx + a*nx; \
-      R[2*_MODEL_NVARS_+2] = vy + a*ny; \
-      R[3*_MODEL_NVARS_+2] = h0 + a*un; \
-      R[0*_MODEL_NVARS_+1] = 0; \
-      R[1*_MODEL_NVARS_+1] = ny; \
-      R[2*_MODEL_NVARS_+1] = -nx; \
-      R[3*_MODEL_NVARS_+1] = vx*ny-vy*nx; \
+      R[0*nvars+0] = 1.0; \
+      R[1*nvars+0] = vx - a*nx; \
+      R[2*nvars+0] = vy - a*ny; \
+      R[3*nvars+0] = h0 - a*un; \
+      R[0*nvars+3] = 1.0; \
+      R[1*nvars+3] = vx; \
+      R[2*nvars+3] = vy; \
+      R[3*nvars+3] = ek; \
+      R[0*nvars+2] = 1.0; \
+      R[1*nvars+2] = vx + a*nx; \
+      R[2*nvars+2] = vy + a*ny; \
+      R[3*nvars+2] = h0 + a*un; \
+      R[0*nvars+1] = 0; \
+      R[1*nvars+1] = ny; \
+      R[2*nvars+1] = -nx; \
+      R[3*nvars+1] = vx*ny-vy*nx; \
+    } \
+    int m_i; \
+    for (m_i = _NS2D_NVARS_; m_i < nvars; m_i++) { \
+      R[m_i*nvars+m_i] = 1.0; \
     } \
   }
 
@@ -331,6 +344,8 @@ typedef struct navierstokes2d_parameters {
 
   int include_chem; /*!< Flag to include chemistry */
   void* chem; /*!< Photochemical reactions object */
+
+  int nvars; /*!< Number of variables per grid point */
 
   // constants for computing viscosity and conductivity coefficients
   double Tref; /*!< Reference temperature */

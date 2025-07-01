@@ -41,8 +41,7 @@ int NavierStokes2DFlux(
   while (!done) {
     int p; _ArrayIndex1DWO_(_MODEL_NDIMS_,dim,index,offset,ghosts,p);
     double rho, vx, vy, e, P;
-    _NavierStokes2DGetFlowVar_((u+_MODEL_NVARS_*p),rho,vx,vy,e,P,param->gamma);
-    _NavierStokes2DSetFlux_((f+_MODEL_NVARS_*p),rho,vx,vy,e,P,dir);
+    _NavierStokes2DSetFlux_((f+param->nvars*p),(u+param->nvars*p),param->gamma,param->nvars,dir);
     _ArrayIncrementIndex_(_MODEL_NDIMS_,bounds,index,done);
   }
 

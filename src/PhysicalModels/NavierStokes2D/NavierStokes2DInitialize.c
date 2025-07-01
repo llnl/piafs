@@ -25,7 +25,6 @@ int NavierStokes2DRightEigenvectors (double*,double*,void*,int);
 int NavierStokes2DUpwindRoe         (double*,double*,double*,double*,double*,double*,int,void*,double);
 int NavierStokes2DUpwindRF          (double*,double*,double*,double*,double*,double*,int,void*,double);
 int NavierStokes2DUpwindLLF         (double*,double*,double*,double*,double*,double*,int,void*,double);
-int NavierStokes2DUpwindSWFS        (double*,double*,double*,double*,double*,double*,int,void*,double);
 int NavierStokes2DUpwindRusanov     (double*,double*,double*,double*,double*,double*,int,void*,double);
 
 int NavierStokes2DWriteChem (void*,void*,double);
@@ -72,10 +71,6 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
 
   static int count = 0;
 
-  if (solver->nvars != _MODEL_NVARS_) {
-    fprintf(stderr,"Error in NavierStokes2DInitialize(): nvars has to be %d.\n",_MODEL_NVARS_);
-    return(1);
-  }
   if (solver->ndims != _MODEL_NDIMS_) {
     fprintf(stderr,"Error in NavierStokes2DInitialize(): ndims has to be %d.\n",_MODEL_NDIMS_);
     return(1);
@@ -138,9 +133,9 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
       }
     }
     fclose(in);
-  }
 
-  physics->include_chem = (!strcmp(include_chem,"yes"));
+    physics->include_chem = (!strcmp(include_chem,"yes"));
+  }
 
   MPIBroadcast_character (physics->upw_choice   ,_MAX_STRING_SIZE_,0,&mpi->world);
   MPIBroadcast_double    (&physics->gamma       ,1                ,0,&mpi->world);
@@ -165,13 +160,12 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
   if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = NavierStokes2DUpwindRoe;
   else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = NavierStokes2DUpwindRF;
   else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = NavierStokes2DUpwindLLF;
-  else if (!strcmp(physics->upw_choice,_SWFS_   )) solver->Upwind = NavierStokes2DUpwindSWFS;
   else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = NavierStokes2DUpwindRusanov;
   else {
     if (!mpi->rank) {
       fprintf(stderr,"Error in NavierStokes2DInitialize(): %s is not a valid upwinding scheme. ",
               physics->upw_choice);
-      fprintf(stderr,"Choices are %s, %s, %s, %s, and %s.\n",_ROE_,_RF_,_LLF_,_SWFS_,_RUSANOV_);
+      fprintf(stderr,"Choices are %s, %s, %s, and %s.\n",_ROE_,_RF_,_LLF_,_RUSANOV_);
     }
     return(1);
   }
@@ -180,6 +174,8 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
   int n;
   DomainBoundary  *boundary = (DomainBoundary*) solver->boundary;
   for (n = 0; n < solver->nBoundaryZones; n++)  boundary[n].gamma = physics->gamma;
+
+  physics->nvars = _NS2D_NVARS_;
 
   if (physics->include_chem) {
     solver->PhysicsOutput = NavierStokes2DWriteChem;
@@ -190,6 +186,7 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
     Chemistry* chem = (Chemistry*) physics->chem;
     physics->gamma = chem->gamma;
     physics->Tref = chem->Ti;
+    physics->nvars += chem->n_reacting_species;
 
     if (physics->Re > 0) {
       if (!mpi->rank) {
@@ -203,6 +200,11 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
       physics->Re = chem->rho_ref * chem->v_ref * chem->L_ref / mu_ref;
       physics->Pr = chem->gamma*chem->R/(chem->gamma-1) * mu_ref / kappa_ref;
     }
+  }
+
+  if (solver->nvars != physics->nvars) {
+    fprintf(stderr,"Error in NavierStokes2DInitialize(): nvars has to be %d in solver.inp.\n",physics->nvars);
+    return(1);
   }
 
   if (!mpi->rank) {

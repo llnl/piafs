@@ -226,7 +226,8 @@ typedef struct chemistry_parameters {
   double sO3; /*!< Ozone absorbtion cross-section [m^2] */
   double* imap; /*!< Array of intensity values read in from file */
 
-  int nspecies; /*!< number of reacting species */
+  int nspecies; /*!< number of species */
+  int n_reacting_species; /*!< number of reacting species */
   double* nv_O2; /*!< number density of O2 */
   double* nv_O3; /*!< number density of O3 */
   double* nv_O3old; /*!< number density of O3 (previous timestep) */

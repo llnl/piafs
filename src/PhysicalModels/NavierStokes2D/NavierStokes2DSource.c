@@ -22,7 +22,7 @@ int NavierStokes2DSource(
   MPIVariables    *mpi    = (MPIVariables*)   m;
   NavierStokes2D  *param  = (NavierStokes2D*) solver->physics;
 
-  _ArraySetValue_(source, _MODEL_NVARS_*solver->npoints_local_wghosts, 0.0);
+  _ArraySetValue_(source, param->nvars*solver->npoints_local_wghosts, 0.0);
 
   if (param->include_chem) {
 
@@ -36,7 +36,7 @@ int NavierStokes2DSource(
     int done = 0; _ArraySetValue_(index,ndims,0);
     while (!done) {
       int p; _ArrayIndex1D_(ndims,dim,index,ghosts,p);
-      source[_MODEL_NVARS_*p + 3] = chem->Qv[p]/(param->gamma-1.0);
+      source[param->nvars*p + 3] = chem->Qv[p]/(param->gamma-1.0);
       _ArrayIncrementIndex_(ndims,dim,index,done);
     }
 

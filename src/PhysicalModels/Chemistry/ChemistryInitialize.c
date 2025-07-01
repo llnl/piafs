@@ -407,7 +407,8 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   }
 
   int nz = chem->z_i + 1;
-  chem->nspecies = 8;
+  chem->nspecies = 8; // O2, O3, 1D, 1Dg, 3Su, 1Sg, CO2, hnu
+  chem->n_reacting_species = chem->nspecies - 1; // not include hnu
   chem->nv_O2    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_O3    = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_O3old = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
