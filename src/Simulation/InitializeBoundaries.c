@@ -128,6 +128,11 @@ int InitializeBoundaries( void  *s,   /*!< Array of simulation objects of type #
           /* read in the inflow density and velocity */
           ferr = fscanf(in,"%lf",&boundary[nb].FlowDensity);
           for (v = 0; v < solver->ndims; v++) ferr = fscanf(in,"%lf",&boundary[nb].FlowVelocity[v]);
+          /* read in passive scalars, if any */
+          int num_scalars = solver->nvars - (2+solver->ndims);
+          boundary[nb].scalars = (double*) calloc (num_scalars, sizeof(double));
+                                           /* deallocated in BCCleanup.c */
+          for (v = 0; v < num_scalars; v++) ferr = fscanf(in,"%lf",&boundary[nb].scalars[v]);
         }
 
         if (!strcmp(boundary[nb].bctype,_SUBSONIC_OUTFLOW_)) {
@@ -231,9 +236,14 @@ int InitializeBoundaries( void  *s,   /*!< Array of simulation objects of type #
       }
 
       if (!strcmp(boundary[nb].bctype,_SUBSONIC_INFLOW_)) {
-        if (mpi->rank) boundary[nb].FlowVelocity = (double*) calloc (solver->ndims,sizeof(double));
+        int num_scalars = solver->nvars - (2+solver->ndims);
+        if (mpi->rank) {
+          boundary[nb].FlowVelocity = (double*) calloc (solver->ndims,sizeof(double));
+          boundary[nb].scalars = (double*) calloc (num_scalars,sizeof(double));
+        }
         IERR MPIBroadcast_double(&boundary[nb].FlowDensity,1            ,0,&mpi->world); CHECKERR(ierr);
         IERR MPIBroadcast_double(boundary[nb].FlowVelocity,solver->ndims,0,&mpi->world); CHECKERR(ierr);
+        IERR MPIBroadcast_double(boundary[nb].scalars     ,num_scalars  ,0,&mpi->world); CHECKERR(ierr);
       }
 
       if (!strcmp(boundary[nb].bctype,_SUBSONIC_OUTFLOW_)) {

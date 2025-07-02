@@ -72,10 +72,19 @@ int BCSubsonicInflowU(
         phi[nvars*p1+2] = rho_gpt * vvel_gpt;
         phi[nvars*p1+3] = energy_gpt;
 
+        int v;
+        for (v = _NS2D_NVARS_; v < nvars; v++ ) {
+          phi[nvars*p1+v] = boundary->scalars[v-_NS2D_NVARS_];
+        }
+
         _ArrayIncrementIndex_(ndims,bounds,indexb,done);
       }
     }
 
+  } else if (ndims == 3) {
+
+      printf("ERROR in BCSubsonicInflowU: not yet implemented for ndims = 3");
   }
+
   return(0);
 }
