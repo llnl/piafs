@@ -16,6 +16,7 @@ int BCCleanup(  void *b /*!< Boundary object of type #DomainBoundary*/ )
   if (boundary->DirichletValue) free(boundary->DirichletValue);
   if (boundary->SpongeValue   ) free(boundary->SpongeValue   );
   if (boundary->FlowVelocity  ) free(boundary->FlowVelocity  );
+  if (boundary->scalars       ) free(boundary->scalars       );
 
   return 0;
 }

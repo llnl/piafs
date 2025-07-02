@@ -72,10 +72,12 @@ typedef struct domain_boundaries {
   double *SpongeValue;      /*!< Specified value for steady Sponge    BC */
 
   /* variables specific to Navier-Stokes/Euler equations BCs */
-  double gamma,                                   /*!< Ratio of specific heats (specific to Euler/Navier-Stokes) */
-         FlowDensity,                             /*!< Boundary flow density (specific to Euler/Navier-Stokes) */
-         *FlowVelocity,                           /*!< Boundary flow velocity (specific to Euler/Navier-Stokes) */
-         FlowPressure;                            /*!< Boundary flow pressure (specific to Euler/Navier-Stokes) */
+  double gamma,          /*!< Ratio of specific heats (specific to Euler/Navier-Stokes) */
+         FlowDensity,    /*!< Boundary flow density (specific to Euler/Navier-Stokes) */
+         *FlowVelocity,  /*!< Boundary flow velocity (specific to Euler/Navier-Stokes) */
+         FlowPressure;   /*!< Boundary flow pressure (specific to Euler/Navier-Stokes) */
+  /* passive scalars advected with Navier-Stokes/Euler */
+  double *scalars; /*!< Boundary flow scalars (specific to Euler/Navier-Stokes) */
 
 } DomainBoundary;
 
