@@ -147,7 +147,7 @@ int main()
   printf("  Grating wavenumber: %1.4e [m^{-1}]\n", kg);
   printf("Reference quantities:\n");
   printf("  Length: %1.4e (m)\n", L_ref);
-  printf("  Temperature: %1.4e (m)\n", T_ref);
+  printf("  Temperature: %1.4e (K)\n", T_ref);
   printf("  Density: %1.4e (kg m^{-3})\n", rho_ref);
   printf("  Speed: %1.4e (m s^{-1})\n", v_ref);
   printf("  Time: %1.4e (s)\n", t_ref);
@@ -179,21 +179,35 @@ int main()
   double k_aw = 1; // normalized acoustic wave vector
   double l_aw = 2*pi/k_aw; // normalized acoustic wavelength
   double N_period_x = 5; // number of spatial periods
-  double xmin = -N_period_x/2*l_aw;
-  double xmax =  N_period_x/2*l_aw;
+  double xmin = -0.005/L_ref; // -5 mm
+  double xmax =  0.005/L_ref; // +5 mm
+  double ymin =  0.000/L_ref; //  0 mm
+  double ymax =  0.002/L_ref; // 10 mm
+  printf("\n");
   printf("Physical domain:\n");
   printf("  normalized xmin, xmax: %1.4e, %1.4e\n", xmin, xmax);
+  printf("  normalized ymin, ymax: %1.4e, %1.4e\n", ymin, ymax);
   printf("  xmin/lambda_ac, xmax/lambda_ac: %1.4e, %1.4e\n", xmin/((2*pi/kg)/L_ref), xmax/((2*pi/kg)/L_ref));
+  printf("  ymin/lambda_ac, ymax/lambda_ac: %1.4e, %1.4e\n", ymin/((2*pi/kg)/L_ref), ymax/((2*pi/kg)/L_ref));
 
   // uniform flow parameters (normalized) - vacuum
-  double rho0 = (rho_O2 + rho_CO2) / rho_ref;
-  double p0 = 1e7 / P_ref;
+  double init_ntot = 1.0e26; // [m^{-3}]
+  double init_n_O2 = f_O2 * init_ntot; // [m^{-3}]; initial O2 concentration
+  double init_n_CO2 = f_CO2 * init_ntot; // [m^{-3}]; initial CO2 concentration
+  double init_rho_O2 = init_n_O2 * M_O2 / NA; // kg
+  double init_rho_CO2 = init_n_CO2 * M_CO2 / NA; // kg
+  double rho0 = (init_rho_O2 + init_rho_CO2) / rho_ref;
+  double p0 = 1.0e7 /* [Pa] */ / P_ref;
   double uvel0 = 0.0;
-  double vvel0 = 1.63;
-  printf("Initial flow: rho = %1.4e, p = %1.4e, (u, v) = (%1.4e, %1.4e)\n", rho0, p0, uvel0, vvel0);
+  double vvel0 = 530 /* [m s^{-1}] */ / v_ref;
+  printf("\n");
+  printf("Initial flow: rho = %1.4e kg m^{-3}, p = %1.4e Pa, (u, v) = (%1.4e, %1.4e) m s^{-1}\n",
+         rho0*rho_ref, p0*P_ref, uvel0*v_ref, vvel0*v_ref);
+  printf("Initial flow (normalized): rho = %1.4e, p = %1.4e, (u, v) = (%1.4e, %1.4e)\n",
+         rho0, p0, uvel0, vvel0);
 
   printf("\n");
-	int NI, NJ, ndims, nvars;
+  int NI, NJ, ndims, nvars;
   char ip_file_type[50]; strcpy(ip_file_type,"ascii");
 
   std::ifstream in;
@@ -225,7 +239,7 @@ int main()
 
 	int i,j;
 	double dx = (xmax - xmin) / ((double)NI-1);
-	double dy = dx;
+	double dy = (ymax - ymin) / ((double)NJ-1);
 
   // allocate flow arrays
 	double* x   = (double*) calloc (NI   , sizeof(double));
@@ -413,12 +427,12 @@ int main()
   }
   printf("Done!\n");
 
-	free(x);
-	free(y);
-	free(u0);
-	free(u1);
-	free(u2);
-	free(u3);
+  free(x);
+  free(y);
+  free(u0);
+  free(u1);
+  free(u2);
+  free(u3);
 
   free(nv_O2);
   free(nv_O3);
@@ -428,5 +442,21 @@ int main()
   free(nv_1Sg);
   free(nv_CO2);
 
-	return(0);
+  // Compute normalized boundary flow and print to screen
+  double bc_ntot = 1.0e26; // [m^{-3}]
+  double bc_n_O2 = f_O2 * bc_ntot; // [m^{-3}]; initial O2 concentration
+  double bc_n_CO2 = f_CO2 * bc_ntot; // [m^{-3}]; initial CO2 concentration
+  double bc_rho_O2 = bc_n_O2 * M_O2 / NA; // kg
+  double bc_rho_CO2 = bc_n_CO2 * M_CO2 / NA; // kg
+  double bc_rho0 = (bc_rho_O2 + bc_rho_CO2) / rho_ref;
+  double bc_p0 = 1.0e7 /* [Pa] */ / P_ref;
+  double bc_uvel0 = 0.0;
+  double bc_vvel0 = 530 /* [m s^{-1}] */ / v_ref;
+  printf("\n");
+  printf("Inflow BC flow: rho = %1.4e kg m^{-3}, p = %1.4e Pa, (u, v) = (%1.4e, %1.4e) m s^{-1}\n",
+         bc_rho0*rho_ref, bc_p0*P_ref, bc_uvel0*v_ref, bc_vvel0*v_ref);
+  printf("Inflow BC flow (normalized): rho = %1.4e, p = %1.4e, (u, v) = (%1.4e, %1.4e)\n",
+         bc_rho0, bc_p0, bc_uvel0, bc_vvel0);
+
+  return(0);
 }

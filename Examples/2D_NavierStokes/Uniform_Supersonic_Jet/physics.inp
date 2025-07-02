@@ -1,5 +1,5 @@
 begin
-	gamma             1.4
-	upwinding         rf-char
-  include_chemistry yes
+    gamma             1.4
+    upwinding         rf-char
+    include_chemistry yes
 end
