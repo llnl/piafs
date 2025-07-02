@@ -211,8 +211,8 @@ int main()
          rho0*rho_ref, p0*P_ref, uvel0*v_ref, vvel0*v_ref);
   printf("Initial flow (normalized):\n    rho = %1.16e,\n    p = %1.16e,\n    (u, v) = (%1.16e, %1.16e)\n",
          rho0, p0, uvel0, vvel0);
-
   printf("\n");
+
   int NI, NJ, ndims, nvars;
   char ip_file_type[50]; strcpy(ip_file_type,"ascii");
 

@@ -46,6 +46,8 @@ int main()
   double z_mm = 0.0;
   int nz = 22;
 
+  double inp_Ptot = 0.0, inp_Ti = 0.0;
+
   FILE *chem_in;
   printf("Reading chemical reaction inputs from file \"chemistry.inp\".\n");
   chem_in = fopen("chemistry.inp","r");
@@ -65,9 +67,9 @@ int main()
         } else if (!strcmp(word,"f_O3")) {
           fscanf(chem_in,"%lf",&f_O3);
         } else if (!strcmp(word,"Ptot")) {
-          fscanf(chem_in,"%lf",&Ptot);
+          fscanf(chem_in,"%lf",&inp_Ptot);
         } else if (!strcmp(word,"Ti")) {
-          fscanf(chem_in,"%lf",&Ti);
+          fscanf(chem_in,"%lf",&inp_Ti);
         } else if (!strcmp(word,"Lz")) {
           fscanf(chem_in,"%lf",&Lz);
         } else if (!strcmp(word,"z_mm")) {
@@ -94,6 +96,14 @@ int main()
   if ((f_O3 > 1.0) || (f_O3 < 0.0)) {
     fprintf(stderr,"ERROR in ChemistryInitialize(): f_O3 is not between 0.0 and 1.0 !!!\n");
     return 1;
+  }
+  if (Ptot != inp_Ptot) {
+      fprintf(stderr,"ERROR in chemistry.inp: Ptot not set to %1.16e\n", Ptot);
+      return 1;
+  }
+  if (Ti != inp_Ti) {
+      fprintf(stderr,"ERROR in chemistry.inp: Ti not set to %1.16e\n", Ti);
+      return 1;
   }
 
   double kUV = 2 * pi / lambda_UV; //pump beam wave vector
@@ -201,12 +211,12 @@ int main()
   double uvel0 = 0.0;
   double vvel0 = 530 /* [m s^{-1}] */ / v_ref;
   printf("\n");
-  printf("Initial flow: rho = %1.4e kg m^{-3}, p = %1.4e Pa, (u, v) = (%1.4e, %1.4e) m s^{-1}\n",
+  printf("Initial flow:\n    rho = %1.16e kg m^{-3},\n    p = %1.16e Pa,\n    (u, v) = (%1.16e, %1.16e) m s^{-1}\n",
          rho0*rho_ref, p0*P_ref, uvel0*v_ref, vvel0*v_ref);
-  printf("Initial flow (normalized): rho = %1.4e, p = %1.4e, (u, v) = (%1.4e, %1.4e)\n",
+  printf("Initial flow (normalized):\n    rho = %1.16e,\n    p = %1.16e,\n    (u, v) = (%1.16e, %1.16e)\n",
          rho0, p0, uvel0, vvel0);
-
   printf("\n");
+
   int NI, NJ, ndims, nvars;
   char ip_file_type[50]; strcpy(ip_file_type,"ascii");
 
@@ -453,9 +463,9 @@ int main()
   double bc_uvel0 = 0.0;
   double bc_vvel0 = 530 /* [m s^{-1}] */ / v_ref;
   printf("\n");
-  printf("Inflow BC flow: rho = %1.4e kg m^{-3}, p = %1.4e Pa, (u, v) = (%1.4e, %1.4e) m s^{-1}\n",
+  printf("Inflow BC flow:\n    rho = %1.16e kg m^{-3},\n    p = %1.16e Pa,\n    (u, v) = (%1.16e, %1.16e) m s^{-1}\n",
          bc_rho0*rho_ref, bc_p0*P_ref, bc_uvel0*v_ref, bc_vvel0*v_ref);
-  printf("Inflow BC flow (normalized): rho = %1.4e, p = %1.4e, (u, v) = (%1.4e, %1.4e)\n",
+  printf("Inflow BC flow (normalized):\n    rho = %1.16e,\n    p = %1.16e,\n    (u, v) = (%1.16e, %1.16e)\n",
          bc_rho0, bc_p0, bc_uvel0, bc_vvel0);
 
   return(0);

@@ -11,7 +11,7 @@ begin
 	dt                 0.1
 	screen_op_iter     10
 	file_op_iter       50
-	op_file_format     tecplot2d
+	op_file_format     binary
 	ip_file_type       binary
 	op_overwrite       no
 	model              navierstokes2d
