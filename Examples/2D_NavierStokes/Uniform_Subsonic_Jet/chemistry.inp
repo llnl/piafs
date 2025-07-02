@@ -1,0 +1,18 @@
+begin
+  lambda_UV   2.48e-7
+  theta       0.0029671
+  Ptot        1.0e7
+  Ti          7.2429705160399199e+03
+  f_CO2       0.0
+  f_O3        0.01
+  Lz          0.03
+  z_mm        0.0
+  nz          20
+  t_start     1e-9
+  t_pulse     1e-8
+  F0          2000.0
+  sO3         1.1e-21
+  IA          1.0
+  IB          1.0
+  IC          0.01
+end
