@@ -41,6 +41,7 @@ void ChemistrySetPhotonDensity(void*,void*,void*,double);
     Lz                 | double       | #Chemistry::Lz                  | 0.03 (30 mm)
     z_mm               | double       | #Chemistry::z_mm                | 0
     nz                 | int          | #Chemistry::nz                  | 20
+    t_start            | double       | #Chemistry::t_start             | 0.0 s
     t_pulse            | double       | #Chemistry::t_pulse             | 1e-8 s (10 nanoseconds)
     k0a                | double       | #Chemistry::k0a                 | 0.9*3.3e-13 s^{-1}
     k0b                | double       | #Chemistry::k0a                 | 0.1*3.3e-13 s^{-1}
@@ -103,6 +104,7 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   chem->Ptot = 101325.0; // [Pa]; total gas pressure
   chem->Ti = 288; // [K]; initial temperature
 
+  chem->t_start = 0.0;
   chem->t_pulse = 10*1e-9; // 10 nanoseconds
   chem->Lz = 0.03; // 30 milimeters
   chem->z_mm = 0.0;
@@ -143,6 +145,9 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
           ferr = fscanf(in,"%s",word); if (ferr != 1) return(1);
           if (!strcmp(word,"lambda_UV")) {
             ferr = fscanf(in,"%lf",&chem->lambda_UV);
+            if (ferr != 1) return(1);
+          } else if (!strcmp(word,"t_start")) {
+            ferr = fscanf(in,"%lf",&chem->t_start);
             if (ferr != 1) return(1);
           } else if (!strcmp(word,"t_pulse")) {
             ferr = fscanf(in,"%lf",&chem->t_pulse);
@@ -246,6 +251,7 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   IERR MPIBroadcast_double    (&chem->Ti       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->Lz       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->z_mm     ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_double    (&chem->t_start  ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->t_pulse  ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_integer   (&chem->nz       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->k0a      ,1,0,&mpi->world);                  CHECKERR(ierr);
@@ -306,6 +312,7 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   chem->P_ref = chem->rho_ref * chem->v_ref * chem->v_ref;
 
   /* compute some important stuff */
+  chem->t_start_norm = chem->t_start / chem->t_ref;
   chem->t_pulse_norm = chem->t_pulse / chem->t_ref;
   double rate_norm_fac = chem->kg*chem->cs / chem->n_O2;
   chem->k0a_norm = chem->k0a / rate_norm_fac;

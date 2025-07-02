@@ -34,7 +34,11 @@ int ChemistrySetPhotonDensity( void*   a_s,    /*!< Solver object of type #HyPar
     double x;
     _GetCoordinate_(0,index[0],dim,ghosts,solver->x,x);
     double sigma = chem->t_pulse_norm/2.35482;
-    double I0 = chem->I0 * exp( - (a_t - chem->t_pulse_norm)*(a_t - chem->t_pulse_norm) / 2 /sigma / sigma ) * chem->imap[p];
+    double I0 = 0.0;
+    if (a_t > chem->t_start_norm) {
+      double tp = a_t - (chem->t_start_norm + chem->t_pulse_norm);
+      I0 = chem->I0 * exp( -(tp*tp)/(2*sigma*sigma) ) * chem->imap[p];
+    }
     //double I0 = chem->I0 * chem->imap[p];
     double c = chem->c;
     double h = chem->h;

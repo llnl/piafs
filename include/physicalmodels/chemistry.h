@@ -171,7 +171,9 @@ typedef struct chemistry_parameters {
   double P_ref; /*!< reference pressure */
 
   /* heating and reaction arrays */
+  double t_start; /*!< Starting time of pulse */
   double t_pulse; /*!< Duration of pulse */
+  double t_start_norm; /*!< Normalized starting time of pulse */
   double t_pulse_norm; /*!< Normalized duration of pulse */
   double Lz; /*!< Gas length */
   int nz; /*!< number of z-layers */
