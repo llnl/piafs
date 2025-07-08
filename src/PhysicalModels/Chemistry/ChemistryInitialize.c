@@ -59,7 +59,6 @@ void ChemistrySetPhotonDensity(void*,void*,void*,double);
     IA                 | double       | #Chemistry::IA                  | 1.0
     IB                 | double       | #Chemistry::IB                  | 1.0
     IC                 | double       | #Chemistry::IC                  | 0.0
-    time_scheme        | double       | #Chemistry::ti_scheme           | RK4
 
     \b Note: "chemistry.inp" is \b optional; if absent, default values will be used.
 */
@@ -128,8 +127,6 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   chem->IA = 1.0;
   chem->IB = 1.0;
   chem->IC = 0.0;
-
-  strcpy(chem->ti_scheme, "RK4");
 
   /* reading physical model specific inputs */
   if (!mpi->rank) {
@@ -224,9 +221,6 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
           } else if (!strcmp(word,"IC")) {
             ferr = fscanf(in,"%lf",&chem->IC);
             if (ferr != 1) return(1);
-          } else if (!strcmp(word,"time_scheme")) {
-            ferr = fscanf(in,"%s",chem->ti_scheme);
-            if (ferr != 1) return(1);
           } else if (strcmp(word,"end")) {
             char useless[_MAX_STRING_SIZE_];
             ferr = fscanf(in,"%s",useless); if (ferr != 1) return(ferr);
@@ -270,8 +264,6 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   IERR MPIBroadcast_double    (&chem->IA       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->IB       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->IC       ,1,0,&mpi->world);                  CHECKERR(ierr);
-
-  IERR MPIBroadcast_character (chem->ti_scheme,_MAX_STRING_SIZE_,0,&mpi->world);  CHECKERR(ierr);
 #endif
 
   /* sanity checks */
@@ -381,6 +373,8 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
     printf("    O3 number density:  %1.4e [m^{-3}]\n", chem->n_O3);
     printf("    CO2 number density: %1.4e [m^{-3}]\n", chem->n_CO2);
     printf("    Sound speed: %1.4e [m s^{-1}]\n", chem->cs);
+    printf("    Pulse start time: %1.4e (s), %1.4e (normalized)\n",
+                chem->t_start, chem->t_start_norm );
     printf("    Pulse duration: %1.4e (s), %1.4e (normalized)\n",
                 chem->t_pulse, chem->t_pulse_norm );
     printf("    Gas length: %1.4e [m]\n", chem->Lz);
@@ -407,7 +401,6 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
     printf("    Intensity function parameters: %1.4e, %1.4e, %1.4e\n", chem->IA, chem->IB, chem->IC);
     printf("        IO * (IA + IB * cos( kg * x * (1-IC*x) ) )\n");
     printf("    nu: %1.4e [s^{-1}]\n", chem->nu);
-    printf("    Reaction ODE solver: %s\n", chem->ti_scheme);
     printf("Reference quantities:\n");
     printf("    Length: %1.4e (m)\n", chem->L_ref);
     printf("    Time: %1.4e (s)\n", chem->t_ref);
@@ -427,11 +420,6 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   // allocate arrays
   chem->nv_O3old = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_hnu   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
-  chem->Qv       = (double*) calloc (solver->npoints_local_wghosts   , sizeof(double));
-
-  int i;
-  _ArraySetValue_ (chem->Qv,       solver->npoints_local_wghosts,    0.0);
-  _ArraySetValue_ (chem->nv_O3old, solver->npoints_local_wghosts*nz, chem->n_O3 / chem->n_O2);
 
   /* allocate array to hold the beam intensity field */
   chem->imap = (double*) calloc (solver->npoints_local_wghosts, sizeof(double));

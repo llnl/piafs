@@ -13,7 +13,6 @@
 
   free(param->nv_O3old);
   free(param->nv_hnu);
-  free(param->Qv);
   free(param->imap);
 
   return 0;

@@ -18,7 +18,7 @@ int NavierStokes2DPreStep( double  *u,   /*!< Solution (conserved variables) */
   HyPar* solver = (HyPar*) s;
   NavierStokes2D* param = (NavierStokes2D*) solver->physics;
 
-  if (param->include_chem) ChemistrySolve(s, u, param->chem, m, dt, waqt);
+  if (param->include_chem) ChemistryPreStep(s, u, param->chem);
 
   return 0;
 }

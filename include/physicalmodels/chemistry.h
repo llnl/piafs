@@ -234,10 +234,6 @@ typedef struct chemistry_parameters {
   double* nv_O3old; /*!< number density of O3 (previous timestep) */
   double* nv_hnu; /*!< number density of h-nu (photons) */
 
-  double* Qv; /*!< heating source term for Euler/NS equations */
-
-  char ti_scheme[_MAX_STRING_SIZE_]; /*!< time integrator to use for reaction equations */
-
   int grid_stride; /*!< grid stride */
   int z_stride; /*!< z stride */
 
@@ -249,7 +245,9 @@ int ChemistryInitialize(void*,void*,void*,int);
 int ChemistryCleanup(void*);
 /*! Function to write reacting species to file */
 int ChemistryWriteSpecies(void*,double*,void*,void*,double);
-/*! Solve the reaction equations */
-int ChemistrySolve(void*,double*,void*,void*,double,double);
+/*! Set the reaction source terms */
+int ChemistrySource(void*,double*,double*,void*,void*,double);
+/*! Pre-time-step operations */
+int ChemistryPreStep(void*,double*,void*);
 
 #endif

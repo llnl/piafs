@@ -26,21 +26,8 @@ int Euler1DSource(
   _ArraySetValue_(source, param->nvars*solver->npoints_local_wghosts, 0.0);
 
   if (param->include_chem) {
-
     Chemistry *chem = (Chemistry*) param->chem;
-
-    int *dim    = solver->dim_local;
-    int ghosts  = solver->ghosts;
-    int ndims   = solver->ndims;
-
-    int index[ndims];
-    int done = 0; _ArraySetValue_(index,ndims,0);
-    while (!done) {
-      int p; _ArrayIndex1D_(ndims,dim,index,ghosts,p);
-      source[param->nvars*p + 2] = chem->Qv[p]/(param->gamma-1.0);
-      _ArrayIncrementIndex_(ndims,dim,index,done);
-    }
-
+    ChemistrySource(solver, u, source, chem, mpi, t);
   }
 
   return 0;
