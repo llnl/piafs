@@ -31,11 +31,7 @@ int ChemistryPreStep( void*   a_s,  /*!< Solver object of type #HyPar */
     int done = 0; _ArraySetValue_(index,solver->ndims,0);
     while (!done) {
       int p; _ArrayIndex1D_(solver->ndims,dim,index,ghosts,p);
-
-      double uchem[nspecies];
-      _ArrayCopy1D_( (a_U + chem->grid_stride*p + chem->n_flow_vars + chem->z_stride*iz), uchem, chem->z_stride);
-      chem->nv_O3old[nz*p+iz] = uchem[1];
-
+      chem->nv_O3old[nz*p+iz] = a_U[chem->grid_stride*p + chem->n_flow_vars + chem->z_stride*iz + iO3];
       _ArrayIncrementIndex_(solver->ndims,dim,index,done);
     }
 
@@ -120,19 +116,19 @@ int ChemistrySource( void*   a_s,  /*!< Solver object of type #HyPar */
     while (!done) {
       int p; _ArrayIndex1D_(solver->ndims,dim,index,ghosts,p);
 
-      double uchem[nspecies];
-      _ArrayCopy1D_( (a_U + chem->grid_stride*p + chem->n_flow_vars + chem->z_stride*iz), uchem, chem->z_stride);
-      uchem[chem->nspecies-1] = chem->nv_hnu[nz*p+iz];
-
       // Set reaction sources
-      double fchem[nspecies-2];
-      _ChemistrySetRHS_(fchem, uchem, chem);
-      _ArrayCopy1D_( fchem, (a_S + chem->grid_stride*p + chem->n_flow_vars + chem->z_stride*iz + 1), nspecies-2);
+      _ChemistrySetRHS_(  (a_S + chem->grid_stride*p),
+                          (a_U + chem->grid_stride*p),
+                          chem,
+                          chem->nv_hnu[nz*p+iz],
+                          iz );
 
       // Set heating source
-      double Qv = 0.0;
-      _ChemistrySetQ_(Qv, uchem, chem);
-      a_S[chem->grid_stride*p + chem->n_flow_vars-1] = Qv/(chem->gamma-1.0);
+      _ChemistrySetQ_( (*(a_S + chem->grid_stride*p + chem->n_flow_vars-1)),
+                       (a_U + chem->grid_stride*p),
+                       chem,
+                       chem->nv_hnu[nz*p+iz],
+                       iz );
 
       // done
       _ArrayIncrementIndex_(solver->ndims,dim,index,done);

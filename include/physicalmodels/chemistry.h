@@ -11,20 +11,30 @@
 #include <basic.h>
 #include <string.h>
 
+/* Species indexing */
+#define iO2   0
+#define iO3   1
+#define i1D   2
+#define i1Dg  3
+#define i3Su  4
+#define i1Sg  5
+#define iCO2  6
+
 /*! \def _ChemistrySetRHS_
     Set the RHS of the reaction equations given the
     number densities of reacting species
 */
-#define _ChemistrySetRHS_(f, u, chem) \
+#define _ChemistrySetRHS_(f, u, chem, n_hnu, zidx) \
   { \
-    double n_O2  = u[0]; \
-    double n_O3  = u[1]; \
-    double n_1D  = u[2]; \
-    double n_1Dg = u[3]; \
-    double n_3Su = u[4]; \
-    double n_1Sg = u[5]; \
-    double n_CO2 = u[6]; \
-    double n_hnu = u[7]; \
+    int nfv = chem->n_flow_vars + chem->z_stride*zidx; \
+    \
+    double n_O2  = u[nfv+iO2 ]; \
+    double n_O3  = u[nfv+iO3 ]; \
+    double n_1D  = u[nfv+i1D ]; \
+    double n_1Dg = u[nfv+i1Dg]; \
+    double n_3Su = u[nfv+i3Su]; \
+    double n_1Sg = u[nfv+i1Sg]; \
+    double n_CO2 = u[nfv+iCO2]; \
     \
     double k0a = chem->k0a_norm; \
     double k0b = chem->k0b_norm; \
@@ -38,44 +48,47 @@
     double k5  = chem->k5_norm; \
     double k6  = chem->k6_norm; \
     \
-    /* O3  */ f[0] = - (k0a+k0b) * n_hnu * n_O3  \
-                     - (k2a+k2b) * n_O3  * n_1D  \
-                     - (k3a+k3b) * n_O3  * n_1Sg \
-                     - k5        * n_O3  * n_3Su \
-                     - k6        * n_1Dg * n_O3; \
+    /* O2 */  f[nfv+iO2 ] = 0.0; \
     \
-    /* 1D  */ f[1] =   k0a       * n_hnu * n_O3   \
-                     - (k1a+k1b) * n_1D  * n_O2   \
-                     - (k2a+k2b) * n_1D  * n_O3   \
-                     - k4        * n_1D  * n_CO2; \
+    /* O3  */ f[nfv+iO3 ] = - (k0a+k0b) * n_hnu * n_O3  \
+                            - (k2a+k2b) * n_O3  * n_1D  \
+                            - (k3a+k3b) * n_O3  * n_1Sg \
+                            - k5        * n_O3  * n_3Su \
+                            - k6        * n_1Dg * n_O3; \
     \
-    /* 1Dg */ f[2] =    k0a * n_hnu * n_O3  \
-                      + k5  * n_O3  * n_3Su \
-                      - k6  * n_1Dg * n_O3; \
+    /* 1D  */ f[nfv+i1D ] =   k0a       * n_hnu * n_O3   \
+                            - (k1a+k1b) * n_1D  * n_O2   \
+                            - (k2a+k2b) * n_1D  * n_O3   \
+                            - k4        * n_1D  * n_CO2; \
     \
-    /* 3Su */ f[3] =    k2a * n_O3 * n_1D   \
-                      - k5  * n_O3 * n_3Su; \
+    /* 1Dg */ f[nfv+i1Dg] =    k0a * n_hnu * n_O3  \
+                             + k5  * n_O3  * n_3Su \
+                             - k6  * n_1Dg * n_O3; \
     \
-    /* 1Sg */ f[4] =    k1a       * n_1D * n_O2 \
-                      - (k3a+k3b) * n_O3 * n_1Sg; \
+    /* 3Su */ f[nfv+i3Su] =    k2a * n_O3 * n_1D   \
+                             - k5  * n_O3 * n_3Su; \
     \
-    /* CO2 */ f[5] = 0.0; \
+    /* 1Sg */ f[nfv+i1Sg] =    k1a       * n_1D * n_O2 \
+                             - (k3a+k3b) * n_O3 * n_1Sg; \
+    \
+    /* CO2 */ f[nfv+iCO2] = 0.0; \
   }
 
 /*! \def _ChemistrySetQ_
     Set the Q for the Euler/NS equations given the
     number densities of reacting species
 */
-#define _ChemistrySetQ_(Q, u, chem) \
+#define _ChemistrySetQ_(Q, u, chem, n_hnu, zidx) \
   { \
-    double n_O2  = u[0]; \
-    double n_O3  = u[1]; \
-    double n_1D  = u[2]; \
-    double n_1Dg = u[3]; \
-    double n_3Su = u[4]; \
-    double n_1Sg = u[5]; \
-    double n_CO2 = u[6]; \
-    double n_hnu = u[7]; \
+    int nfv = chem->n_flow_vars + chem->z_stride*zidx; \
+    \
+    double n_O2  = u[nfv+iO2 ]; \
+    double n_O3  = u[nfv+iO3 ]; \
+    double n_1D  = u[nfv+i1D ]; \
+    double n_1Dg = u[nfv+i1Dg]; \
+    double n_3Su = u[nfv+i3Su]; \
+    double n_1Sg = u[nfv+i1Sg]; \
+    double n_CO2 = u[nfv+iCO2]; \
     \
     double k0a = chem->k0a_norm; \
     double k0b = chem->k0b_norm; \
@@ -101,13 +114,13 @@
     double q5  = chem->q5_norm; \
     double q6  = chem->q6_norm; \
     \
-    Q =   (q0a*k0a +q0b*k0b) * n_hnu * n_O3  \
-        + (q1a*k1a +q1b*k1b) * n_O2  * n_1D  \
-        + (q2a*k2a +q2b*k2b) * n_O3  * n_1D  \
-        + (q3a*k3a +q3b*k3b) * n_O3  * n_1Sg \
-        + q4*k4              * n_1D  * n_CO2 \
-        + q5*k5              * n_O3  * n_3Su \
-        + q6*k6              * n_1Dg * n_O3; \
+    Q = (  (q0a*k0a +q0b*k0b) * n_hnu * n_O3  \
+         + (q1a*k1a +q1b*k1b) * n_O2  * n_1D  \
+         + (q2a*k2a +q2b*k2b) * n_O3  * n_1D  \
+         + (q3a*k3a +q3b*k3b) * n_O3  * n_1Sg \
+         + q4*k4              * n_1D  * n_CO2 \
+         + q5*k5              * n_O3  * n_3Su \
+         + q6*k6              * n_1Dg * n_O3 ) / (chem->gamma-1.0); \
   }
 
 /*! \def Chemistry
