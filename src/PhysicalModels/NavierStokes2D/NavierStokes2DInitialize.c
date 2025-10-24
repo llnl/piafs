@@ -59,6 +59,7 @@ int NavierStokes2DPreStep (double*,void*,void*,double,double);
     T_B                | double       | #NavierStokes2D::TB             |  27.6  (Kelvin)
     upwinding          | char[]       | #NavierStokes2D::upw_choice     | "roe" (#_ROE_)
     include_chemistry  | char[]       | #NavierStokes2D::include_chem   | "no"
+    write_output       | char[]       | #NavierStokes2D::write_op       | "yes"
 
     \b Note: "physics.inp" is \b optional; if absent, default values will be used.
 */
@@ -92,6 +93,7 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
   physics->TB     = 27.6;
   strcpy(physics->upw_choice,"roe");
   char include_chem[_MAX_STRING_SIZE_] = "no";
+  strcpy(physics->write_op,"yes");
 
   /* reading physical model specific inputs - all processes */
   if (!mpi->rank) {
@@ -125,6 +127,8 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
             ferr = fscanf(in,"%lf",&physics->TB);       if (ferr != 1) return(1);
           } else if (!strcmp(word,"include_chemistry")) {
             ferr = fscanf(in,"%s",include_chem);        if (ferr != 1) return(1);
+          } else if (!strcmp(word,"write_output")) {
+            ferr = fscanf(in,"%s",physics->write_op); if (ferr != 1) return(1);
           } else if (strcmp(word,"end")) {
             char useless[_MAX_STRING_SIZE_];
             ferr = fscanf(in,"%s",useless); if (ferr != 1) return(ferr);
@@ -152,6 +156,7 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
   MPIBroadcast_double    (&physics->TA          ,1                ,0,&mpi->world);
   MPIBroadcast_double    (&physics->TB          ,1                ,0,&mpi->world);
   MPIBroadcast_integer   (&physics->include_chem,1                ,0,&mpi->world);
+  MPIBroadcast_character (physics->write_op     ,_MAX_STRING_SIZE_,0,&mpi->world);
 
   /* initializing physical model-specific functions */
   solver->PreStep               = NavierStokes2DPreStep;
@@ -182,7 +187,7 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
   for (n = 0; n < solver->nBoundaryZones; n++)  boundary[n].gamma = physics->gamma;
 
   if (physics->include_chem) {
-    solver->PhysicsOutput = NavierStokes2DWriteChem;
+    if (!strcmp(physics->write_op,"yes")) solver->PhysicsOutput = NavierStokes2DWriteChem;
     physics->chem = (Chemistry*) calloc (1, sizeof(Chemistry));
     ChemistryInitialize( solver,
                          physics->chem,

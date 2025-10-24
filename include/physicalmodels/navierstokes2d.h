@@ -332,6 +332,8 @@ typedef struct navierstokes2d_parameters {
   int include_chem; /*!< Flag to include chemistry */
   void* chem; /*!< Photochemical reactions object */
 
+  char write_op[_MAX_STRING_SIZE_]; /*!< Write physics-specific output to file */
+
   // constants for computing viscosity and conductivity coefficients
   double Tref; /*!< Reference temperature */
   double T0; /*!< T_0 (in Kelvins) (viscoscity/conductivity coeff) */

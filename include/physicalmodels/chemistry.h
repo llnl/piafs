@@ -241,6 +241,8 @@ typedef struct chemistry_parameters {
 
   char ti_scheme[_MAX_STRING_SIZE_]; /*!< time integrator to use for reaction equations */
 
+  char write_all_zlocs[_MAX_STRING_SIZE_]; /*!< write chemical species at all z-locations? */
+
 } Chemistry;
 
 /*! Function to initialize the chemistry object */
