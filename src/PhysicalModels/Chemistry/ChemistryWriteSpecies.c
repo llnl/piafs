@@ -26,7 +26,10 @@ int ChemistryWriteSpecies(  void*   a_s,  /*!< Solver object of type #HyPar */
   int nz = chem->z_i+1;
   int iz;
 
-  for (iz = 0; iz < nz; iz++) {
+  int iz_start = 0;
+  if (!strcmp(params->write_all_zlocs,"no")) iz_start = params->z_i;
+
+  for (iz = iz_start; iz < nz; iz++) {
 
     char fname_root[_MAX_STRING_SIZE_] = "op_species";
     {

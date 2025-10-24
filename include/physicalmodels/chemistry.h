@@ -237,6 +237,8 @@ typedef struct chemistry_parameters {
   int grid_stride; /*!< grid stride */
   int z_stride; /*!< z stride */
 
+  char write_all_zlocs[_MAX_STRING_SIZE_]; /*!< write chemical species at all z-locations? */
+
 } Chemistry;
 
 /*! Function to initialize the chemistry object */

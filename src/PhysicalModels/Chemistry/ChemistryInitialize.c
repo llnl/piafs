@@ -59,6 +59,7 @@ void ChemistrySetPhotonDensity(void*,void*,void*,double);
     IA                 | double       | #Chemistry::IA                  | 1.0
     IB                 | double       | #Chemistry::IB                  | 1.0
     IC                 | double       | #Chemistry::IC                  | 0.0
+    write_all_zlocs    | double       | #Chemistry::write_all_zlocs     | "yes"
 
     \b Note: "chemistry.inp" is \b optional; if absent, default values will be used.
 */
@@ -127,6 +128,8 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   chem->IA = 1.0;
   chem->IB = 1.0;
   chem->IC = 0.0;
+
+  strcpy(chem->write_all_zlocs, "yes");
 
   /* reading physical model specific inputs */
   if (!mpi->rank) {
@@ -221,6 +224,9 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
           } else if (!strcmp(word,"IC")) {
             ferr = fscanf(in,"%lf",&chem->IC);
             if (ferr != 1) return(1);
+          } else if (!strcmp(word,"write_all_zlocs")) {
+            ferr = fscanf(in,"%s",chem->write_all_zlocs);
+            if (ferr != 1) return(1);
           } else if (strcmp(word,"end")) {
             char useless[_MAX_STRING_SIZE_];
             ferr = fscanf(in,"%s",useless); if (ferr != 1) return(ferr);
@@ -264,6 +270,7 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   IERR MPIBroadcast_double    (&chem->IA       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->IB       ,1,0,&mpi->world);                  CHECKERR(ierr);
   IERR MPIBroadcast_double    (&chem->IC       ,1,0,&mpi->world);                  CHECKERR(ierr);
+  IERR MPIBroadcast_character (chem->write_all_zlocs,_MAX_STRING_SIZE_,0,&mpi->world);  CHECKERR(ierr);
 #endif
 
   /* sanity checks */

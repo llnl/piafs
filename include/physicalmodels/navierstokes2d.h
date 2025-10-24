@@ -346,6 +346,7 @@ typedef struct navierstokes2d_parameters {
   void* chem; /*!< Photochemical reactions object */
 
   int nvars; /*!< Number of variables per grid point */
+  char write_op[_MAX_STRING_SIZE_]; /*!< Write physics-specific output to file */
 
   // constants for computing viscosity and conductivity coefficients
   double Tref; /*!< Reference temperature */
