@@ -27,7 +27,7 @@ int ChemistryWriteSpecies(  void*   a_s,  /*!< Solver object of type #HyPar */
   int iz;
 
   int iz_start = 0;
-  if (!strcmp(params->write_all_zlocs,"no")) iz_start = params->z_i;
+  if (!strcmp(chem->write_all_zlocs,"no")) iz_start = chem->z_i;
 
   for (iz = iz_start; iz < nz; iz++) {
 
