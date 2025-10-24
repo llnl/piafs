@@ -11,39 +11,11 @@
 #include <hypar.h>
 #include <physicalmodels/chemistry.h>
 
-/*! Pre-time-step actions  */
-int ChemistryPreStep( void*   a_s,  /*!< Solver object of type #HyPar */
-                      double* a_U,  /*!< Solution array */
-                      void*   a_p   /*!< Object of type #Chemistry */ )
-{
-  HyPar        *solver = (HyPar*)        a_s;
-  Chemistry    *chem   = (Chemistry*)    a_p;
-
-  int *dim    = solver->dim_local;
-  int ghosts  = solver->ghosts;
-
-  // Save current value of O3 number density
-  int nspecies = chem->nspecies;
-  int iz, nz = chem->z_i+1;
-  for (iz = 0; iz < nz; iz++) {
-
-    int index[solver->ndims];
-    int done = 0; _ArraySetValue_(index,solver->ndims,0);
-    while (!done) {
-      int p; _ArrayIndex1D_(solver->ndims,dim,index,ghosts,p);
-      chem->nv_O3old[nz*p+iz] = a_U[chem->grid_stride*p + chem->n_flow_vars + chem->z_stride*iz + iO3];
-      _ArrayIncrementIndex_(solver->ndims,dim,index,done);
-    }
-
-  }
-
-  return 0;
-}
-
 /*! set the photon density  */
 int ChemistrySetPhotonDensity( void*   a_s, /*!< Solver object of type #HyPar */
                                void*   a_p, /*!< Object of type #Chemistry */
                                void*   a_m, /*!< MPI object of type #MPIVariables */
+                               double* a_U,  /*!< Solution array */
                                double  a_t  /*!< Current simulation time */ )
 {
   HyPar        *solver = (HyPar*)        a_s;
@@ -78,7 +50,7 @@ int ChemistrySetPhotonDensity( void*   a_s, /*!< Solver object of type #HyPar */
     int iz;
     for (iz = 1; iz < nz; iz++) {
       double sigma = chem->sO3 * chem->n_O2;
-      double damp_fac = 1.0 - chem->dz*sigma*chem->nv_O3old[nz*p+(iz-1)];
+      double damp_fac = 1.0 - chem->dz*sigma*a_U[chem->grid_stride*p + chem->n_flow_vars + chem->z_stride*(iz-1) + iO3];
       chem->nv_hnu[nz*p+iz] = chem->nv_hnu[nz*p+(iz-1)] * damp_fac;
     }
 
@@ -104,7 +76,7 @@ int ChemistrySource( void*   a_s,  /*!< Solver object of type #HyPar */
   int *dim    = solver->dim_local;
   int ghosts  = solver->ghosts;
 
-  ChemistrySetPhotonDensity( solver, chem, mpi, a_t );
+  ChemistrySetPhotonDensity( solver, chem, mpi, a_U, a_t );
 
   // Solve the reaction equations
   int nspecies = chem->nspecies;

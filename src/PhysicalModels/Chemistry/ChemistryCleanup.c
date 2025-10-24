@@ -11,7 +11,6 @@
 {
   Chemistry *param  = (Chemistry*) s;
 
-  free(param->nv_O3old);
   free(param->nv_hnu);
   free(param->imap);
 

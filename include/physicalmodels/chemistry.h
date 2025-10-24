@@ -244,7 +244,6 @@ typedef struct chemistry_parameters {
   int n_flow_vars; /*!< number of flow variables */
   int nspecies; /*!< number of species */
   int n_reacting_species; /*!< number of reacting species that advects with flow */
-  double* nv_O3old; /*!< number density of O3 (previous timestep) */
   double* nv_hnu; /*!< number density of h-nu (photons) */
 
   int grid_stride; /*!< grid stride */
@@ -262,7 +261,5 @@ int ChemistryCleanup(void*);
 int ChemistryWriteSpecies(void*,double*,void*,void*,double);
 /*! Set the reaction source terms */
 int ChemistrySource(void*,double*,double*,void*,void*,double);
-/*! Pre-time-step operations */
-int ChemistryPreStep(void*,double*,void*);
 
 #endif

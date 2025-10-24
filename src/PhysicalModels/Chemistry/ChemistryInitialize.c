@@ -425,7 +425,6 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   chem->z_stride = chem->nspecies - 1;
 
   // allocate arrays
-  chem->nv_O3old = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
   chem->nv_hnu   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
 
   /* allocate array to hold the beam intensity field */
@@ -460,9 +459,6 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
 
     }
   }
-
-  // set initial photon density
-  ChemistrySetPhotonDensity( solver, chem, mpi, 0.0 );
 
   count++;
   return 0;

@@ -18,7 +18,5 @@ int Euler1DPreStep( double  *u,   /*!< Solution (conserved variables) */
   HyPar   *solver = (HyPar*)   s;
   Euler1D *param  = (Euler1D*) solver->physics;
 
-  if (param->include_chem) ChemistryPreStep(s, u, param->chem);
-
   return 0;
 }
