@@ -18,6 +18,13 @@ export PIAFS_EXEC_W_PATH="${piafs_dir}/bin/${piafs_exec}"
 export MPI_EXEC="mpiexec --oversubscribe"
 export PIAFS_EXEC_OTHER_ARGS=""
 
+# Test if --oversubscribe flag is supported
+$MPI_EXEC -n 1 echo "test" &> /dev/null
+if [ $? -ne 0 ]; then
+  echo "Warning: --oversubscribe flag not supported, falling back to 'mpiexec'"
+  export MPI_EXEC="mpiexec"
+fi
+
 # some details about PIAFS benchmarks
 # (benchmark solutions maintained on the public repository)
 # do not change these, unless you know what you are doing
