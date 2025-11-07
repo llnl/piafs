@@ -2,7 +2,7 @@
 <img src="piafs.jpg" alt="PIAFS Logo">
 
 <p>
-PIAFS2D: Photochemically Induced Acousto-optics Fluid Simulations
+PIAFS: Photochemically Induced Acousto-optics Fluid Simulations
 </p>
 
 [Overview](#Overview) -
@@ -16,19 +16,19 @@ PIAFS2D: Photochemically Induced Acousto-optics Fluid Simulations
 
 ## Overview
 
-`PIAFS2D` is a finite-difference code to solve the compressible Euler/Navier-Stokes
+`PIAFS` is a finite-difference code to solve the compressible Euler/Navier-Stokes
 equations with chemical heating on Cartesian grids. 
 
 ## Getting the Code
 
 (With SSH keys)
 ```
-git clone ssh://git@czgitlab.llnl.gov:7999/piafs/piafs2d.git
+git clone ssh://git@czgitlab.llnl.gov:7999/piafs/piafs.git
 ```
 
 (Without SSH keys)
 ```
-https://lc.llnl.gov/gitlab/piafs/piafs2d.git
+https://lc.llnl.gov/gitlab/piafs/piafs.git
 ```
 
 ## Documentation
@@ -47,7 +47,7 @@ make [-j <n>] && make install
 
 If these steps are successful, the binary file
 ```
-bin/PIAFS2D
+bin/PIAFS
 ```
 will be available.
 
@@ -61,7 +61,7 @@ Note:
 
 ## Running
 
-Create a copy of an example from `Examples` directory in a new location (outside the PIAFS2D 
+Create a copy of an example from `Examples` directory in a new location (outside the PIAFS 
 directory), then follow these steps:
 
 + Compile the code `<example_dir>/aux/init.[c,C]` as follows:
@@ -77,7 +77,7 @@ depending on the whether the file is `.c` or `.C`.
 + In the run directory (that contains the `solver.inp`, `boundary.inp`, etc), run
   the binary `INIT` from the previous step. This will generate the initial solution.
 
-+ Run /path/to/piafs2d/bin/PIAFS2D either in serial or in parallel using `mpiexec` or `srun`.
++ Run /path/to/piafs/bin/PIAFS either in serial or in parallel using `mpiexec` or `srun`.
 
 
 ## Plotting
@@ -89,7 +89,7 @@ depending on the whether the file is `.c` or `.C`.
 
 Note that the Python scripts expect the following environment to be defined:
 ```
-PIAFS2D_DIR=/path/to/piafs2d
+PIAFS_DIR=/path/to/piafs
 ```
 
 1D:

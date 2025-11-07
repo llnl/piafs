@@ -1,10 +1,10 @@
 '''
 Python script to create streamline plots from the solution
-of a PIAFS2D simulation. This particular file is for the
+of a PIAFS simulation. This particular file is for the
 2D Navier-Stokes/Euler physics, where the solution vector
 components are (rho, rho*u, rho*v, e), but it can be modified
 for other physics by appropriately computing the Cartesian
-velocity components from the PIAFS2D solution.
+velocity components from the PIAFS solution.
 
 - if op_overwrite is set to "no", a plot is generated
 for each variable (solution vector component) and each
@@ -13,8 +13,8 @@ simulation time for which the solution is available.
 created for for each variable (solution vector component).
 - solution must be in binary format
 
-Make sure the environment variable "PIAFS2D_DIR" is set
-and points to the correct location (/path/to/piafs2d)
+Make sure the environment variable "PIAFS_DIR" is set
+and points to the correct location (/path/to/piafs)
 '''
 
 import os
@@ -26,11 +26,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-piafs2d_dir = os.environ.get('PIAFS2D_DIR')
-piafs2d_dir_python = piafs2d_dir + '/Examples/Python'
-sys.path.append(piafs2d_dir_python)
+piafs_dir = os.environ.get('PIAFS_DIR')
+piafs_dir_python = piafs_dir + '/Examples/Python'
+sys.path.append(piafs_dir_python)
 
-import modPIAFS2DUtils as piafs2dutils
+import modPIAFSUtils as piafsutils
 
 font = {'size':22}
 matplotlib.rc('font', **font)
@@ -46,8 +46,8 @@ linewidth = 1
 Set up the simulation parameters
 '''
 sim_path = '.'
-sim_inp_data = piafs2dutils.readPIAFS2DInpFile(sim_path+'/simulation.inp')
-solver_inp_data = piafs2dutils.readPIAFS2DInpFile(sim_path+'/solver.inp')
+sim_inp_data = piafsutils.readPIAFSInpFile(sim_path+'/simulation.inp')
+solver_inp_data = piafsutils.readPIAFSInpFile(sim_path+'/solver.inp')
 
 if not sim_inp_data:
     nsims = 1
@@ -92,7 +92,7 @@ if solver_inp_data['op_overwrite'] == 'no':
   '''
   Load simulation data (solution snapshots)
   '''
-  grid, solution_snapshots = piafs2dutils.getSolutionSnapshots( sim_path,
+  grid, solution_snapshots = piafsutils.getSolutionSnapshots( sim_path,
                                                               nsims,
                                                               n_snapshots,
                                                               ndims,
@@ -153,7 +153,7 @@ else:
   '''
   Load simulation data (solution snapshots)
   '''
-  grid,solution_snapshots = piafs2dutils.getSolutionSnapshots(  sim_path,
+  grid,solution_snapshots = piafsutils.getSolutionSnapshots(  sim_path,
                                                               nsims,
                                                               n_snapshots,
                                                               ndims,

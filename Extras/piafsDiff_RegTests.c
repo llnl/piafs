@@ -1,5 +1,5 @@
 /*
- * This code implements a diff between two PIAFS2D binary
+ * This code implements a diff between two PIAFS binary
  * solutions.
  *
  * If the two solutions are identical within the specified
@@ -8,14 +8,14 @@
  * Else, the differences will be printed to the screen.
  *
  * Please compile it using the C99 standard.
- *   gcc -std=c99 piafs2dDiff.c -lm -o PIAFS2DDiff
+ *   gcc -std=c99 piafsDiff.c -lm -o PIAFSDiff
  *
  * Usage:
- *   ./PIAFS2DDiff [OPTIONS] FILENAME1 FILENAME2
+ *   ./PIAFSDiff [OPTIONS] FILENAME1 FILENAME2
  *
  * For help/usage:
- *   ./PIAFS2DDiff --help
- *   ./PIAFS2DDiff --usage
+ *   ./PIAFSDiff --help
+ *   ./PIAFSDiff --usage
 */
 
 #include <stdio.h>
@@ -70,10 +70,10 @@
   }
 
 static char doc[] =
-  "PIAFS2DDiff -- diff program for PIAFS2D binary solution files";
+  "PIAFSDiff -- diff program for PIAFS binary solution files";
 
-const char *argp_program_version = "PIAFS2DDiff 0.0";
-const char *argp_program_bug_address = "PIAFS2D authors";
+const char *argp_program_version = "PIAFSDiff 0.0";
+const char *argp_program_bug_address = "PIAFS authors";
 
 static char args_doc[] = "FILENAME1 FILENAME2";
 

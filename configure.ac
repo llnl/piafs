@@ -1,9 +1,9 @@
-AC_INIT([piafs2d],[0.1],[debojyoti.ghosh@gmail.com])
+AC_INIT([piafs],[0.1],[debojyoti.ghosh@gmail.com])
 AC_CONFIG_SRCDIR([config.h.in])
 AC_CONFIG_HEADERS([config.h])
 echo -n AC_PACKAGE_VERSION>VERSION
 AC_SUBST(PACKAGE_VERSION)
-AC_MSG_NOTICE([piafs2d AC_PACKAGE_VERSION])
+AC_MSG_NOTICE([piafs AC_PACKAGE_VERSION])
 
 AM_INIT_AUTOMAKE
 AC_PREFIX_DEFAULT('$(top_srcdir)')

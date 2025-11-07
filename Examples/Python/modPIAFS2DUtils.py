@@ -1,7 +1,7 @@
 import numpy as np
 
 '''
-Read in a PIAFS2D text input file (eg, solver.inp, physics.inp, etc)
+Read in a PIAFS text input file (eg, solver.inp, physics.inp, etc)
 
 Input arguments:
   fname: name of the file (eg: "solver.inp")
@@ -9,7 +9,7 @@ Input arguments:
 The function will return a dictionary with the keywords found
 in the file.
 '''
-def readPIAFS2DInpFile(fname: str):
+def readPIAFSInpFile(fname: str):
   input_data = {}
 
   try:
@@ -28,7 +28,7 @@ def readPIAFS2DInpFile(fname: str):
 
   return input_data
 
-def readPIAFS2DErrFile( path: str,
+def readPIAFSErrFile( path: str,
                       ndims: int):
 
   fname = path + '/errors.dat'

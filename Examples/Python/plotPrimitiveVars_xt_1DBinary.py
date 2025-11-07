@@ -1,12 +1,12 @@
 '''
 Python script to create plots from the solution of a
-PIAFS2D simulation.
+PIAFS simulation.
 
 op_overwrite must be set to "no": x-t plots are generated
 for each primitive variable
 
-Make sure the environment variable "PIAFS2D_DIR" is set
-and points to the correct location (/path/to/piafs2d)
+Make sure the environment variable "PIAFS_DIR" is set
+and points to the correct location (/path/to/piafs)
 '''
 
 import os
@@ -18,11 +18,11 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-piafs2d_dir = os.environ.get('PIAFS2D_DIR')
-piafs2d_dir_python = piafs2d_dir + '/Examples/Python'
-sys.path.append(piafs2d_dir_python)
+piafs_dir = os.environ.get('PIAFS_DIR')
+piafs_dir_python = piafs_dir + '/Examples/Python'
+sys.path.append(piafs_dir_python)
 
-import modPIAFS2DUtils as piafs2dutils
+import modPIAFSUtils as piafsutils
 
 font = {'size':22}
 matplotlib.rc('font', **font)
@@ -35,8 +35,8 @@ plt_dir_name='plots'
 Set up the simulation parameters
 '''
 sim_path = '.'
-sim_inp_data = piafs2dutils.readPIAFS2DInpFile(sim_path+'/simulation.inp')
-solver_inp_data = piafs2dutils.readPIAFS2DInpFile(sim_path+'/solver.inp')
+sim_inp_data = piafsutils.readPIAFSInpFile(sim_path+'/simulation.inp')
+solver_inp_data = piafsutils.readPIAFSInpFile(sim_path+'/solver.inp')
 
 if not sim_inp_data:
     nsims = 1
@@ -83,7 +83,7 @@ print('  expected number of snapshots = ', n_snapshots)
 '''
 Load simulation data (solution snapshots)
 '''
-x,solution_snapshots = piafs2dutils.getSolutionSnapshots( sim_path,
+x,solution_snapshots = piafsutils.getSolutionSnapshots( sim_path,
                                                           nsims,
                                                           n_snapshots,
                                                           ndims,

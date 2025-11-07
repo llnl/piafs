@@ -8,10 +8,10 @@
 
   @author Debojyoti Ghosh [\b Email: (first name) (dot) (last name) (at) gmail (dot) com, \b Website: http://debog.github.io/]
 
-  PIAFS2D: Compressible Euler/Navier-Stokes Solver on Cartesian Grids
+  PIAFS: Compressible Euler/Navier-Stokes Solver on Cartesian Grids
   -------------------------------------------------------------------
 
-  PIAFS2D is a finite-difference algorithm to solve the compressible Euler/Navier-Stokes
+  PIAFS is a finite-difference algorithm to solve the compressible Euler/Navier-Stokes
   equations (with source terms) on Cartesian grids.
 
   Documentation
@@ -22,7 +22,7 @@
   Compiling
   ---------
 
-  To compile PIAFS2D, follow these steps in the root directory:
+  To compile PIAFS, follow these steps in the root directory:
 
         autoreconf -i
         [CFLAGS="..."] [CXXFLAGS="..."] ./configure [options]
@@ -35,7 +35,7 @@
            administrative privileges. The binary will be placed in \a bin/ subdirectory.
 
   The configure options can include options such as BLAS/LAPACK location, MPI directory, etc. Type "./configure --help"
-  to see a full list. The options specific to PIAFS2D are:
+  to see a full list. The options specific to PIAFS are:
   + \--enable-serial: Compile a serial version without MPI.
   + \--with-mpi-dir: Specify path where mpicc is installed, if not in standard path.
   + \--enable-omp: Enable OpenMP threads.
@@ -55,7 +55,7 @@
 #include <mpivars_cpp.h>
 #include <simulation_library.h>
 
-static const char help[] = "PIAFS2D - A finite-difference algorithm for the compressible Euler/Navier-Stokes equations";
+static const char help[] = "PIAFS - A finite-difference algorithm for the compressible Euler/Navier-Stokes equations";
 
 /*!
  * \brief Main driver
@@ -72,7 +72,7 @@ int main(int argc, char **argv)
   int world = 0;
   int rank  = 0;
   int nproc = 1;
-  printf("PIAFS2D - Serial Version\n");
+  printf("PIAFS - Serial Version\n");
 #else
   MPI_Comm world;
   int rank, nproc;
@@ -80,7 +80,7 @@ int main(int argc, char **argv)
   MPI_Comm_dup(MPI_COMM_WORLD, &world);
   MPI_Comm_rank(MPI_COMM_WORLD,&rank );
   MPI_Comm_size(MPI_COMM_WORLD,&nproc);
-  if (!rank) printf("PIAFS2D - Parallel (MPI) version with %d processes\n",nproc);
+  if (!rank) printf("PIAFS - Parallel (MPI) version with %d processes\n",nproc);
 #endif
 
   gettimeofday(&main_start,NULL);
