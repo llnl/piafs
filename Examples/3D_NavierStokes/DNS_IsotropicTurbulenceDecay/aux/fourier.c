@@ -3,7 +3,7 @@
   solution.
 
   + The grid dimensions must be the same in all three dimensions.
-  + The solution must be in HyPar's binary solution format.
+  + The solution must be in PIAFS's binary solution format.
   + This code looks for "op.bin"; if the simulation was unsteady with
     multiple "op_<idx>.bin" files, create a symbolic link named "op.bin"
     pointing to the specific "op_<idx>.bin" solution file for which the

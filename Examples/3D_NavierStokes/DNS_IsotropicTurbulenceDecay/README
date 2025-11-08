@@ -17,14 +17,7 @@ The following input files are required:
 + physics.inp   -   Physics-related parameters
 + initial.inp   -   Initial solution
 
-** See hypar/README for other (optional) input files
-
-** In solver.inp, if the field "input_mode" is set to "parallel", 
-the code would need the initial solution in a file called 
-"initial_par.inp". This file contains the initial solution split into
-the MPI subdomains. "initial_par.inp" can be generated from "initial.inp" 
-by compiling and running "hypar/Extras/ParallelInput.c" after specifying 
-the number of processors ("iproc") in "solver.inp".
+** See piafs/README for other (optional) input files
 
 Notes:-
 The code aux/init.c is an example to generate the initial solution

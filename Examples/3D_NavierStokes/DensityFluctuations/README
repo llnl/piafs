@@ -23,7 +23,7 @@ The following input files are required:
 + exact.inp     -   Make exact.inp a symbolic link pointing 
                     to initial.inp
 
-** See hypar/README for other (optional) input files
+** See piafs/README for other (optional) input files
 
 Notes:-
 The code aux/exact.C is an example to generate the initial solution
