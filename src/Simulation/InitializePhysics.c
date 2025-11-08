@@ -14,6 +14,7 @@
 /* include header files for each physical model */
 #include <physicalmodels/euler1d.h>
 #include <physicalmodels/navierstokes2d.h>
+#include <physicalmodels/navierstokes3d.h>
 
 /*! Initialize the physical model for a simulation: Depending on the
     physical model specified, this function calls the initialization
@@ -64,6 +65,11 @@ int InitializePhysics(  void  *s,   /*!< Array of simulation objects of type #Si
 
       solver->physics = (NavierStokes2D*) calloc (1,sizeof(NavierStokes2D));
       IERR NavierStokes2DInitialize(solver,mpi); CHECKERR(ierr);
+
+    } else if (!strcmp(solver->model,_NAVIER_STOKES_3D_)) {
+
+      solver->physics = (NavierStokes3D*) calloc (1,sizeof(NavierStokes3D));
+      IERR NavierStokes3DInitialize(solver,mpi); CHECKERR(ierr);
 
     }else {
 

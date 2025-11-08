@@ -145,6 +145,7 @@ AC_CONFIG_FILES([
    src/PhysicalModels/Chemistry/Makefile
    src/PhysicalModels/Euler1D/Makefile
    src/PhysicalModels/NavierStokes2D/Makefile
+   src/PhysicalModels/NavierStokes3D/Makefile
  src/Simulation/Makefile
  src/TimeIntegration/Makefile
  src/TridiagLU/Makefile
