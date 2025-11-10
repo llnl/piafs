@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 #include <basic.h>
 #include <arrayfunctions.h>
 #include <io.h>
@@ -106,9 +107,19 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
 
   chem->t_start = 0.0;
   chem->t_pulse = 10*1e-9; // 10 nanoseconds
-  chem->Lz = 0.03; // 30 milimeters
+
+  double zmax = 0.0;
+  if (solver->ndims == 3) {
+    // get zmax of the domain
+    _GetCoordinate_(3,solver->dim_local[_ZDIR_]-1,solver->dim_local,solver->ghosts,solver->x,zmax);
+    MPIMax_double(&zmax, &zmax, 1, &mpi->world);
+    chem->Lz = zmax;
+    chem->nz = solver->dim_global[_ZDIR_];
+  } else {
+    chem->Lz = 0.03; // 30 milimeters
+    chem->nz = 22;
+  }
   chem->z_mm = 0.0;
-  chem->nz = 22;
 
   chem->k0a = 0.9 * 3.3e-13; // s^{-1}
   chem->k0b = 0.1 * 3.3e-13; // s^{-1}
@@ -282,6 +293,16 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
     fprintf(stderr,"ERROR in ChemistryInitialize(): f_O3 is not between 0.0 and 1.0 !!!\n");
     return 1;
   }
+  if (solver->ndims == 3) {
+    if (chem->Lz != zmax) {
+      fprintf(stderr,"ERROR in ChemistryInitialize(): grid zmax (%1.2e) is not equal to Lz specified in chemistry.inp (%1.2e).\n", zmax, chem->Lz);
+      return 1;
+    }
+    if (chem->nz != solver->dim_global[_ZDIR_]) {
+      fprintf(stderr,"ERROR in ChemistryInitialize(): grid kmax (%d) is not equal to nz specified in chemistry.inp (%d).\n", solver->dim_global[_ZDIR_], chem->nz);
+      return 1;
+    }
+  }
 
   /* compute O2 fraction */
   chem->f_O2 = 1.0 - chem->f_CO2;
@@ -346,8 +367,19 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   chem->q5_norm  = 1.81 * chem->e/Ei;
   chem->q6_norm  = 0.42 * chem->e/Ei;
 
-  chem->dz = chem->Lz / chem->nz;
-  chem->z_i = (int)(ceil(chem->z_mm*0.001 * chem->nz / chem->Lz));
+  chem->nspecies = 8; // O2, O3, 1D, 1Dg, 3Su, 1Sg, CO2, hnu
+  chem->z_i = (solver->ndims == 3 ? -INT_MAX : (int)(ceil(chem->z_mm*0.001 * chem->nz / chem->Lz)));
+  int nz = (solver->ndims == 3 ? 1 : chem->z_i + 1);
+  chem->n_reacting_species = (chem->nspecies - 1) * nz; // not include hnu
+  if (solver->ndims == 3) {
+    _GetCoordinate_(_ZDIR_,0,solver->dim_local,solver->ghosts,solver->dxinv,chem->dz);
+    chem->dz = 1.0/chem->dz;
+    chem->z_stride = 0;
+  } else {
+    chem->dz = chem->Lz / chem->nz;
+    chem->z_stride = chem->nspecies - 1;
+  }
+  chem->grid_stride = chem->n_flow_vars+chem->n_reacting_species;
 
   if (!mpi->rank) {
     printf("Constants:\n");
@@ -385,8 +417,10 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
     printf("    Pulse duration: %1.4e (s), %1.4e (normalized)\n",
                 chem->t_pulse, chem->t_pulse_norm );
     printf("    Gas length: %1.4e [m]\n", chem->Lz);
-    printf("    Number of z-layers: %d\n", chem->nz);
-    printf("    Z-location: %1.4e [m] (z_i = %d)\n", chem->z_mm*1e-3,chem->z_i);
+    if (solver->ndims < 3) {
+      printf("    Number of z-layers: %d\n", chem->nz);
+      printf("    Z-location: %1.4e [m] (z_i = %d)\n", chem->z_mm*1e-3,chem->z_i);
+    }
     printf("    lambda_ac (acoustic spatial period): %1.4e (m)\n", (2*chem->pi/chem->kg) );
     printf("      normalized lambda_ac: %1.4e\n", (2*chem->pi/chem->kg)/chem->L_ref );
     printf("    tau_ac (acoustic time period): %1.4e (s)\n", (2*chem->pi/chem->kg)/chem->cs );
@@ -416,13 +450,6 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
     printf("    Pressure: %1.4e (Pa)\n", chem->P_ref);
     printf("    Temperature: %1.4e (Pa)\n", chem->Ti);
   }
-
-  int nz = chem->z_i + 1;
-  chem->nspecies = 8; // O2, O3, 1D, 1Dg, 3Su, 1Sg, CO2, hnu
-  chem->n_reacting_species = (chem->nspecies - 1) * nz; // not include hnu
-  // define strides
-  chem->grid_stride = chem->n_flow_vars+chem->n_reacting_species;
-  chem->z_stride = chem->nspecies - 1;
 
   // allocate arrays
   chem->nv_hnu   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));

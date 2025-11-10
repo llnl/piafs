@@ -23,16 +23,14 @@ int ChemistryWriteSpecies(  void*   a_s,  /*!< Solver object of type #HyPar */
   MPIVariables *mpi    = (MPIVariables*) a_m;
   Chemistry    *chem   = (Chemistry*)    a_p;
 
-  int nz = chem->z_i+1;
-  int iz;
-
-  int iz_start = 0;
-  if (!strcmp(chem->write_all_zlocs,"no")) iz_start = chem->z_i;
+  int nz = (solver->ndims == 3 ? 1 : chem->z_i+1);
+  int iz, iz_start = 0;
+  if ((!strcmp(chem->write_all_zlocs,"no")) && (solver->ndims < 3)) iz_start = chem->z_i;
 
   for (iz = iz_start; iz < nz; iz++) {
 
     char fname_root[_MAX_STRING_SIZE_] = "op_species";
-    {
+    if (solver->ndims < 3) {
       char z_idx[_MAX_STRING_SIZE_];
       GetStringFromInteger(iz, z_idx, (int)log10(nz)+1);
       strcat(fname_root, "_z");
@@ -61,10 +59,17 @@ int ChemistryWriteSpecies(  void*   a_s,  /*!< Solver object of type #HyPar */
     int done = 0; _ArraySetValue_(index,solver->ndims,0);
     while (!done) {
       int p; _ArrayIndex1DWO_(solver->ndims,dim,index,offset,ghosts,p);
-      _ArrayCopy1D_( (a_U + chem->grid_stride*p + chem->n_flow_vars + chem->z_stride*chem->z_i),
-                     (species_arr+nspecies*p),
-                     chem->z_stride );
-      species_arr[nspecies*p+(nspecies-1)] = chem->nv_hnu[nz*p+iz];
+      if (solver->ndims == 3) {
+        _ArrayCopy1D_( (a_U + chem->grid_stride*p + chem->n_flow_vars),
+                       (species_arr+nspecies*p),
+                       chem->nspecies-1 );
+        species_arr[nspecies*p+(nspecies-1)] = chem->nv_hnu[p];
+      } else {
+        _ArrayCopy1D_( (a_U + chem->grid_stride*p + chem->n_flow_vars + chem->z_stride*chem->z_i),
+                       (species_arr+nspecies*p),
+                       chem->z_stride );
+        species_arr[nspecies*p+(nspecies-1)] = chem->nv_hnu[nz*p+iz];
+      }
       _ArrayIncrementIndex_(solver->ndims,bounds,index,done);
     }
 

@@ -11,6 +11,10 @@
 #include <basic.h>
 #include <string.h>
 
+#ifndef _ZDIR_
+#define _ZDIR_ 2
+#endif
+
 /* Species indexing */
 #define iO2   0
 #define iO3   1
