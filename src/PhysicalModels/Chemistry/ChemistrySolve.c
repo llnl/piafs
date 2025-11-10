@@ -65,7 +65,6 @@ int ChemistrySetPhotonDensity( void*   a_s, /*!< Solver object of type #HyPar */
       int go = (first_rank_z ? 1 : meow[my_rank_z-1]);
 
       if (go && (!meow[my_rank_z])) {
-
         for (i = 0; i < imax; i++) {
           for (j = 0; j < jmax; j++) {
             if (first_rank_z) {
@@ -90,12 +89,10 @@ int ChemistrySetPhotonDensity( void*   a_s, /*!< Solver object of type #HyPar */
             }
           }
         }
-
+        meow[my_rank_z] = 1;
       }
 
       MPIExchangeBoundariesnD(solver->ndims, 1, dim, ghosts, mpi, chem->nv_hnu);
-
-      meow[my_rank_z] = 1;
       MPIMax_integer(meow, meow, num_rank_z, &mpi->world);
     }
 

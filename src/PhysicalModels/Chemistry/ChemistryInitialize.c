@@ -111,7 +111,7 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   double zmax = 0.0;
   if (solver->ndims == 3) {
     // get zmax of the domain
-    _GetCoordinate_(3,solver->dim_local[_ZDIR_]-1,solver->dim_local,solver->ghosts,solver->x,zmax);
+    _GetCoordinate_(_ZDIR_,solver->dim_local[_ZDIR_]-1,solver->dim_local,solver->ghosts,solver->x,zmax);
     MPIMax_double(&zmax, &zmax, 1, &mpi->world);
     chem->Lz = zmax;
     chem->nz = solver->dim_global[_ZDIR_];
