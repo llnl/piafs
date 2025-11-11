@@ -116,7 +116,7 @@ for s in range(nsims):
   pressure = 0.4 * (cons_sol[3,:,:,:,:] - 0.5*(cons_sol[1,:,:,:,:]*cons_sol[1,:,:,:,:]+cons_sol[2,:,:,:,:]*cons_sol[2,:,:,:,:])/cons_sol[0,:,:,:,:])
   temperature = 1.4 * pressure / rho
   
-  for n in range(num_snapshots):
+  for n in range(n_snapshots):
     fig = plt.figure(figsize=figsize)
     ax = plt.axes()
     ax.set( xlim=(np.min(x), np.max(x)), ylim=(np.min(z), np.max(z)) )
