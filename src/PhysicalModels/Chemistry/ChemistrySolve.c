@@ -140,24 +140,20 @@ int ChemistrySource( void*   a_s,  /*!< Solver object of type #HyPar */
   int done = 0;  int index[solver->ndims]; _ArraySetValue_(index,solver->ndims,0);
   while (!done) {
     int p; _ArrayIndex1D_(solver->ndims,dim,index,ghosts,p);
-
     int iz, nz = (solver->ndims == 3 ? 1 : chem->z_i+1);
     for (iz = 0; iz < nz; iz++) {
-
       // Set reaction sources
       _ChemistrySetRHS_(  (a_S + chem->grid_stride*p),
                           (a_U + chem->grid_stride*p),
                           chem,
                           chem->nv_hnu[nz*p+iz],
                           iz );
-
       // Set heating source
       _ChemistrySetQ_( (*(a_S + chem->grid_stride*p + chem->n_flow_vars-1)),
                        (a_U + chem->grid_stride*p),
                        chem,
                        chem->nv_hnu[nz*p+iz],
                        iz );
-
     }
     // done
     _ArrayIncrementIndex_(solver->ndims,dim,index,done);

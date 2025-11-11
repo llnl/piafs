@@ -373,8 +373,9 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   chem->n_reacting_species = (chem->nspecies - 1) * nz; // not include hnu
   if (solver->ndims == 3) {
     _GetCoordinate_(_ZDIR_,0,solver->dim_local,solver->ghosts,solver->dxinv,chem->dz);
-    chem->dz = 1.0/chem->dz;
+    chem->dz = 1.0/chem->dz * chem->L_ref;
     chem->z_stride = 0;
+    chem->Lz *= chem->L_ref;
   } else {
     chem->dz = chem->Lz / chem->nz;
     chem->z_stride = chem->nspecies - 1;
