@@ -5,7 +5,7 @@ begin
   f_O3        0.01
   Ptot        101325.0
   Ti          288
-  z_mm        0.03
+  z_mm        3.0
   t_pulse     1e-8
   F0          2000.0
   sO3         1.1e-21

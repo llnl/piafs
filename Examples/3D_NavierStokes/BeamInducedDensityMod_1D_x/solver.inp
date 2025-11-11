@@ -1,7 +1,7 @@
 begin
 	ndims              3
 	nvars              12
-	size               256 4 4
+	size               256 4 128
 	ghost              3
 	n_iter             785
 	time_scheme        rk
