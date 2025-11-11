@@ -1,0 +1,18 @@
+begin
+	ndims              3
+	nvars              12
+	size               256 4 4
+	ghost              3
+	n_iter             785
+	time_scheme        rk
+	time_scheme_type   44
+	hyp_space_scheme   weno5
+	hyp_interp_type    characteristic
+	dt                 0.04
+	screen_op_iter     1
+	file_op_iter       5
+	op_file_format     binary
+	ip_file_type       ascii
+	op_overwrite       no
+	model              navierstokes3d
+end
