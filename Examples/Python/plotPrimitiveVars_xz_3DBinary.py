@@ -124,9 +124,9 @@ for s in range(nsims):
     ax.set_title('rho at j={:}, y={:.3} t={:.3}'.format(j0,y[j0],t[n]))
     fig.colorbar(plot, ax=ax)
     if nsims > 1:
-      plt_fname = plt_dir_name+'/fig_'+f'{s:02d}'+'_rho_xz_'+f'j{j0:02d}'+f'n{t0:02d}'+'.png'
+      plt_fname = plt_dir_name+'/fig_'+f'{s:02d}'+'_rho_xz_'+f'j{j0:02d}'+f't{n:03d}'+'.png'
     else:
-      plt_fname = plt_dir_name+'/fig_rho_xz_'+f'j{j0:02d}'+f'n{t0:02d}'+'.png'
+      plt_fname = plt_dir_name+'/fig_rho_xz_'+f'j{j0:02d}'+f't{n:03d}'+'.png'
     print('Saving %s' % plt_fname)
     plt.savefig(plt_fname)
     plt.close()
@@ -138,9 +138,9 @@ for s in range(nsims):
     ax.set_title('pressure at j={:}, y={:.3} t={:.3}'.format(j0,y[j0],t[n]))
     fig.colorbar(plot, ax=ax)
     if nsims > 1:
-      plt_fname = plt_dir_name+'/fig_'+f'{s:02d}'+'_pressure_xz_'+f'j{j0:02d}'+f'n{t0:02d}'+'.png'
+      plt_fname = plt_dir_name+'/fig_'+f'{s:02d}'+'_pressure_xz_'+f'j{j0:02d}'+f't{n:03d}'+'.png'
     else:
-      plt_fname = plt_dir_name+'/fig_pressure_xz_'+f'j{j0:02d}'+f'n{t02d}'+'.png'
+      plt_fname = plt_dir_name+'/fig_pressure_xz_'+f'j{j0:02d}'+f't{n:03d}'+'.png'
     print('Saving %s' % plt_fname)
     plt.savefig(plt_fname)
     plt.close()
@@ -152,9 +152,9 @@ for s in range(nsims):
     ax.set_title('temperature at j={:}, y={:.3} t={:.3}'.format(j0,y[j0],t[n]))
     fig.colorbar(plot, ax=ax)
     if nsims > 1:
-      plt_fname = plt_dir_name+'/fig_'+f'{s:02d}'+'_temperature_xz_'+f'j{j0:02d}'+f'n{t0:02d}'+'.png'
+      plt_fname = plt_dir_name+'/fig_'+f'{s:02d}'+'_temperature_xz_'+f'j{j0:02d}'+f't{n:02d}'+'.png'
     else:
-      plt_fname = plt_dir_name+'/fig_temperature_xz_'+f'j{j0:02d}'+f'n{t0:02d}'+'.png'
+      plt_fname = plt_dir_name+'/fig_temperature_xz_'+f'j{j0:02d}'+f't{n:02d}'+'.png'
     print('Saving %s' % plt_fname)
     plt.savefig(plt_fname)
     plt.close()
