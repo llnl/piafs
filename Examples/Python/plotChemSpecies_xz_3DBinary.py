@@ -121,9 +121,9 @@ for s in range(nsims):
       ax[row, col].set_title('species {:} at j={:}, y={:.3} t={:.3}'.format(var,j0,y[j0],t[n]))
       fig.colorbar(plot, ax=ax[row, col])
     if nsims > 1:
-      plt_fname = plt_dir_name+'/fig_'+f'{s:02d}'+'_xz_'+f'j{j0:02d}'+f't{n:03d}'+'.png'
+      plt_fname = plt_dir_name+'/fig_species_'+f'{s:02d}'+'_xz_'+f'j{j0:02d}'+f't{n:03d}'+'.png'
     else:
-      plt_fname = plt_dir_name+'/fig_xz_'+f'j{j0:02d}'+f't{n:03d}'+'.png'
+      plt_fname = plt_dir_name+'/fig_species_xz_'+f'j{j0:02d}'+f't{n:03d}'+'.png'
     print('Saving %s' % plt_fname)
     plt.savefig(plt_fname)
     plt.close()
