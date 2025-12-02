@@ -1,0 +1,4 @@
+add_subdirectory(Chemistry)
+add_subdirectory(Euler1D)
+add_subdirectory(NavierStokes2D)
+add_subdirectory(NavierStokes3D)

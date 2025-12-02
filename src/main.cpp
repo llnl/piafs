@@ -19,31 +19,34 @@
   To generate a local copy of this documentation, run "doxygen Doxyfile" in $(root_dir). The folder $(root_dir)/doc
   should contain the generated documentation in HTML format.
 
-  Compiling
-  ---------
+  Quick Start
+  -----------
 
-  To compile PIAFS, follow these steps in the root directory:
+  PIAFS supports two build systems: \b CMake (recommended) and \b Autotools.
 
+  \b CMake build:
+        mkdir build && cd build
+        cmake ..
+        make -j 4
+
+  \b Autotools build:
         autoreconf -i
-        [CFLAGS="..."] [CXXFLAGS="..."] ./configure [options]
-        make
-        make install
+        ./configure
+        make && make install
 
-  CFLAGS and CXXFLAGS should include all the compiler flags.
+  For detailed build instructions, options, and troubleshooting, see:
+  + \ref cmake_build "Building PIAFS with CMake" - Comprehensive CMake build guide
+  + \ref Input_Files - Input file documentation
+  + \ref Numerical_Method - Numerical methods documentation
 
-  \b Note: Default installation target is its own directory, and thus "make install" should not require
-           administrative privileges. The binary will be placed in \a bin/ subdirectory.
-
-  The configure options can include options such as BLAS/LAPACK location, MPI directory, etc. Type "./configure --help"
-  to see a full list. The options specific to PIAFS are:
-  + \--enable-serial: Compile a serial version without MPI.
-  + \--with-mpi-dir: Specify path where mpicc is installed, if not in standard path.
-  + \--enable-omp: Enable OpenMP threads.
+  \b Key \b build \b options:
+  + CMake: \c -DENABLE_SERIAL=ON (serial mode), \c -DENABLE_OMP=ON (OpenMP)
+  + Autotools: \c --enable-serial (serial mode), \c --enable-omp (OpenMP)
 
   Running
   -------
   + It's best to start with some examples. See the section on examples.
-  + To run more cases, see the section in input files for a complete description of input files required.
+  + To run more cases, see the section on input files for a complete description of input files required.
 
 */
 
