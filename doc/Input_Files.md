@@ -1,4 +1,4 @@
-Input Files
+Input Files {#Input_Files}
 ===========
 
 The following input files are required to run HyPar. They are indicated as being mandatory or 

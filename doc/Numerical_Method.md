@@ -1,4 +1,4 @@
-Numerical Method
+Numerical Method {#Numerical_Method}
 ================
 
 HyPar solves the following partial differential equation (PDE) using a conservative finite-difference

@@ -5,12 +5,12 @@
 PIAFS: Photochemically Induced Acousto-optics Fluid Simulations
 </p>
 
-[Overview](#Overview) -
-[Code](#Getting the Code) -
-[Documentation](#Documentation) -
-[Compiling](#Compiling) -
-[Running](#Running) -
-[Plotting](#Plotting) -
+[Overview](#overview) -
+[Code](#getting-the-code) -
+[Documentation](#documentation) -
+[Compiling](#compiling) -
+[Running](#running) -
+[Plotting](#plotting)
 
 </div>
 

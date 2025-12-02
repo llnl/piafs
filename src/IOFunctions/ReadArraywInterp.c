@@ -107,7 +107,7 @@ int ReadArraywInterp( int     ndims,          /*!< Number of spatial dimensions 
     his approach is not very scalable either, if running
     with a very large number of processors (> 1000). Supports both binary and ASCII formats.
     \n\n
-    The name of the file being read is <fname_root>.inp
+    The name of the file being read is \<fname_root\>.inp
     \n\n
     \b ASCII format:-\n
     The input file should contain the ASCII data as follows:\n

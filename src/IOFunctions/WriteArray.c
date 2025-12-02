@@ -155,7 +155,7 @@ int WriteArraySerial(
     group, and writes it out to the corresponding file.
     + The data is written in binary format only.
     + The number of files written is equal to the number of IO groups
-      (#MPIVariables::N_IORanks), and are named as <fname_root>.bin.nnnn
+      (#MPIVariables::N_IORanks), and are named as \<fname_root\>.bin.nnnn
       where "nnnn" is a string of format "%04d" representing n,
       0 <= n < MPIVariables::N_IORanks.
     + Each file contains the following blocks of data:\n
@@ -182,7 +182,7 @@ int WriteArraySerial(
     + To stitch all the local data in these files into the global solution, and write that out to
       a binary file can be done by Extras/ParallelOutput.c.
     + If #HyPar::op_overwrite is set to 0, the vector field at the various simulation times are appended
-      to each of the <fname_root>.bin.nnnn. The code Extras/ParallelOutput.c will take care of writing
+      to each of the \<fname_root\>.bin.nnnn. The code Extras/ParallelOutput.c will take care of writing
       the global solution at each simulation time to a different file (in binary format) (the same files
       that WriteArraySerial() would have written out if serial file output was chosen).
 

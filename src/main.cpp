@@ -6,7 +6,10 @@
 
 /*! @mainpage
 
-  @author Debojyoti Ghosh [\b Email: (first name) (dot) (last name) (at) gmail (dot) com, \b Website: http://debog.github.io/]
+  \image html piafs.jpg width=400px
+
+  @author Debojyoti Ghosh [\b Email: ghosh5@llnl.gov],
+          Albertine Oudin [\b Email: oudin1@llnl.gov]
 
   PIAFS: Compressible Euler/Navier-Stokes Solver on Cartesian Grids
   -------------------------------------------------------------------
@@ -16,26 +19,34 @@
 
   Documentation
   -------------
-  To generate a local copy of this documentation, run "doxygen Doxyfile" in $(root_dir). The folder $(root_dir)/doc
-  should contain the generated documentation in HTML format.
+  To generate a local copy of this documentation, run the following in the root directory:
+  \code{.sh}
+  doxygen Doxyfile
+  \endcode
+  The folder \c doc/html will contain the generated documentation in HTML format.
 
   Quick Start
   -----------
 
   PIAFS supports two build systems: \b CMake (recommended) and \b Autotools.
 
-  \b CMake build:
-        mkdir build && cd build
-        cmake ..
-        make -j 4
+  \b CMake \b build:
+  \code{.sh}
+  mkdir build && cd build
+  cmake ..
+  make -j 4
+  \endcode
 
-  \b Autotools build:
-        autoreconf -i
-        ./configure
-        make && make install
+  \b Autotools \b build:
+  \code{.sh}
+  autoreconf -i
+  ./configure
+  make && make install
+  \endcode
 
   For detailed build instructions, options, and troubleshooting, see:
-  + \ref cmake_build "Building PIAFS with CMake" - Comprehensive CMake build guide
+  + \ref cmake_build "Building PIAFS with CMake" - CMake build guide
+  + \ref autotools_build "Building PIAFS with Autotools" - Autotools build guide
   + \ref Input_Files - Input file documentation
   + \ref Numerical_Method - Numerical methods documentation
 

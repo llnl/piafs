@@ -98,7 +98,7 @@ int ReadArray(
     0. Thus, do not use for large domains. This approach is not very scalable either, if running
     with a very large number of processors (> 1000). Supports both binary and ASCII formats.
     \n\n
-    The name of the file being read is <fname_root>.inp
+    The name of the file being read is \<fname_root\>.inp
     \n\n
     \b ASCII format:-\n
     The input file should contain the ASCII data as follows:\n
@@ -305,7 +305,7 @@ int ReadArraySerial(
     + Supports only binary format.
 
    There should be as many files as the number of IO ranks (#MPIVariables::N_IORanks).
-   The files should be named as: <fname_root>_par.inp.<nnnn>, where <nnnn> is the string
+   The files should be named as: \<fname_root\>_par.inp.\<nnnn\>, where \<nnnn\> is the string
    of formast "%04d" corresponding to integer n, 0 <= n < #MPIVariables::N_IORanks.\n
    Each file should contain the following data:
    \n
@@ -334,8 +334,8 @@ int ReadArraySerial(
      corresponding IO group.
    + The ranks that belong to a particular IO group are given as p, where
      #MPIVariables::GroupStartRank <= p < #MPIVariables::GroupEndRank
-   + The code Extras/ParallelInput.c can generate the files <fname_root>_par.inp.<nnnn>
-     from the file <fname_root>.inp that is read by ReadArraySerial() if input_mode in
+   + The code Extras/ParallelInput.c can generate the files \<fname_root\>_par.inp.\<nnnn\>
+     from the file \<fname_root\>.inp that is read by ReadArraySerial() if input_mode in
      the input file "solver.inp" is set to "parallel n" where n is the number of IO ranks.
 */
 int ReadArrayParallel(
@@ -479,7 +479,7 @@ int ReadArrayParallel(
     \n
     + Supports only binary format.
 
-   There should be as one file named as <fname_root>_mpi.inp. It should contain the
+   There should be as one file named as \<fname_root\>_mpi.inp. It should contain the
    following data:
    \n
    {\n
@@ -506,8 +506,8 @@ int ReadArrayParallel(
    + The file should contain as many such blocks of data as there are MPI ranks.
    + Each IO rank computes its offset to figure out where the data it's supposed to
      read exists in the file, and then reads it.
-   + The code Extras/MPIInput.c can generate the file <fname_root>_mpi.inp
-     from the file <fname_root>.inp that is read by ReadArraySerial() if input_mode in
+   + The code Extras/MPIInput.c can generate the file \<fname_root\>_mpi.inp
+     from the file \<fname_root\>.inp that is read by ReadArraySerial() if input_mode in
      the input file "solver.inp" is set to "mpi-io n" where n is the number of IO ranks.
 */
 int ReadArrayMPI_IO(

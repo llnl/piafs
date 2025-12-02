@@ -202,7 +202,7 @@
 typedef struct euler1d_parameters {
 
   double gamma; /*!< Ratio of heat capacities (\f$\gamma\f$) */
-  /*! Choice of upwinding scheme.\sa #_ROE_,#_LLF_,#_RF_,#_SWFS_ */
+  /*! Choice of upwinding scheme.\sa #_ROE_,#_LLF_,#_RF_ */
   char upw_choice[_MAX_STRING_SIZE_];
 
   int include_chem; /*!< Flag to include chemistry */

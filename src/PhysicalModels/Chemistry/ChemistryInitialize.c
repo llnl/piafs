@@ -33,7 +33,7 @@ void ChemistrySetPhotonDensity(void*,void*,void*,double);
 
     Keyword name       | Type         | Variable                        | Default value
     ------------------ | ------------ | ------------------------------- | ------------------------
-    lambda_UV          | double       | #Chemistry::lambda_UB           | 2.48e-7 (248 nm)
+    lambda_UV          | double       | #Chemistry::lambda_UV           | 2.48e-7 (248 nm)
     theta              | double       | #Chemistry::theta               | 0.17*pi/180 radians
     f_CO2              | double       | #Chemistry::f_CO2               | 0
     f_O3               | double       | #Chemistry::f_O3                | 0.005
