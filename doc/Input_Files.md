@@ -229,7 +229,7 @@ Description: This file contains inputs specific to a physics model. Depending on
              be mandatory. The exact parameters to specify depend on the physics.
 
 Format: ASCII text
-        
+
         begin
             <keyword>   <value>
             <keyword>   <value>
@@ -237,7 +237,59 @@ Format: ASCII text
             <keyword>   <value>
         end
 
-See the documentation for the initialization function of the various phyical models for a list of keywords (for example, Euler1DInitialize(), NavierStokes2DInitialize()).
+The list of keywords depends on the physical model being used:
+
+\subsection physics_inp_euler1d Euler1D
+
+Read by: Euler1DInitialize()
+
+Keyword name       | Type         | Variable                      | Default value
+------------------ | ------------ | ----------------------------- | ------------------------
+gamma              | double       | #Euler1D::gamma               | 1.4
+upwinding          | char[]       | #Euler1D::upw_choice          | "roe" (#_ROE_)
+include_chemistry  | char[]       | #Euler1D::include_chem        | "no"
+
+\b Note: "physics.inp" is \b optional; if absent, default values will be used.
+
+\subsection physics_inp_navierstokes2d NavierStokes2D
+
+Read by: NavierStokes2DInitialize()
+
+Keyword name       | Type         | Variable                        | Default value
+------------------ | ------------ | ------------------------------- | ------------------------
+gamma              | double       | #NavierStokes2D::gamma          | 1.4
+Pr                 | double       | #NavierStokes2D::Pr             | 0.72
+Re                 | double       | #NavierStokes2D::Re             | -1
+T_ref              | double       | #NavierStokes2D::Tref           | 273.15 (Kelvin)
+T_0                | double       | #NavierStokes2D::T0             | 275.0  (Kelvin)
+T_S                | double       | #NavierStokes2D::TS             | 110.4  (Kelvin)
+T_A                | double       | #NavierStokes2D::TA             | 245.4  (Kelvin)
+T_B                | double       | #NavierStokes2D::TB             |  27.6  (Kelvin)
+upwinding          | char[]       | #NavierStokes2D::upw_choice     | "roe" (#_ROE_)
+include_chemistry  | char[]       | #NavierStokes2D::include_chem   | "no"
+write_output       | char[]       | #NavierStokes2D::write_op       | "yes"
+
+\b Note: "physics.inp" is \b optional; if absent, default values will be used.
+
+\subsection physics_inp_navierstokes3d NavierStokes3D
+
+Read by: NavierStokes3DInitialize()
+
+Keyword name       | Type         | Variable                        | Default value
+------------------ | ------------ | ------------------------------- | ------------------------
+gamma              | double       | #NavierStokes3D::gamma          | 1.4
+Pr                 | double       | #NavierStokes3D::Pr             | 0.72
+Re                 | double       | #NavierStokes3D::Re             | -1
+T_ref              | double       | #NavierStokes3D::Tref           | 273.15 (Kelvin)
+T_0                | double       | #NavierStokes3D::T0             | 275.0  (Kelvin)
+T_S                | double       | #NavierStokes3D::TS             | 110.4  (Kelvin)
+T_A                | double       | #NavierStokes3D::TA             | 245.4  (Kelvin)
+T_B                | double       | #NavierStokes3D::TB             |  27.6  (Kelvin)
+upwinding          | char[]       | #NavierStokes3D::upw_choice     | "roe" (#_ROE_)
+include_chemistry  | char[]       | #NavierStokes3D::include_chem   | "no"
+write_output       | char[]       | #NavierStokes3D::write_op       | "yes"
+
+\b Note: "physics.inp" is \b optional; if absent, default values will be used.
 
 \section simulation_inp simulation.inp
 
@@ -263,5 +315,57 @@ Keyword name       | Type         | Variable                                    
 nsims              | int          | #EnsembleSimulation::m_nsims                  | 1
 
 \b Notes:
-+ This file \b must exist for ensemble simulations; 
++ This file \b must exist for ensemble simulations;
   if this file does not exist, HyPar will run a standard single simulation.
+
+\section chemistry_inp chemistry.inp
+
+Requirement: \b optional
+
+Read by: ChemistryInitialize()
+
+Description: Specify parameters related to the chemistry module (photochemistry).
+
+Format: ASCII text
+
+        begin
+            <keyword>   <value>
+            <keyword>   <value>
+            <keyword>   <value>
+            ...
+            <keyword>   <value>
+        end
+
+where the list of keywords and their type are:\n
+Keyword name       | Type         | Variable                        | Default value
+------------------ | ------------ | ------------------------------- | ------------------------
+lambda_UV          | double       | #Chemistry::lambda_UV           | 2.48e-7 (248 nm)
+theta              | double       | #Chemistry::theta               | 0.17*pi/180 radians
+f_CO2              | double       | #Chemistry::f_CO2               | 0
+f_O3               | double       | #Chemistry::f_O3                | 0.005
+Ptot               | double       | #Chemistry::Ptot                | 101325 Pa
+Ti                 | double       | #Chemistry::Ti                  | 288 K
+Lz                 | double       | #Chemistry::Lz                  | 0.03 (30 mm)
+z_mm               | double       | #Chemistry::z_mm                | 0
+nz                 | int          | #Chemistry::nz                  | 20
+t_start            | double       | #Chemistry::t_start             | 0.0 s
+t_pulse            | double       | #Chemistry::t_pulse             | 1e-8 s (10 nanoseconds)
+k0a                | double       | #Chemistry::k0a                 | 0.9*3.3e-13 s^{-1}
+k0b                | double       | #Chemistry::k0a                 | 0.1*3.3e-13 s^{-1}
+k1a                | double       | #Chemistry::k1a                 | 0.8*3.95e-13 s^{-1}
+k1b                | double       | #Chemistry::k1a                 | 0.2*3.95e-13 s^{-1}
+k2a                | double       | #Chemistry::k2a                 | 1.2e-16 s^{-1}
+k2b                | double       | #Chemistry::k2a                 | 1.2e-16 s^{-1}
+k3a                | double       | #Chemistry::k3a                 | 1.2e-17 s^{-1}
+k3b                | double       | #Chemistry::k3a                 | 1.0e-17 s^{-1}
+k4                 | double       | #Chemistry::k4                  | 1.1e-16 s^{-1}
+k5                 | double       | #Chemistry::k5                  | 2.0e-16 s^{-1}
+k6                 | double       | #Chemistry::k6                  | 0.2*3.0e-17 s^{-1}
+F0                 | double       | #Chemistry::F0                  | 2000 J/m^2
+sO3                | double       | #Chemistry::sO3                 | 1.1e-21 m^2
+IA                 | double       | #Chemistry::IA                  | 1.0
+IB                 | double       | #Chemistry::IB                  | 1.0
+IC                 | double       | #Chemistry::IC                  | 0.0
+write_all_zlocs    | double       | #Chemistry::write_all_zlocs     | "yes"
+
+\b Note: "chemistry.inp" is \b optional; if absent, default values will be used.
