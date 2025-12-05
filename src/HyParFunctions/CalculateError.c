@@ -72,7 +72,15 @@ int CalculateError(
     sum = ArraySumSquarenD(solver->nvars,solver->ndims,solver->dim_local,
                            solver->ghosts,solver->index,uex);
     global_sum = 0; MPISum_double(&global_sum,&sum,1,&mpi->world);
+    if (solver->npoints_global == 0) {
+      fprintf(stderr,"ERROR in CalculateError: npoints_global is zero, cannot compute norm.\n");
+      exit(1);
+    }
     solution_norm[1] = sqrt(global_sum/((double)solver->npoints_global));
+    if (isnan(solution_norm[1]) || isinf(solution_norm[1])) {
+      fprintf(stderr,"ERROR in CalculateError: NaN/Inf in L2 solution norm.\n");
+      exit(1);
+    }
     /* Linf */
     sum = ArrayMaxnD      (solver->nvars,solver->ndims,solver->dim_local,
                            solver->ghosts,solver->index,uex);
@@ -93,12 +101,20 @@ int CalculateError(
                            solver->ghosts,solver->index,uex);
     global_sum = 0; MPISum_double(&global_sum,&sum,1,&mpi->world);
     solver->error[1] = sqrt(global_sum/((double)solver->npoints_global));
+    if (isnan(solver->error[1]) || isinf(solver->error[1])) {
+      fprintf(stderr,"ERROR in CalculateError: NaN/Inf in L2 error norm.\n");
+      exit(1);
+    }
 
     /* calculate Linf norm of error */
     sum = ArrayMaxnD      (solver->nvars,solver->ndims,solver->dim_local,
                            solver->ghosts,solver->index,uex);
     global_sum = 0; MPIMax_double(&global_sum,&sum,1,&mpi->world);
     solver->error[2] = global_sum;
+    if (isnan(solver->error[2]) || isinf(solver->error[2])) {
+      fprintf(stderr,"ERROR in CalculateError: NaN/Inf in Linf error norm.\n");
+      exit(1);
+    }
 
     /*
       decide whether to normalize and report relative errors,

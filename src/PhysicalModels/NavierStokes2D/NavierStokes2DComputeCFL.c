@@ -38,11 +38,19 @@ double NavierStokes2DComputeCFL(
     _NavierStokes2DGetFlowVar_((u+param->nvars*p),rho,vx,vy,e,P,param->gamma);
 
     c = sqrt(param->gamma*P/rho); /* speed of sound */
+    if (isnan(c) || isinf(c)) {
+      fprintf(stderr,"ERROR in NavierStokes2DComputeCFL: NaN/Inf sound speed c=%e detected at grid point %d.\n",c,p);
+      exit(1);
+    }
     _GetCoordinate_(_XDIR_,index[_XDIR_],dim,ghosts,solver->dxinv,dxinv); /* 1/dx */
     _GetCoordinate_(_YDIR_,index[_YDIR_],dim,ghosts,solver->dxinv,dyinv); /* 1/dy */
 
     local_cfl[_XDIR_] = (absolute(vx)+c)*dt*dxinv; /* local cfl for this grid point (x) */
     local_cfl[_YDIR_] = (absolute(vy)+c)*dt*dyinv; /* local cfl for this grid point (y) */
+    if (isnan(local_cfl[_XDIR_]) || isinf(local_cfl[_XDIR_]) || isnan(local_cfl[_YDIR_]) || isinf(local_cfl[_YDIR_])) {
+      fprintf(stderr,"ERROR in NavierStokes2DComputeCFL: NaN/Inf CFL detected at grid point %d.\n",p);
+      exit(1);
+    }
     if (local_cfl[_XDIR_] > max_cfl) max_cfl = local_cfl[_XDIR_];
     if (local_cfl[_YDIR_] > max_cfl) max_cfl = local_cfl[_YDIR_];
 

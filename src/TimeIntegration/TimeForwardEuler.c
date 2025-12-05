@@ -51,6 +51,14 @@ int TimeForwardEuler(
                   solver->u,
                   TS->u_sizes[ns] );
 
+    /* Check for NaN/Inf in updated solution */
+    for (int i = 0; i < TS->u_sizes[ns]; i++) {
+      if (isnan(solver->u[i]) || isinf(solver->u[i])) {
+        fprintf(stderr,"ERROR in TimeForwardEuler: NaN/Inf detected in solution at index %d, time=%e, dt=%e.\n",i,TS->waqt,TS->dt);
+        exit(1);
+      }
+    }
+
     _ArrayScaleCopy1D_( solver->StageBoundaryIntegral,
                         TS->dt,
                         solver->StepBoundaryIntegral,

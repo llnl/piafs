@@ -95,6 +95,16 @@ int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
 
   }
 
+  /* Check for NaN/Inf in final solution after all stages */
+  for (ns = 0; ns < nsims; ns++) {
+    for (int i = 0; i < TS->u_sizes[ns]; i++) {
+      if (isnan(sim[ns].solver.u[i]) || isinf(sim[ns].solver.u[i])) {
+        fprintf(stderr,"ERROR in TimeRK: NaN/Inf detected in solution at index %d, time=%e, dt=%e.\n",i,TS->waqt,TS->dt);
+        exit(1);
+      }
+    }
+  }
+
   return 0;
 }
 

@@ -28,6 +28,8 @@
     Chapter 5, Section 5.1.7 (However, the non-dimensional velocity and the Reynolds
     number is based on speed of sound, instead of the freestream velocity).
 */
+#include <stdio.h>
+#include <stdlib.h>
 #include <basic.h>
 #include <math_ops.h>
 #include <physicalmodels/chemistry.h>
@@ -72,12 +74,20 @@
   { \
     double  vsq; \
     rho = u[0]; \
+    if (isnan(rho) || isinf(rho)) { \
+      fprintf(stderr,"ERROR in _NavierStokes3DGetFlowVar_: NaN/Inf density detected.\n"); \
+      exit(1); \
+    } \
     vx  = (rho==0) ? 0 : u[1] / rho; \
     vy  = (rho==0) ? 0 : u[2] / rho; \
     vz  = (rho==0) ? 0 : u[3] / rho; \
     e   = u[4]; \
     vsq  = (vx*vx) + (vy*vy) + (vz*vz); \
     P   = (e - 0.5*rho*vsq) * (gamma-1.0); \
+    if (isnan(vx) || isinf(vx) || isnan(vy) || isinf(vy) || isnan(vz) || isinf(vz) || isnan(P) || isinf(P)) { \
+      fprintf(stderr,"ERROR in _NavierStokes3DGetFlowVar_: NaN/Inf in velocity (%e,%e,%e) or pressure (%e).\n",vx,vy,vz,P); \
+      exit(1); \
+    } \
   }
 
 /*! \def _NavierStokes3DSetFlux_
@@ -139,6 +149,10 @@
     HR = 0.5*(vxR*vxR+vyR*vyR+vzR*vzR) + cRsq / (gamma-1.0); \
     double tL = sqrt(rhoL); \
     double tR = sqrt(rhoR); \
+    if (isnan(tL) || isinf(tL) || isnan(tR) || isinf(tR)) { \
+      fprintf(stderr,"ERROR in _NavierStokes3DRoeAverage_: NaN/Inf in sqrt(rho) detected.\n"); \
+      exit(1); \
+    } \
     rho = tL * tR; \
     vx  = (tL*vxL + tR*vxR) / (tL + tR); \
     vy  = (tL*vyL + tR*vyR) / (tL + tR); \
@@ -147,6 +161,10 @@
     vsq = vx*vx + vy*vy + vz*vz; \
     P   = (gamma-1.0) * (H-0.5*vsq) * rho / gamma; \
     e   = P/(gamma-1.0) + 0.5*rho*vsq; \
+    if (isnan(vx) || isinf(vx) || isnan(vy) || isinf(vy) || isnan(vz) || isinf(vz) || isnan(P) || isinf(P)) { \
+      fprintf(stderr,"ERROR in _NavierStokes3DRoeAverage_: NaN/Inf in averaged quantities detected.\n"); \
+      exit(1); \
+    } \
     uavg[0] = rho; \
     uavg[1] = rho*vx; \
     uavg[2] = rho*vy; \
