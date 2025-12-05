@@ -56,6 +56,7 @@ CFLAGS="-g -O0" CXXFLAGS="-g -O0" ./configure
 | `--enable-serial` | Build without MPI (serial mode) |
 | `--enable-omp` | Enable OpenMP support |
 | `--with-mpi-dir=DIR` | Specify MPI installation directory |
+| `--with-mpiexec=CMD` | Specify MPI run command for tests (e.g., srun, jsrun) |
 
 ### Standard Autotools Options
 
@@ -95,6 +96,59 @@ To install to a different location:
 ./configure --prefix=/usr/local
 make install
 ```
+
+## Testing
+
+PIAFS includes a comprehensive regression test suite that compares simulation outputs against benchmark solutions.
+
+### Running Tests
+
+```bash
+# Run all tests
+make check
+
+# View detailed test output
+cat Tests/test_mpi.sh.log
+```
+
+### Custom MPI Executor (HPC Platforms)
+
+For HPC systems with job schedulers, specify a custom MPI launch command during configuration:
+
+```bash
+# For Slurm
+./configure --with-mpiexec="srun"
+
+# For IBM JSRun
+./configure --with-mpiexec="jsrun"
+
+# For standard mpirun with options
+./configure --with-mpiexec="mpirun -np"
+
+# Then run tests
+make check
+```
+
+### Out-of-Source Testing
+
+The test system supports out-of-source builds:
+
+```bash
+mkdir build && cd build
+../configure --with-mpiexec="srun"
+make
+make check
+```
+
+### Test Output
+
+Test results include:
+- Summary of passed/failed file comparisons
+- Detailed diff output for any failures
+- Test logs saved to `Tests/test_mpi.sh.log`
+- Benchmark comparisons use relative tolerance of 1.0e-14
+
+For more details, see `Tests/README.md` in the source directory.
 
 ## Common Workflows
 
@@ -210,6 +264,8 @@ make install
 | Configure | `./configure` | `cmake ..` |
 | Out-of-tree builds | Supported | Native |
 | Parallel builds | `make -jN` | `make -jN` |
+| Testing | `make check` | `make test` or `ctest` |
+| MPI executor | `--with-mpiexec=srun` | `-DMPIEXEC=srun` |
 | Clean build | `make distclean` | `rm -rf build` |
 | IDE integration | Limited | Excellent |
 | Cross-platform | Unix-like | All platforms |

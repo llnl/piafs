@@ -102,8 +102,47 @@ Note:
 | Configuration | `./configure` | `cmake ..` |
 | Serial mode | `--enable-serial` | `-DENABLE_SERIAL=ON` |
 | OpenMP | `--enable-omp` | `-DENABLE_OMP=ON` |
+| MPI executor | `--with-mpiexec=srun` | `-DMPIEXEC=srun` |
+| Testing | `make check` | `make test` or `ctest` |
 | IDE Integration | Limited | Excellent |
 | Out-of-tree builds | Supported | Native |
+
+## Testing
+
+PIAFS includes a regression test suite that validates simulation outputs against benchmark solutions.
+
+### Running Tests
+
+**With CMake:**
+```bash
+cd build
+make test
+# or
+ctest --verbose
+```
+
+**With Autotools:**
+```bash
+make check
+```
+
+### HPC Platform Configuration
+
+For systems using job schedulers (Slurm, etc.), specify the MPI launch command:
+
+**CMake:**
+```bash
+cmake -DMPIEXEC="srun" ..
+make test
+```
+
+**Autotools:**
+```bash
+./configure --with-mpiexec="srun"
+make check
+```
+
+For detailed testing documentation, see `Tests/README.md`.
 
 ## Running
 
