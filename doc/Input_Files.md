@@ -215,9 +215,43 @@ borges             | int          | #WENOParameters::borges       | 0
 yc                 | int          | #WENOParameters::yc           | 0
 no_limiting        | int          | #WENOParameters::no_limiting  | 0
 epsilon            | double       | #WENOParameters::eps          | 1e-6
+p                  | double       | #WENOParameters::p            | 2.0
 rc                 | double       | #WENOParameters::rc           | 0.3
 xi                 | double       | #WENOParameters::xi           | 0.001
 tol                | double       | #WENOParameters::tol          | 1e-16
+
+\section muscl_inp muscl.inp
+
+Requirement: \b optional
+
+Read by: MUSCLInitialize()
+
+Description: Specify parameters related to MUSCL-type spatial discretization. This file is relevant only if a MUSCL-type
+             method is being used for spatial discretization (for example: Interp1PrimSecondOrderMUSCL(), Interp1PrimThirdOrderMUSCL()).
+             For most cases, this file is optional; typically, the default values are sufficient.
+
+Format: ASCII text
+
+        begin
+            <keyword>   <value>
+            <keyword>   <value>
+            ...
+            <keyword>   <value>
+        end
+
+where the list of keywords are:
+
+Keyword name       | Type         | Variable                      | Default value
+------------------ | ------------ | ----------------------------- | ------------------------
+epsilon            | double       | #MUSCLParameters::eps         | 1e-3
+limiter            | char[]       | #MUSCLParameters::limiter_type| "gmm" (#_LIM_GM_)
+
+\b Notes:
++ Valid limiter types are:
+  - "gmm" (#_LIM_GM_) - Generalized MinMod limiter (default)
+  - "minmod" (#_LIM_MM_) - MinMod limiter
+  - "vanleer" (#_LIM_VANLEER_) - van Leer limiter
+  - "superbee" (#_LIM_SUPERBEE_) - SuperBee limiter
 
 \section physics_inp physics.inp
 
