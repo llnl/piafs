@@ -116,7 +116,8 @@ for k0 in range(size[2]):
     rho = cons_sol[0,:,:,:,:]
     uvel = cons_sol[1,:,:,:,:] / cons_sol[0,:,:,:,:]
     vvel = cons_sol[2,:,:,:,:] / cons_sol[0,:,:,:,:]
-    pressure = 0.4 * (cons_sol[3,:,:,:,:] - 0.5*(cons_sol[1,:,:,:,:]*cons_sol[1,:,:,:,:]+cons_sol[2,:,:,:,:]*cons_sol[2,:,:,:,:])/cons_sol[0,:,:,:,:])
+    wvel = cons_sol[3,:,:,:,:] / cons_sol[0,:,:,:,:]
+    pressure = 0.4 * (cons_sol[4,:,:,:,:] - 0.5*(cons_sol[1,:,:,:,:]*cons_sol[1,:,:,:,:]+cons_sol[2,:,:,:,:]*cons_sol[2,:,:,:,:]+cons_sol[3,:,:,:,:]*cons_sol[3,:,:,:,:])/cons_sol[0,:,:,:,:])
     temperature = 1.4 * pressure / rho
   
     fig = plt.figure(figsize=figsize)
