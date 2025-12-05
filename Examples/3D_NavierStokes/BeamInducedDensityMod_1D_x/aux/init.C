@@ -428,8 +428,8 @@ int main()
     for (i=0; i < NI; i++) {
       for (j = 0; j < NJ; j++) {
         for (k = 0; k < NK; k++) {
-          int p = NJ*i + j;
-          int q = NI*j + i;
+          int p = NJ*NK*i + NK*j + k;
+          int q = NJ*NI*k + NI*j + i;
           U[nvars*q+0] = u0[p];
           U[nvars*q+1] = u1[p];
           U[nvars*q+2] = u2[p];
