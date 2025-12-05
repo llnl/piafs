@@ -10,7 +10,7 @@ EXTRA_DIST = \
 	Tests
 
 # Testing support
-TESTS_ENVIRONMENT = PIAFS_DIR=$(abs_top_builddir) PIAFS_SRC_DIR=$(abs_top_srcdir)
+TESTS_ENVIRONMENT = PIAFS_DIR=$(abs_top_builddir) PIAFS_SRC_DIR=$(abs_top_srcdir) MPIEXEC="@MPIEXEC@"
 TESTS = Tests/test_mpi.sh
 
 check-local:

@@ -42,9 +42,28 @@ if(NOT ENABLE_SERIAL)
     add_compile_definitions(serial)
     set(ENABLE_SERIAL ON)
   endif()
+
+  # Set MPIEXEC for tests - use user-specified value or detected executable
+  # Only set if not already defined by user via -DMPIEXEC=...
+  if(NOT MPIEXEC)
+    if(MPIEXEC_EXECUTABLE)
+      set(MPIEXEC "${MPIEXEC_EXECUTABLE}" CACHE STRING "MPI run command for tests")
+    else()
+      set(MPIEXEC "mpiexec" CACHE STRING "MPI run command for tests")
+    endif()
+  else()
+    # User specified MPIEXEC, ensure it's in cache
+    set(MPIEXEC "${MPIEXEC}" CACHE STRING "MPI run command for tests")
+  endif()
 else()
   message(STATUS "Building in serial mode (MPI disabled)")
   add_compile_definitions(serial)
+  # For serial builds, default to mpiexec if not specified
+  if(NOT MPIEXEC)
+    set(MPIEXEC "mpiexec" CACHE STRING "MPI run command for tests")
+  else()
+    set(MPIEXEC "${MPIEXEC}" CACHE STRING "MPI run command for tests")
+  endif()
 endif()
 
 # OpenMP support
@@ -103,9 +122,9 @@ add_test(
   WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-# Set environment variable for the test
+# Set environment variables for the test
 set_tests_properties(piafs_regression_tests PROPERTIES
-  ENVIRONMENT "PIAFS_DIR=${CMAKE_BINARY_DIR}"
+  ENVIRONMENT "PIAFS_DIR=${CMAKE_BINARY_DIR};PIAFS_SRC_DIR=${CMAKE_SOURCE_DIR};MPIEXEC=${MPIEXEC}"
   TIMEOUT 3600
 )
 
@@ -120,4 +139,5 @@ message(STATUS "  C Compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "  CXX Compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "  Testing: Enabled (use 'make test' or 'ctest')")
+message(STATUS "  MPI executor for tests: ${MPIEXEC}")
 message(STATUS "")

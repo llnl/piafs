@@ -25,6 +25,12 @@ make
 # Run the test suite
 make check
 
+# Custom MPI executor (for HPC platforms)
+./configure --with-mpiexec="srun"          # For Slurm
+./configure --with-mpiexec="mpirun -np"    # For standard mpirun
+./configure --with-mpiexec="jsrun"         # For IBM JSRun
+make check
+
 # The test log is saved to Tests/test_mpi.sh.log
 # View the full test output:
 cat Tests/test_mpi.sh.log
@@ -34,6 +40,7 @@ cat Tests/test_mpi.sh.log
 - The autotools build system automatically copies the PIAFS binary from `src/PIAFS` to `bin/PIAFS` before running tests.
 - Out-of-source builds are fully supported. The test system automatically locates source files (like the diff tool) in the source directory while using binaries from the build directory.
 - For out-of-source builds, run `make check` from your build directory.
+- Use `--with-mpiexec` to specify a custom MPI launcher for HPC environments (default: `mpiexec`).
 
 ### Using CMake
 
@@ -50,6 +57,13 @@ make test
 ctest
 ctest --verbose  # for detailed output
 ctest --output-on-failure  # show output only for failed tests
+
+# Custom MPI executor (for HPC platforms)
+cmake -DMPIEXEC="srun" ..                  # For Slurm
+cmake -DMPIEXEC="mpirun -np" ..            # For standard mpirun
+cmake -DMPIEXEC="jsrun" ..                 # For IBM JSRun
+make
+ctest --verbose
 ```
 
 ### Manual Execution
@@ -67,8 +81,13 @@ cd Tests
 
 ## Environment Variables
 
+The test script supports the following environment variables:
+
 - `PIAFS_DIR`: Required. Path to PIAFS build directory containing the `bin/PIAFS` executable
-- `MPI_EXEC`: Optional. MPI executor command (default: `mpiexec --oversubscribe`)
+- `PIAFS_SRC_DIR`: Optional. Path to PIAFS source directory (automatically set by build systems for out-of-source builds)
+- `MPIEXEC`: Optional. MPI executor command for running parallel tests (default: `mpiexec --oversubscribe`)
+  - Examples: `mpiexec`, `mpirun`, `srun`, `jsrun`
+  - Set via `--with-mpiexec` (autotools) or `-DMPIEXEC` (CMake)
 - `PIAFS_EXEC_OTHER_ARGS`: Optional. Additional arguments to pass to PIAFS
 
 ## Test Structure

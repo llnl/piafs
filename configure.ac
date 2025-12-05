@@ -14,6 +14,7 @@ fi
 
 AC_ARG_ENABLE([serial],AS_HELP_STRING([--enable-serial],[Enable serial mode]))
 AC_ARG_WITH([mpi_dir],AS_HELP_STRING([--with-mpi-dir],[Specify path where MPI is installed.]))
+AC_ARG_WITH([mpiexec],AS_HELP_STRING([--with-mpiexec],[Specify MPI run command (e.g., mpirun, mpiexec, srun) for tests.]))
 AC_ARG_ENABLE([omp],AS_HELP_STRING([--enable-omp],[Enable OpenMP threads]))
 
 AC_PROG_CC
@@ -128,6 +129,15 @@ fi
 
 AC_PROG_RANLIB
 AC_PROG_INSTALL
+
+dnl Set MPI executor for tests
+if test "x$with_mpiexec" != "x" ; then
+  MPIEXEC="$with_mpiexec"
+  AC_MSG_NOTICE([Using custom MPI executor for tests: $MPIEXEC])
+else
+  MPIEXEC="mpiexec"
+fi
+AC_SUBST(MPIEXEC)
 
 AC_CONFIG_FILES([
  Makefile

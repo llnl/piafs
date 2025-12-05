@@ -15,14 +15,20 @@ piafs_exec="PIAFS"
 
 #export env vars for other scripts to run PIAFS
 export PIAFS_EXEC_W_PATH="${piafs_dir}/bin/${piafs_exec}"
-export MPI_EXEC="mpiexec --oversubscribe"
 export PIAFS_EXEC_OTHER_ARGS=""
 
-# Test if --oversubscribe flag is supported
-$MPI_EXEC -n 1 echo "test" &> /dev/null
-if [ $? -ne 0 ]; then
-  echo "Warning: --oversubscribe flag not supported, falling back to 'mpiexec'"
-  export MPI_EXEC="mpiexec"
+# Set MPI executor - use MPIEXEC if provided, otherwise use mpiexec with --oversubscribe
+if [ -z "$MPIEXEC" ]; then
+  export MPI_EXEC="mpiexec --oversubscribe"
+  # Test if --oversubscribe flag is supported
+  $MPI_EXEC -n 1 echo "test" &> /dev/null
+  if [ $? -ne 0 ]; then
+    echo "Warning: --oversubscribe flag not supported, falling back to 'mpiexec'"
+    export MPI_EXEC="mpiexec"
+  fi
+else
+  export MPI_EXEC="$MPIEXEC"
+  echo "Using custom MPI executor: $MPI_EXEC"
 fi
 
 # some details about PIAFS benchmarks
