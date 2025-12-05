@@ -205,6 +205,10 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
                            / (chem->Ti+physics->TA*exp(-physics->TB/chem->Ti))    );
       physics->Re = chem->rho_ref * chem->v_ref * chem->L_ref / mu_ref;
       physics->Pr = chem->gamma*chem->R/(chem->gamma-1) * mu_ref / kappa_ref;
+      if (!mpi->rank) {
+        printf("Reference coefficient of visocity: %1.4e\n", mu_ref);
+        printf("Reference coefficient of thermal conductivity: %1.4e\n", kappa_ref);
+      }
     }
   }
 
