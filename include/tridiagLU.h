@@ -104,11 +104,6 @@ typedef struct _tridiagLU_ {
   double  stage3_time;    /*!< Wall time (in seconds) for stage 3 of tridiagLU() or blocktridiagLU() */
   double  stage4_time;    /*!< Wall time (in seconds) for stage 4 of tridiagLU() or blocktridiagLU() */
 
-#ifdef with_scalapack
-  int blacs_ctxt;         /*!< Context variable for ScaLAPACK (relevant if compiled with ScaLAPACK
-                               support (-Dwith_scalapack) \sa tridiagScaLPK */
-#endif
-
 } TridiagLU;
 
 int tridiagLU         (double*,double*,double*,double*,int,int,void*,void*);
@@ -119,10 +114,5 @@ int tridiagLUInit     (void*,void*);
 /* Block solvers */
 int blocktridiagLU         (double*,double*,double*,double*,int,int,int,void*,void*);
 int blocktridiagIterJacobi (double*,double*,double*,double*,int,int,int,void*,void*);
-
-#ifdef with_scalapack
-/* ScaLAPACK interface */
-int tridiagScaLPK     (double*,double*,double*,double*,int,int,void*,void*);
-#endif
 
 #endif

@@ -3,8 +3,6 @@
     @brief Compute the hyperbolic term of the governing equations
 */
 
-#include <time.h>
-
 #include <stdlib.h>
 #include <basic.h>
 #include <arrayfunctions.h>
@@ -66,11 +64,6 @@ int HyperbolicFunction(
   if (!FluxFunction) return(0); /* zero hyperbolic term */
   solver->count_hyp++;
 
-#if defined(CPU_STAT)
-  double cpu_time = 0.0;
-  clock_t cpu_start, cpu_end;
-#endif
-
   int offset = 0;
   for (d = 0; d < ndims; d++) {
     _ArrayCopy1D_(dim,dim_interface,ndims); dim_interface[d]++;
@@ -86,10 +79,6 @@ int HyperbolicFunction(
     /* calculate the first derivative */
     done = 0; _ArraySetValue_(index,ndims,0);
     int p, p1, p2;
-
-#if defined(CPU_STAT)
-    cpu_start = clock();
-#endif
 
     while (!done) {
       _ArrayCopy1D_(index,index1,ndims);
@@ -108,17 +97,8 @@ int HyperbolicFunction(
       _ArrayIncrementIndex_(ndims,dim,index,done);
     }
 
-#if defined(CPU_STAT)
-    cpu_end = clock();
-    cpu_time += (double)(cpu_end - cpu_start) / CLOCKS_PER_SEC;
-#endif
-
     offset += dim[d] + 2*ghosts;
   }
-
-#if defined(CPU_STAT)
-  printf("HyperbolicFunction CPU time = %8.6lf\n", cpu_time);
-#endif
 
   return(0);
 }

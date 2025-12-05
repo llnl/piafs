@@ -4,8 +4,6 @@
 */
 
 #include <stdlib.h>
-#include <time.h>
-
 #include <basic.h>
 #include <arrayfunctions.h>
 #include <mathfunctions.h>
@@ -107,11 +105,6 @@ int Interp1PrimFifthOrderWENO(
   _ArrayCopy1D_(dim,bounds_inter,ndims); bounds_inter[dir] += 1;
   int N_outer; _ArrayProduct1D_(bounds_outer,ndims,N_outer);
 
-#if defined(CPU_STAT)
-  clock_t cpu_start, cpu_end;
-  cpu_start = clock();
-#endif
-
   int i;
 #pragma omp parallel for schedule(auto) default(shared) private(i,index_outer,indexC,indexI)
   for (i=0; i<N_outer; i++) {
@@ -158,11 +151,6 @@ int Interp1PrimFifthOrderWENO(
       _ArrayMultiply3Add1D_((fI+p*nvars),w1,f1,w2,f2,w3,f3,nvars);
     }
   }
-
-#if defined(CPU_STAT)
-  cpu_end = clock();
-  printf("Interp1PrimFifthOrderWENO CPU time = %8.6lf dir = %d\n", (double)(cpu_end - cpu_start) / CLOCKS_PER_SEC, dir);
-#endif
 
   return(0);
 }

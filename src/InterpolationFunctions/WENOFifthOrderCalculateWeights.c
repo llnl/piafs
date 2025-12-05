@@ -5,8 +5,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-
 #include <basic.h>
 #include <arrayfunctions.h>
 #include <matmult_native.h>
@@ -309,12 +307,6 @@ int WENOFifthOrderCalculateWeightsM(
   ww2RU = weno->w2 + 2*weno->size + weno->size + offset;
   ww3RU = weno->w3 + 2*weno->size + weno->size + offset;
 
-#if defined(CPU_STAT)
-  clock_t startTime, endTime;
-  double copyTime = 0.0;
-  startTime = clock();
-#endif
-
 #pragma omp parallel for schedule(auto) default(shared) private(i,index_outer,indexC,indexI)
   for (i=0; i<N_outer; i++) {
     _ArrayIndexnD_(ndims,i,bounds_outer,index_outer,0);
@@ -390,12 +382,6 @@ int WENOFifthOrderCalculateWeightsM(
       _WENOWeights_v_M_((ww1RU+p*nvars),(ww2RU+p*nvars),(ww3RU+p*nvars),c1,c2,c3,m3RU,m2RU,m1RU,p1RU,p2RU,weno->eps,nvars);
     }
   }
-
-#if defined(CPU_STAT)
-  endTime = clock();
-  printf("WENOFifthOrderCalculateWeightsM CPU time = %8.6f dir = %d\n",
-         (double)(endTime - startTime) / CLOCKS_PER_SEC, dir);
-#endif
 
   return(0);
 }
@@ -634,11 +620,6 @@ int WENOFifthOrderCalculateWeightsYC(
   ww2RU = weno->w2 + 2*weno->size + weno->size + offset;
   ww3RU = weno->w3 + 2*weno->size + weno->size + offset;
 
-#if defined(CPU_STAT)
-  clock_t cpu_start, cpu_end;
-  cpu_start = clock();
-#endif
-
 #pragma omp parallel for schedule(auto) default(shared) private(i,index_outer,indexC,indexI)
   for (i=0; i<N_outer; i++) {
     _ArrayIndexnD_(ndims,i,bounds_outer,index_outer,0);
@@ -714,12 +695,6 @@ int WENOFifthOrderCalculateWeightsYC(
       _WENOWeights_v_YC_((ww1RU+p*nvars),(ww2RU+p*nvars),(ww3RU+p*nvars),c1,c2,c3,m3RU,m2RU,m1RU,p1RU,p2RU,weno->eps,nvars);
     }
   }
-
-#if defined(CPU_STAT)
-  cpu_end = clock();
-  printf("WENOFifthOrderCalculateWeightsYC:\n");
-  printf("  CPU time = %8.6lf dir = %d\n", (double)(cpu_end - cpu_start) / CLOCKS_PER_SEC, dir);
-#endif
 
   return(0);
 }
