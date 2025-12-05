@@ -112,6 +112,14 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 # Testing support
 enable_testing()
 
+# Create a custom target to copy PIAFS binary to bin/ before running tests
+add_custom_target(prepare_test_binary
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin
+  COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:PIAFS> ${CMAKE_BINARY_DIR}/bin/PIAFS
+  DEPENDS PIAFS
+  COMMENT "Copying PIAFS binary to bin/ for testing"
+)
+
 # Set PIAFS_DIR environment variable for tests
 set(ENV{PIAFS_DIR} ${CMAKE_BINARY_DIR})
 
@@ -126,6 +134,16 @@ add_test(
 set_tests_properties(piafs_regression_tests PROPERTIES
   ENVIRONMENT "PIAFS_DIR=${CMAKE_BINARY_DIR};PIAFS_SRC_DIR=${CMAKE_SOURCE_DIR};MPIEXEC=${MPIEXEC}"
   TIMEOUT 3600
+  FIXTURES_REQUIRED prepare_binary
+)
+
+# Add a fixture to ensure binary is prepared before testing
+add_test(
+  NAME prepare_piafs_binary
+  COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target prepare_test_binary
+)
+set_tests_properties(prepare_piafs_binary PROPERTIES
+  FIXTURES_SETUP prepare_binary
 )
 
 # Display configuration summary
