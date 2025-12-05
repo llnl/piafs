@@ -63,16 +63,24 @@ fi
 # compile the PIAFS diff code
 piafs_diff_srcname="Extras/piafsDiff_RegTests.c"
 PIAFS_DIFF="PIAFS_DIFF"
-if [ -f "$piafs_dir/$piafs_diff_srcname" ]; then
+
+# Use PIAFS_SRC_DIR if set (for out-of-source builds), otherwise use PIAFS_DIR
+if [ -z "$PIAFS_SRC_DIR" ]; then
+  piafs_src_dir=$piafs_dir
+else
+  piafs_src_dir=$PIAFS_SRC_DIR
+fi
+
+if [ -f "$piafs_src_dir/$piafs_diff_srcname" ]; then
   echo "Compiling PIAFS-diff."
-  gcc $piafs_dir/$piafs_diff_srcname -lm -o $root_dir/$PIAFS_DIFF
+  gcc $piafs_src_dir/$piafs_diff_srcname -lm -o $root_dir/$PIAFS_DIFF
 else
   echo "---------------------------------"
   echo "ERROR !!!"
   echo " "
   echo "PIAFS-Diff source NOT FOUND !!!"
   echo " "
-  echo "$piafs_dir/$piafs_diff_srcname does not exist"
+  echo "$piafs_src_dir/$piafs_diff_srcname does not exist"
   echo " "
   echo "---------------------------------"
 fi

@@ -90,6 +90,25 @@ install(FILES README.md LICENSE DESTINATION share/doc/piafs)
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
+# Testing support
+enable_testing()
+
+# Set PIAFS_DIR environment variable for tests
+set(ENV{PIAFS_DIR} ${CMAKE_BINARY_DIR})
+
+# Add the test
+add_test(
+  NAME piafs_regression_tests
+  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/Tests/test_mpi.sh
+  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+# Set environment variable for the test
+set_tests_properties(piafs_regression_tests PROPERTIES
+  ENVIRONMENT "PIAFS_DIR=${CMAKE_BINARY_DIR}"
+  TIMEOUT 3600
+)
+
 # Display configuration summary
 message(STATUS "")
 message(STATUS "PIAFS Configuration Summary:")
@@ -100,4 +119,5 @@ message(STATUS "  OpenMP support: ${ENABLE_OMP}")
 message(STATUS "  C Compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "  CXX Compiler: ${CMAKE_CXX_COMPILER}")
 message(STATUS "  Install prefix: ${CMAKE_INSTALL_PREFIX}")
+message(STATUS "  Testing: Enabled (use 'make test' or 'ctest')")
 message(STATUS "")

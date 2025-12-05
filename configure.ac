@@ -128,6 +128,7 @@ fi
 
 AC_PROG_RANLIB
 AC_PROG_INSTALL
+
 AC_CONFIG_FILES([
  Makefile
  src/Makefile
