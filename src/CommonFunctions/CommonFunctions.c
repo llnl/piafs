@@ -4,6 +4,7 @@
 */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <basic.h>
 #include <common.h>
 #include <math.h>
@@ -59,6 +60,28 @@ void takeExp( double* const array,      /*!< the array to take log of */
 {
     for (size_t i = 0; i < array_size; ++i) {
       array[i] = exp(array[i]);
+    }
+  return;
+}
+
+/*!
+  Check for NaN or Inf values in an array and abort if found
+*/
+void checkNanInf( const double* const array,      /*!< the array to check */
+                  const int           array_size,  /*!< size of the array */
+                  const char* const   location     /*!< location string for error message */ )
+{
+    for (size_t i = 0; i < array_size; ++i) {
+        if (isnan(array[i])) {
+            fprintf(stderr, "ERROR: NaN detected at %s, index %zu\n", location, i);
+            fprintf(stderr, "       Aborting simulation.\n");
+            exit(1);
+        }
+        if (isinf(array[i])) {
+            fprintf(stderr, "ERROR: Inf detected at %s, index %zu\n", location, i);
+            fprintf(stderr, "       Aborting simulation.\n");
+            exit(1);
+        }
     }
   return;
 }

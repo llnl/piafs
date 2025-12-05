@@ -38,6 +38,10 @@ double NavierStokes3DComputeCFL(
     _NavierStokes3DGetFlowVar_((u+param->nvars*p),rho,vx,vy,vz,e,P,param->gamma);
 
     c = sqrt(param->gamma*P/rho); /* speed of sound */
+    if (isnan(c) || isinf(c)) {
+      fprintf(stderr,"ERROR in NavierStokes3DComputeCFL: NaN/Inf sound speed c=%e detected at grid point %d.\n",c,p);
+      exit(1);
+    }
     _GetCoordinate_(_XDIR_,index[_XDIR_],dim,ghosts,solver->dxinv,dxinv); /* 1/dx */
     _GetCoordinate_(_YDIR_,index[_YDIR_],dim,ghosts,solver->dxinv,dyinv); /* 1/dy */
     _GetCoordinate_(_ZDIR_,index[_ZDIR_],dim,ghosts,solver->dxinv,dzinv); /* 1/dz */
@@ -45,6 +49,10 @@ double NavierStokes3DComputeCFL(
     local_cfl[_XDIR_] = (absolute(vx)+c)*dt*dxinv; /* local cfl for this grid point (x) */
     local_cfl[_YDIR_] = (absolute(vy)+c)*dt*dyinv; /* local cfl for this grid point (y) */
     local_cfl[_ZDIR_] = (absolute(vz)+c)*dt*dzinv; /* local cfl for this grid point (z) */
+    if (isnan(local_cfl[_XDIR_]) || isinf(local_cfl[_XDIR_]) || isnan(local_cfl[_YDIR_]) || isinf(local_cfl[_YDIR_]) || isnan(local_cfl[_ZDIR_]) || isinf(local_cfl[_ZDIR_])) {
+      fprintf(stderr,"ERROR in NavierStokes3DComputeCFL: NaN/Inf CFL detected at grid point %d.\n",p);
+      exit(1);
+    }
     if (local_cfl[_XDIR_] > max_cfl) max_cfl = local_cfl[_XDIR_];
     if (local_cfl[_YDIR_] > max_cfl) max_cfl = local_cfl[_YDIR_];
     if (local_cfl[_ZDIR_] > max_cfl) max_cfl = local_cfl[_ZDIR_];

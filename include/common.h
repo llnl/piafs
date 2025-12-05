@@ -19,4 +19,8 @@ void takeLog(double* , int);
 */
 void takeExp(double* , int);
 
+/*! Check for NaN or Inf values in an array and abort if found
+*/
+void checkNanInf(const double* const array, const int array_size, const char* const location);
+
 #endif

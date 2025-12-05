@@ -51,7 +51,15 @@ int TimePostStep(void *ts /*!< Object of type #TimeIntegration */)
                     &sum,1,
                     &(sim[0].mpi.world) );
 
+    if (npts == 0) {
+      fprintf(stderr,"ERROR in TimePostStep: Total grid points is zero, cannot compute norm.\n");
+      exit(1);
+    }
     TS->norm = sqrt(global_sum/npts);
+    if (isnan(TS->norm) || isinf(TS->norm)) {
+      fprintf(stderr,"ERROR in TimePostStep: NaN/Inf detected in residual norm at iteration %d.\n",TS->iter+1);
+      exit(1);
+    }
 
     /* write to file */
     if (TS->ResidualFile) {

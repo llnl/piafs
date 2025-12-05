@@ -38,7 +38,15 @@ double Euler1DComputeCFL(
     _Euler1DGetFlowVar_((u+param->nvars*p),rho,v,e,P,param);
     _GetCoordinate_(0,index[0],dim,ghosts,solver->dxinv,dxinv); /* 1/dx */
     c = sqrt(param->gamma*P/rho); /* speed of sound */
+    if (isnan(c) || isinf(c)) {
+      fprintf(stderr,"ERROR in Euler1DComputeCFL: NaN/Inf sound speed c=%e detected at grid point %d.\n",c,p);
+      exit(1);
+    }
     local_cfl = (absolute(v)+c)*dt*dxinv; /* local cfl for this grid point */
+    if (isnan(local_cfl) || isinf(local_cfl)) {
+      fprintf(stderr,"ERROR in Euler1DComputeCFL: NaN/Inf CFL=%e detected at grid point %d.\n",local_cfl,p);
+      exit(1);
+    }
     if (local_cfl > max_cfl) max_cfl = local_cfl;
     _ArrayIncrementIndex_(ndims,dim,index,done);
   }

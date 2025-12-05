@@ -18,6 +18,8 @@
   + Laney, C. B., Computational Gasdynamics, Cambridge University Press, 1998
 */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <basic.h>
 #include <math.h>
 #include <matops.h>
@@ -59,9 +61,17 @@
   { \
     double gamma = p->gamma; \
     rho = u[0]; \
+    if (isnan(rho) || isinf(rho)) { \
+      fprintf(stderr,"ERROR in _Euler1DGetFlowVar_: NaN/Inf density detected.\n"); \
+      exit(1); \
+    } \
     v   = u[1] / rho; \
     e   = u[2]; \
     P   = (e - 0.5*rho*v*v) * (gamma-1.0); \
+    if (isnan(v) || isinf(v) || isnan(P) || isinf(P)) { \
+      fprintf(stderr,"ERROR in _Euler1DGetFlowVar_: NaN/Inf in velocity (%e) or pressure (%e).\n",v,P); \
+      exit(1); \
+    } \
   }
 
 /*! \def _Euler1DSetFlux_
@@ -92,12 +102,12 @@
     double rhoR,vR,eR,PR,HR,cRsq; \
     double gamma = p->gamma; \
     rhoL = uL[0]; \
+    rhoR = uR[0]; \
     vL   = uL[1] / rhoL; \
     eL   = uL[2]; \
     PL   = (eL - 0.5*rhoL*vL*vL) * (gamma-1.0); \
     cLsq = gamma * PL/rhoL; \
     HL = 0.5*vL*vL + cLsq / (gamma-1.0); \
-    rhoR = uR[0]; \
     vR   = uR[1] / rhoR; \
     eR   = uR[2]; \
     PR   = (eR - 0.5*rhoR*vR*vR) * (gamma-1.0); \
@@ -105,12 +115,20 @@
     HR = 0.5*vR*vR + cRsq / (gamma-1.0); \
     double tL = sqrt(rhoL); \
     double tR = sqrt(rhoR); \
+    if (isnan(tL) || isinf(tL) || isnan(tR) || isinf(tR)) { \
+      fprintf(stderr,"ERROR in _Euler1DRoeAverage_: NaN/Inf in sqrt(rho) detected.\n"); \
+      exit(1); \
+    } \
     rho = tL * tR; \
     v   = (tL*vL + tR*vR) / (tL + tR); \
     H   = (tL*HL + tR*HR) / (tL + tR); \
     csq = (gamma-1.0) * (H-0.5*v*v); \
     P   = csq * rho / gamma; \
     e   = P/(gamma-1.0) + 0.5*rho*v*v; \
+    if (isnan(v) || isinf(v) || isnan(P) || isinf(P)) { \
+      fprintf(stderr,"ERROR in _Euler1DRoeAverage_: NaN/Inf in averaged quantities detected.\n"); \
+      exit(1); \
+    } \
     \
     uavg[0] = rho; \
     uavg[1] = rho*v; \
@@ -133,6 +151,10 @@
     double rho,v,e,P,c; \
     _Euler1DGetFlowVar_(u,rho,v,e,P,p); \
     c = sqrt(gamma*P/rho); \
+    if (isnan(c) || isinf(c)) { \
+      fprintf(stderr,"ERROR in _Euler1DEigenvalues_: NaN/Inf sound speed c=%e detected.\n",c); \
+      exit(1); \
+    } \
     _ArraySetValue_(D, p->nvars*p->nvars, 0.0); \
     D[0*p->nvars+0] = v; \
     D[1*p->nvars+1] = (v-c); \
