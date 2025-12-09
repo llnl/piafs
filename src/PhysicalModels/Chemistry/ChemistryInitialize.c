@@ -328,7 +328,7 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   chem->I0 = chem->F0/chem->t_pulse;
   chem->nu = chem->c / chem->lambda_UV;
 
-  double Ei = chem->Ptot/((chem->gamma-1.0)*chem->n_O2);
+  double Ei = chem->P_ref/((chem->gamma-1.0)*chem->n_O2);
 
   chem->q0a_norm = 0.73 * chem->e/Ei;
   chem->q0b_norm = 2.8  * chem->e/Ei;
