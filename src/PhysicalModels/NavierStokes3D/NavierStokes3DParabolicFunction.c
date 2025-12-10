@@ -101,7 +101,7 @@ int NavierStokes3DParabolicFunction(
   IERR MPIExchangeBoundariesnD(_MODEL_NDIMS_,nvars,solver->dim_local,
                                  solver->ghosts,mpi,QDerivY); CHECKERR(ierr);
   IERR MPIExchangeBoundariesnD(_MODEL_NDIMS_,nvars,solver->dim_local,
-                                 solver->ghosts,mpi,QDerivY); CHECKERR(ierr);
+                                 solver->ghosts,mpi,QDerivZ); CHECKERR(ierr);
 
   for (i=-ghosts; i<(imax+ghosts); i++) {
     for (j=-ghosts; j<(jmax+ghosts); j++) {

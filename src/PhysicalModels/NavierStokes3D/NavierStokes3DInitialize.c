@@ -133,10 +133,11 @@ int NavierStokes3DInitialize( void *s, /*!< Solver object of type #HyPar */
         }
       } else {
         fprintf(stderr,"Error: Illegal format in file \"physics.inp\".\n");
+        fclose(in);
         return(1);
       }
+      fclose(in);
     }
-    fclose(in);
 
     physics->include_chem = (!strcmp(include_chem,"yes"));
   }
