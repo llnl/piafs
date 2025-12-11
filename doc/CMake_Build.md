@@ -18,9 +18,9 @@ mkdir build && cd build
 cmake ..
 make -j4
 ```
-Executable: `build/src/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` (e.g., `PIAFS-v0.1-gcc9-mpi4`)
+Executable: `build/src/PIAFS-<compiler>-<mpi/serial>` (e.g., `PIAFS-gcc-mpi`)
 
-The binary name automatically includes version, compiler, and MPI information to distinguish different builds.
+The binary name automatically includes compiler and build configuration information to distinguish different builds.
 
 ### Common Build Variants
 ```bash
@@ -53,14 +53,15 @@ make install
 ```
 
 This creates:
-- `bin/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` - Executable
+- `bin/PIAFS-<compiler>-<mpi/serial>` - Executable
 
-The binary name format is: `PIAFS-v<VERSION>-<compiler><version>-<mpi><version>[-omp][-<buildtype>]`
+The binary name format is: `PIAFS-<compiler>-<mpi/serial>[-omp][-<buildtype>]`
 
 Examples:
-- `PIAFS-v0.1-gcc9-mpi4` - Version 0.1, GCC 9, MPI 4, Release build
-- `PIAFS-v0.1-clang19-mpi4-omp` - Version 0.1, Clang 19, MPI 4, OpenMP enabled
-- `PIAFS-v0.1-gcc9-mpi4-debug` - Version 0.1, GCC 9, MPI 4, Debug build
+- `PIAFS-gcc-mpi` - GCC compiler, MPI parallel, Release build
+- `PIAFS-clang-mpi-omp` - Clang compiler, MPI parallel, OpenMP enabled
+- `PIAFS-gcc-mpi-debug` - GCC compiler, MPI parallel, Debug build
+- `PIAFS-intel-serial` - Intel compiler, serial mode
 
 **Note:** The default install prefix is the source directory, so no root permissions are needed.
 

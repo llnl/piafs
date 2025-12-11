@@ -21,9 +21,9 @@ make -j4
 make install
 ```
 
-The executable will be installed at: `bin/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` (e.g., `bin/PIAFS-v0.1-gcc9-mpi4`)
+The executable will be installed at: `bin/PIAFS-<compiler>-<mpi/serial>` (e.g., `bin/PIAFS-gcc-mpi`)
 
-The binary name automatically includes version, compiler, and MPI information to distinguish different builds.
+The binary name automatically includes compiler and build configuration information to distinguish different builds.
 
 **Note:** The first command `autoreconf -i` is only needed:
 - After a fresh clone/download of the code
@@ -90,13 +90,14 @@ make install
 ```
 
 This creates:
-- `bin/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` - Executable
+- `bin/PIAFS-<compiler>-<mpi/serial>` - Executable
 
-The binary name format is: `PIAFS-v<VERSION>-<compiler><version>-<mpi><version>[-omp]`
+The binary name format is: `PIAFS-<compiler>-<mpi/serial>[-omp]`
 
 Examples:
-- `PIAFS-v0.1-gcc9-mpi4` - Version 0.1, GCC 9, MPI 4
-- `PIAFS-v0.1-clang19-mpi4-omp` - Version 0.1, Clang 19, MPI 4, OpenMP enabled
+- `PIAFS-gcc-mpi` - GCC compiler, MPI parallel
+- `PIAFS-clang-mpi-omp` - Clang compiler, MPI parallel, OpenMP enabled
+- `PIAFS-intel-serial` - Intel compiler, serial mode
 
 To install to a different location:
 
