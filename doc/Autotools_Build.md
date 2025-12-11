@@ -21,7 +21,9 @@ make -j4
 make install
 ```
 
-The executable will be installed at: `bin/PIAFS`
+The executable will be installed at: `bin/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` (e.g., `bin/PIAFS-v0.1-gcc9-mpi4`)
+
+The binary name automatically includes version, compiler, and MPI information to distinguish different builds.
 
 **Note:** The first command `autoreconf -i` is only needed:
 - After a fresh clone/download of the code
@@ -88,7 +90,13 @@ make install
 ```
 
 This creates:
-- `bin/PIAFS` - Executable
+- `bin/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` - Executable
+
+The binary name format is: `PIAFS-v<VERSION>-<compiler><version>-<mpi><version>[-omp]`
+
+Examples:
+- `PIAFS-v0.1-gcc9-mpi4` - Version 0.1, GCC 9, MPI 4
+- `PIAFS-v0.1-clang19-mpi4-omp` - Version 0.1, Clang 19, MPI 4, OpenMP enabled
 
 To install to a different location:
 
@@ -311,6 +319,28 @@ When adding source files, update the appropriate `Makefile.am`.
 For general autotools documentation:
 - [GNU Autoconf Manual](https://www.gnu.org/software/autoconf/manual/)
 - [GNU Automake Manual](https://www.gnu.org/software/automake/manual/)
+
+## Startup Information
+
+When PIAFS starts, it displays detailed build information:
+
+```
+================================================================================
+PIAFS - Parallel (MPI) version with 64 processes
+  Version: 0.1
+  Git Hash: abc1234 (branch: main)
+  Build Date: 2024-01-15 10:30:45
+  Compiler: gcc 9.4.0
+  MPI: parallel 4.0.0
+  Build Type: Release
+  OpenMP: enabled
+================================================================================
+```
+
+This information helps identify:
+- Which version of the code is running
+- Build configuration (compiler, MPI, OpenMP)
+- Git commit information for reproducibility
 
 For PIAFS-specific information:
 - See README.md for project overview

@@ -67,7 +67,13 @@ cmake -DENABLE_OMP=ON ..
 make -j 4
 ```
 
-If successful, the executable will be at `build/src/PIAFS`.
+If successful, the executable will be at `build/src/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` (e.g., `PIAFS-v0.1-gcc9-mpi4`).
+
+The binary name includes:
+- Version (e.g., `v0.1`)
+- Compiler name and major version (e.g., `gcc9`, `clang19`)
+- MPI major version for parallel builds (e.g., `mpi4`)
+- Build type suffix for non-Release builds (e.g., `-debug`)
 
 For detailed CMake build instructions and options, see [BUILD_CMAKE.md](BUILD_CMAKE.md).
 
@@ -83,9 +89,15 @@ make [-j <n>] && make install
 
 If these steps are successful, the binary file
 ```
-bin/PIAFS
+bin/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>
 ```
-will be available.
+will be available (e.g., `bin/PIAFS-v0.1-gcc9-mpi4`).
+
+The binary name includes:
+- Version (e.g., `v0.1`)
+- Compiler name and major version (e.g., `gcc9`, `clang19`)
+- MPI major version for parallel builds (e.g., `mpi4`)
+- OpenMP suffix if enabled (e.g., `-omp`)
 
 Note:
 + The first command `autoreconf -i` needs to be run the first time
@@ -162,7 +174,17 @@ depending on the whether the file is `.c` or `.C`.
 + In the run directory (that contains the `solver.inp`, `boundary.inp`, etc), run
   the binary `INIT` from the previous step. This will generate the initial solution.
 
-+ Run /path/to/piafs/bin/PIAFS either in serial or in parallel using `mpiexec` or `srun`.
++ Run `/path/to/piafs/bin/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` either in serial or in parallel using `mpiexec` or `srun`.
+  
+  **Note:** With CMake, the default install location is the source directory (matching autotools), so after `make install`, the binary will be at `piafs/bin/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` (e.g., `PIAFS-v0.1-gcc9-mpi4`).
+
+  **Startup Information:** When PIAFS starts, it prints detailed build information including:
+  - Version and Git hash/branch
+  - Build date
+  - Compiler name and version
+  - MPI mode and version (for parallel builds)
+  - OpenMP status
+  - Build type
 
 
 ## Plotting

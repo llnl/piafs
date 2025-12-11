@@ -130,6 +130,99 @@ fi
 AC_PROG_RANLIB
 AC_PROG_INSTALL
 
+dnl Build binary name suffix from configuration
+PIAFS_NAME_SUFFIX=""
+
+dnl Add compiler info
+if test "$GXX" = "yes" ; then
+  PIAFS_NAME_SUFFIX="${PIAFS_NAME_SUFFIX}-gcc"
+elif test "$CXX" = "clang++" -o "$CXX" = "clang" ; then
+  PIAFS_NAME_SUFFIX="${PIAFS_NAME_SUFFIX}-clang"
+else
+  dnl Extract compiler name from CXX
+  CXX_BASENAME=`basename "$CXX" 2>/dev/null`
+  PIAFS_NAME_SUFFIX="${PIAFS_NAME_SUFFIX}-${CXX_BASENAME}"
+fi
+
+dnl Add MPI/serial info
+if test "x$enable_serial" = "xyes"; then
+  PIAFS_NAME_SUFFIX="${PIAFS_NAME_SUFFIX}-serial"
+else
+  PIAFS_NAME_SUFFIX="${PIAFS_NAME_SUFFIX}-mpi"
+fi
+
+dnl Add OpenMP info
+if test "x$enable_omp" = "xyes"; then
+  PIAFS_NAME_SUFFIX="${PIAFS_NAME_SUFFIX}-omp"
+fi
+
+AC_SUBST(PIAFS_NAME_SUFFIX)
+
+dnl Get git information
+AC_CHECK_PROG([GIT_FOUND], [git], [yes], [no])
+PIAFS_GIT_HASH="unknown"
+PIAFS_GIT_BRANCH="unknown"
+if test "$GIT_FOUND" = "yes"; then
+  PIAFS_GIT_HASH=`git rev-parse --short HEAD 2>/dev/null || echo "unknown"`
+  PIAFS_GIT_BRANCH=`git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"`
+fi
+AC_SUBST(PIAFS_GIT_HASH)
+AC_SUBST(PIAFS_GIT_BRANCH)
+
+dnl Get build date
+PIAFS_BUILD_DATE=`date -u +"%Y-%m-%d %H:%M:%S" 2>/dev/null || date +"%Y-%m-%d %H:%M:%S" || echo "unknown"`
+AC_SUBST(PIAFS_BUILD_DATE)
+
+dnl Get compiler version
+PIAFS_COMPILER_VERSION="unknown"
+if test "$GXX" = "yes"; then
+  PIAFS_COMPILER_VERSION=`$CXX --version | head -n1 | sed 's/.*version //' | sed 's/ .*//' 2>/dev/null || echo "unknown"`
+fi
+AC_SUBST(PIAFS_COMPILER_VERSION)
+
+dnl Get MPI version
+PIAFS_MPI_VERSION="unknown"
+if test "x$enable_serial" != "xyes"; then
+  dnl Try to get MPI version from mpicc or mpicxx
+  if test -n "$MPICC"; then
+    PIAFS_MPI_VERSION=`$MPICC --version 2>/dev/null | head -n1 | grep -o '[0-9]\+\.[0-9]\+' | head -n1 || echo "unknown"`
+  fi
+  if test "$PIAFS_MPI_VERSION" = "unknown" -a -n "$MPICXX"; then
+    PIAFS_MPI_VERSION=`$MPICXX --version 2>/dev/null | head -n1 | grep -o '[0-9]\+\.[0-9]\+' | head -n1 || echo "unknown"`
+  fi
+fi
+AC_SUBST(PIAFS_MPI_VERSION)
+
+dnl Set build configuration
+if test "x$enable_serial" = "xyes"; then
+  PIAFS_MPI_MODE="serial"
+else
+  PIAFS_MPI_MODE="mpi"
+fi
+AC_SUBST(PIAFS_MPI_MODE)
+
+if test "x$enable_omp" = "xyes"; then
+  PIAFS_OPENMP="enabled"
+else
+  PIAFS_OPENMP="disabled"
+fi
+AC_SUBST(PIAFS_OPENMP)
+
+dnl Get compiler name
+PIAFS_COMPILER="unknown"
+if test "$GXX" = "yes"; then
+  PIAFS_COMPILER="gcc"
+elif test "$CXX" = "clang++" -o "$CXX" = "clang"; then
+  PIAFS_COMPILER="clang"
+else
+  PIAFS_COMPILER=`basename "$CXX" 2>/dev/null || echo "unknown"`
+fi
+AC_SUBST(PIAFS_COMPILER)
+
+dnl Set build type (default to Release for autotools)
+PIAFS_BUILD_TYPE="Release"
+AC_SUBST(PIAFS_BUILD_TYPE)
+
 dnl Set MPI executor for tests
 if test "x$with_mpiexec" != "x" ; then
   MPIEXEC="$with_mpiexec"
@@ -138,6 +231,12 @@ else
   MPIEXEC="mpiexec"
 fi
 AC_SUBST(MPIEXEC)
+
+dnl Generate build_info.h
+dnl Set PIAFS_VERSION from PACKAGE_VERSION for substitution
+PIAFS_VERSION="${PACKAGE_VERSION}"
+AC_SUBST(PIAFS_VERSION)
+AC_CONFIG_FILES([build_info.h:build_info.h.in])
 
 AC_CONFIG_FILES([
  Makefile

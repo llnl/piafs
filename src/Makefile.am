@@ -14,9 +14,9 @@ SUBDIRS = \
   TimeIntegration \
   TridiagLU
 
-bin_PROGRAMS = PIAFS
-PIAFS_SOURCES = main.cpp
-PIAFS_LDADD = \
+bin_PROGRAMS = PIAFS@PIAFS_NAME_SUFFIX@
+PIAFS@PIAFS_NAME_SUFFIX@_SOURCES = main.cpp
+PIAFS@PIAFS_NAME_SUFFIX@_LDADD = \
   Simulation/libSimulation.a \
   HyParFunctions/libHyParFunctions.a \
   TimeIntegration/libTimeIntegration.a \

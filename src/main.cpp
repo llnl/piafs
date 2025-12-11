@@ -68,6 +68,7 @@
 
 #include <mpivars_cpp.h>
 #include <simulation_library.h>
+#include <build_info.h>
 
 static const char help[] = "PIAFS - A finite-difference algorithm for the compressible Euler/Navier-Stokes equations";
 
@@ -86,7 +87,15 @@ int main(int argc, char **argv)
   int world = 0;
   int rank  = 0;
   int nproc = 1;
+  printf("================================================================================\n");
   printf("PIAFS - Serial Version\n");
+  printf("  Version: %s\n", PIAFS_VERSION);
+  printf("  Git Hash: %s (branch: %s)\n", PIAFS_GIT_HASH, PIAFS_GIT_BRANCH);
+  printf("  Build Date: %s\n", PIAFS_BUILD_DATE);
+  printf("  Build Type: %s\n", PIAFS_BUILD_TYPE);
+  printf("  MPI Mode: %s\n", PIAFS_MPI_MODE);
+  printf("  OpenMP: %s\n", PIAFS_OPENMP);
+  printf("================================================================================\n");
 #else
   MPI_Comm world;
   int rank, nproc;
@@ -94,7 +103,16 @@ int main(int argc, char **argv)
   MPI_Comm_dup(MPI_COMM_WORLD, &world);
   MPI_Comm_rank(MPI_COMM_WORLD,&rank );
   MPI_Comm_size(MPI_COMM_WORLD,&nproc);
-  if (!rank) printf("PIAFS - Parallel (MPI) version with %d processes\n",nproc);
+  if (!rank) {
+    printf("================================================================================\n");
+    printf("PIAFS - Parallel (MPI) version with %d processes\n", nproc);
+    printf("  Version: %s\n", PIAFS_VERSION);
+    printf("  Git Hash: %s (branch: %s)\n", PIAFS_GIT_HASH, PIAFS_GIT_BRANCH);
+    printf("  Build Date: %s\n", PIAFS_BUILD_DATE);
+    printf("  Build Type: %s\n", PIAFS_BUILD_TYPE);
+    printf("  OpenMP: %s\n", PIAFS_OPENMP);
+    printf("================================================================================\n");
+  }
 #endif
 
   gettimeofday(&main_start,NULL);

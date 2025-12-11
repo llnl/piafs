@@ -18,7 +18,9 @@ mkdir build && cd build
 cmake ..
 make -j4
 ```
-Executable: `build/src/PIAFS`
+Executable: `build/src/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` (e.g., `PIAFS-v0.1-gcc9-mpi4`)
+
+The binary name automatically includes version, compiler, and MPI information to distinguish different builds.
 
 ### Common Build Variants
 ```bash
@@ -39,18 +41,44 @@ cmake -DCMAKE_BUILD_TYPE=Debug ..
 | `ENABLE_SERIAL` | OFF | Build without MPI |
 | `ENABLE_OMP` | OFF | Enable OpenMP |
 | `CMAKE_BUILD_TYPE` | Release | Debug, Release, RelWithDebInfo, MinSizeRel |
-| `CMAKE_INSTALL_PREFIX` | /usr/local | Installation directory |
+| `CMAKE_INSTALL_PREFIX` | Source directory | Installation directory (matches autotools) |
 | `MPIEXEC` | Auto-detected | MPI run command for tests (e.g., mpiexec, srun) |
 
 ## Installation
+
+By default, CMake installs to the project's own directory (matching autotools behavior):
 
 ```bash
 make install
 ```
 
-To change install location:
+This creates:
+- `bin/PIAFS-v<VERSION>-<compiler><version>-<mpi><version>` - Executable
+
+The binary name format is: `PIAFS-v<VERSION>-<compiler><version>-<mpi><version>[-omp][-<buildtype>]`
+
+Examples:
+- `PIAFS-v0.1-gcc9-mpi4` - Version 0.1, GCC 9, MPI 4, Release build
+- `PIAFS-v0.1-clang19-mpi4-omp` - Version 0.1, Clang 19, MPI 4, OpenMP enabled
+- `PIAFS-v0.1-gcc9-mpi4-debug` - Version 0.1, GCC 9, MPI 4, Debug build
+
+**Note:** The default install prefix is the source directory, so no root permissions are needed.
+
+To install to a different location:
 ```bash
 cmake -DCMAKE_INSTALL_PREFIX=/your/path ..
+make install
+```
+
+**Important:** If installing to system directories like `/usr/local`, you may need root permissions:
+```bash
+sudo make install
+```
+
+Alternatively, install to a user-writable location:
+```bash
+cmake -DCMAKE_INSTALL_PREFIX=$HOME/piafs ..
+make install
 ```
 
 ## Testing
@@ -128,5 +156,27 @@ cmake -DMPI_C_COMPILER=/path/to/mpicc -DMPI_CXX_COMPILER=/path/to/mpicxx ..
 ```bash
 rm -rf build && mkdir build && cd build && cmake .. && make
 ```
+
+## Startup Information
+
+When PIAFS starts, it displays detailed build information:
+
+```
+================================================================================
+PIAFS - Parallel (MPI) version with 64 processes
+  Version: 0.1
+  Git Hash: abc1234 (branch: main)
+  Build Date: 2024-01-15 10:30:45
+  Compiler: gcc 9.4.0
+  MPI: parallel 4.0.0
+  Build Type: Release
+  OpenMP: enabled
+================================================================================
+```
+
+This information helps identify:
+- Which version of the code is running
+- Build configuration (compiler, MPI, OpenMP)
+- Git commit information for reproducibility
 
 For more troubleshooting help, see BUILD_CMAKE.md.

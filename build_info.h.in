@@ -1,0 +1,26 @@
+/*! @file build_info.h
+ *  @brief Build information (generated at configure time)
+ *  @note This file is auto-generated - do not edit manually
+ */
+
+#ifndef _BUILD_INFO_H_
+#define _BUILD_INFO_H_
+
+/* Version information */
+#define PIAFS_VERSION "@PIAFS_VERSION@"
+
+/* Git information */
+#define PIAFS_GIT_HASH "@PIAFS_GIT_HASH@"
+#define PIAFS_GIT_BRANCH "@PIAFS_GIT_BRANCH@"
+
+/* Build configuration */
+#define PIAFS_BUILD_TYPE "@PIAFS_BUILD_TYPE@"
+#define PIAFS_COMPILER "@PIAFS_COMPILER@"
+#define PIAFS_COMPILER_VERSION "@PIAFS_COMPILER_VERSION@"
+#define PIAFS_MPI_MODE "@PIAFS_MPI_MODE@"
+#define PIAFS_MPI_VERSION "@PIAFS_MPI_VERSION@"
+#define PIAFS_OPENMP "@PIAFS_OPENMP@"
+#define PIAFS_BUILD_DATE "@PIAFS_BUILD_DATE@"
+
+#endif /* _BUILD_INFO_H_ */
+
