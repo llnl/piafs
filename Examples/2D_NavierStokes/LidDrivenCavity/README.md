@@ -56,6 +56,107 @@ Note: This is an incompressible problem being solved using the compressible Navi
 
 See the main PIAFS README for other optional input files.
 
+
+## Input File Details
+
+### solver.inp
+
+```
+begin
+  ndims               2
+  nvars               4
+  size                128 128
+  ghost               3
+  n_iter              50000
+  time_scheme         rk
+  time_scheme_type    44
+  hyp_space_scheme    upw5
+  hyp_flux_split      no
+  hyp_interp_type     components
+  par_space_type      nonconservative-2stage
+  par_space_scheme    4
+  dt                  0.005
+  screen_op_iter      100
+  file_op_iter        1000
+  input_mode          serial
+  ip_file_type        binary
+  output_mode         serial
+  op_file_format      tecplot2d
+  op_overwrite        yes
+  model               navierstokes2d
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| ndims | 2 | Number of spatial dimensions |
+| nvars | 4 | Number of solution variables |
+| size | 128 128 | Grid size (for 1D) or grid dimensions separated by spaces (for 2D/3D) |
+| ghost | 3 | Number of ghost points |
+| n_iter | 50000 | Number of time iterations |
+| time_scheme | rk | Time integration scheme (rk=Runge-Kutta, euler=Forward Euler) |
+| time_scheme_type | 44 | RK scheme type (44=RK4, ssprk3=SSP-RK3, etc.) |
+| hyp_space_scheme | upw5 | Spatial discretization for hyperbolic terms (weno5, crweno5, muscl3, etc.) |
+| hyp_flux_split | no | Flux splitting (no, yes) |
+| hyp_interp_type | components | Interpolation type (characteristic, components) |
+| par_space_type | nonconservative-2stage | Parabolic scheme type (nonconservative-1.5stage, etc.) |
+| par_space_scheme | 4 | Parabolic term discretization (2, 4 for 2nd/4th order) |
+| dt | 0.005 | Time step size |
+| screen_op_iter | 100 | Iterations between screen output |
+| file_op_iter | 1000 | Iterations between file output |
+| input_mode | serial | Parameter description |
+| ip_file_type | binary | Parameter description |
+| output_mode | serial | Parameter description |
+| op_file_format | tecplot2d | Output format (text, binary, tecplot2d) |
+| op_overwrite | yes | Overwrite output files (yes, no) |
+| model | navierstokes2d | Physical model (euler1d, navierstokes2d, navierstokes3d) |
+
+### boundary.inp
+
+```
+4
+noslip-wall   0     1     0     0      0   1.0
+0.0 0.0
+noslip-wall   0    -1     0     0      0   1.0
+0.0 0.0
+noslip-wall   1     1     0   1.0      0      0
+0.0 0.0
+noslip-wall   1    -1     0   1.0      0      0
+0.1 0.0
+```
+
+The boundary.inp file format:
+- First line: Number of boundary specifications (4)
+- Each subsequent line: type dim face xmin xmax
+
+| Parameter | Description |
+|-----------|-------------|
+| type | Boundary condition type (periodic, extrapolate, noslip, slip-wall, supersonic_inflow, supersonic_outflow, subsonic_inflow, subsonic_outflow) |
+| dim | Spatial dimension (0=x, 1=y, 2=z) |
+| face | Face identifier (1=right/top/front, -1=left/bottom/back) |
+| xmin, xmax | Range where BC applies |
+
+### physics.inp
+
+```
+begin
+  gamma     1.4
+  upwinding roe
+  Pr        0.72
+  Minf      0.1
+  Re        3200
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| gamma | 1.4 | Ratio of specific heats (typically 1.4 for air) |
+| upwinding | roe | Upwinding scheme (rf-char=Roe-fixed characteristic, rusanov, etc.) |
+| Pr | 0.72 | Prandtl number |
+| Minf | 0.1 | Freestream Mach number |
+| Re | 3200 | Reynolds number |
+
+
 ## How to Run
 
 1. **Generate the initial solution:**

@@ -62,6 +62,85 @@ Parameters:
 
 See the main PIAFS README for other optional input files.
 
+
+## Input File Details
+
+### solver.inp
+
+```
+begin
+  ndims               1
+  nvars               3
+  size                512
+  ghost               3
+  n_iter              400
+  time_scheme         rk
+  time_scheme_type    44
+  hyp_space_scheme    weno5
+  hyp_interp_type     characteristic
+  conservation_check  yes
+  dt                  0.05
+  screen_op_iter      10
+  file_op_iter        50
+  op_file_format      binary
+  op_overwrite        no
+  model               euler1d
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| ndims | 1 | Number of spatial dimensions |
+| nvars | 3 | Number of solution variables |
+| size | 512 | Grid size (for 1D) or grid dimensions separated by spaces (for 2D/3D) |
+| ghost | 3 | Number of ghost points |
+| n_iter | 400 | Number of time iterations |
+| time_scheme | rk | Time integration scheme (rk=Runge-Kutta, euler=Forward Euler) |
+| time_scheme_type | 44 | RK scheme type (44=RK4, ssprk3=SSP-RK3, etc.) |
+| hyp_space_scheme | weno5 | Spatial discretization for hyperbolic terms (weno5, crweno5, muscl3, etc.) |
+| hyp_interp_type | characteristic | Interpolation type (characteristic, components) |
+| conservation_check | yes | Check conservation (yes, no) |
+| dt | 0.05 | Time step size |
+| screen_op_iter | 10 | Iterations between screen output |
+| file_op_iter | 50 | Iterations between file output |
+| op_file_format | binary | Output format (text, binary, tecplot2d) |
+| op_overwrite | no | Overwrite output files (yes, no) |
+| model | euler1d | Physical model (euler1d, navierstokes2d, navierstokes3d) |
+
+### boundary.inp
+
+```
+2
+periodic   0     1     0     0
+periodic   0    -1     0     0
+```
+
+The boundary.inp file format:
+- First line: Number of boundary specifications (2)
+- Each subsequent line: type dim face xmin xmax
+
+| Parameter | Description |
+|-----------|-------------|
+| type | Boundary condition type (periodic, extrapolate, noslip, slip-wall, supersonic_inflow, supersonic_outflow, subsonic_inflow, subsonic_outflow) |
+| dim | Spatial dimension (0=x, 1=y, 2=z) |
+| face | Face identifier (1=right/top/front, -1=left/bottom/back) |
+| xmin, xmax | Range where BC applies |
+
+### physics.inp
+
+```
+begin
+  gamma       1.4
+  upwinding   rf-char
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| gamma | 1.4 | Ratio of specific heats (typically 1.4 for air) |
+| upwinding | rf-char | Upwinding scheme (rf-char=Roe-fixed characteristic, rusanov, etc.) |
+
+
 ## How to Run
 
 1. **Generate the initial solution:**

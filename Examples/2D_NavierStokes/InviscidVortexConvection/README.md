@@ -75,6 +75,149 @@ where r^2 = (x-x0)^2 + (y-y0)^2
 
 See the main PIAFS README for other optional input files.
 
+
+## Input File Details
+
+### solver.inp
+
+```
+begin
+  ndims               2
+  nvars               4
+  size                60 60
+  ghost               3
+  n_iter              800
+  restart_iter        0
+  time_scheme         rk
+  time_scheme_type    ssprk3
+  hyp_space_scheme    crweno5
+  hyp_flux_split      no
+  hyp_interp_type     components
+  par_space_type      nonconservative-2stage
+  par_space_scheme    4
+  dt                  0.025
+  conservation_check  yes
+  screen_op_iter      20
+  file_op_iter        80
+  input_mode          serial
+  ip_file_type        binary
+  output_mode         serial
+  op_file_format      tecplot2d
+  op_overwrite        no
+  model               navierstokes2d
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| ndims | 2 | Number of spatial dimensions |
+| nvars | 4 | Number of solution variables |
+| size | 60 60 | Grid size (for 1D) or grid dimensions separated by spaces (for 2D/3D) |
+| ghost | 3 | Number of ghost points |
+| n_iter | 800 | Number of time iterations |
+| restart_iter | 0 | Iteration number to restart from (if applicable) |
+| time_scheme | rk | Time integration scheme (rk=Runge-Kutta, euler=Forward Euler) |
+| time_scheme_type | ssprk3 | RK scheme type (44=RK4, ssprk3=SSP-RK3, etc.) |
+| hyp_space_scheme | crweno5 | Spatial discretization for hyperbolic terms (weno5, crweno5, muscl3, etc.) |
+| hyp_flux_split | no | Flux splitting (no, yes) |
+| hyp_interp_type | components | Interpolation type (characteristic, components) |
+| par_space_type | nonconservative-2stage | Parabolic scheme type (nonconservative-1.5stage, etc.) |
+| par_space_scheme | 4 | Parabolic term discretization (2, 4 for 2nd/4th order) |
+| dt | 0.025 | Time step size |
+| conservation_check | yes | Check conservation (yes, no) |
+| screen_op_iter | 20 | Iterations between screen output |
+| file_op_iter | 80 | Iterations between file output |
+| input_mode | serial | Parameter description |
+| ip_file_type | binary | Parameter description |
+| output_mode | serial | Parameter description |
+| op_file_format | tecplot2d | Output format (text, binary, tecplot2d) |
+| op_overwrite | no | Overwrite output files (yes, no) |
+| model | navierstokes2d | Physical model (euler1d, navierstokes2d, navierstokes3d) |
+
+### boundary.inp
+
+```
+4
+periodic      0     1     0     0      0   10.0
+periodic      0    -1     0     0      0   10.0
+periodic      1     1     0  10.0      0      0
+periodic      1    -1     0  10.0      0      0
+```
+
+The boundary.inp file format:
+- First line: Number of boundary specifications (4)
+- Each subsequent line: type dim face xmin xmax
+
+| Parameter | Description |
+|-----------|-------------|
+| type | Boundary condition type (periodic, extrapolate, noslip, slip-wall, supersonic_inflow, supersonic_outflow, subsonic_inflow, subsonic_outflow) |
+| dim | Spatial dimension (0=x, 1=y, 2=z) |
+| face | Face identifier (1=right/top/front, -1=left/bottom/back) |
+| xmin, xmax | Range where BC applies |
+
+### physics.inp
+
+```
+begin
+  gamma     1.4
+  upwinding roe
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| gamma | 1.4 | Ratio of specific heats (typically 1.4 for air) |
+| upwinding | roe | Upwinding scheme (rf-char=Roe-fixed characteristic, rusanov, etc.) |
+
+### weno.inp
+
+```
+begin
+  mapped        1
+  borges        0
+  yc            0
+  no_limiting   0
+  epsilon       0.000001
+  p             2.0
+  rc            0.3
+  xi            0.001
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| mapped | 1 | Use mapped WENO (0=no, 1=yes) |
+| borges | 0 | Use Borges mapping (0=no, 1=yes) |
+| yc | 0 | Use Yamaleev-Carpenter mapping (0=no, 1=yes) |
+| no_limiting | 0 | Disable limiting (0=limiting on, 1=no limiting) |
+| epsilon | 0.000001 | Small number to avoid division by zero |
+| p | 2.0 | Exponent in WENO weights |
+| rc | 0.3 | Critical ratio for mapped WENO |
+| xi | 0.001 | Parameter for WENO-Z scheme |
+
+### lusolver.inp
+
+```
+begin
+  reducedsolvetype  gather-and-solve
+  evaluate_norm     1
+  maxiter           10
+  atol              1e-12
+  rtol              1e-10
+  verbose           0
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| reducedsolvetype | gather-and-solve | Parameter description |
+| evaluate_norm | 1 | Calculate norms (yes, no) |
+| maxiter | 10 | Maximum iterations |
+| atol | 1e-12 | Absolute tolerance |
+| rtol | 1e-10 | Relative tolerance |
+| verbose | 0 | Verbosity level (0=silent, 1=summary, 2=detailed) |
+
+
 ## How to Run
 
 1. **Generate the initial solution:**

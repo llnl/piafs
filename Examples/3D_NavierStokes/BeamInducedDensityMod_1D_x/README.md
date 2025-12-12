@@ -66,6 +66,114 @@ Uniform flow:
 
 See the main PIAFS README for other optional input files.
 
+
+## Input File Details
+
+### solver.inp
+
+```
+begin
+	ndims              3
+	nvars              12
+	size               256 4 128
+	ghost              3
+	n_iter             785
+	time_scheme        rk
+	time_scheme_type   44
+	hyp_space_scheme   weno5
+	hyp_interp_type    characteristic
+	dt                 0.04
+	screen_op_iter     1
+	file_op_iter       5
+	op_file_format     binary
+	ip_file_type       ascii
+	op_overwrite       no
+	model              navierstokes3d
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| ndims | 3 | Number of spatial dimensions |
+| nvars | 12 | Number of solution variables |
+| size | 256 4 128 | Grid size (for 1D) or grid dimensions separated by spaces (for 2D/3D) |
+| ghost | 3 | Number of ghost points |
+| n_iter | 785 | Number of time iterations |
+| time_scheme | rk | Time integration scheme (rk=Runge-Kutta, euler=Forward Euler) |
+| time_scheme_type | 44 | RK scheme type (44=RK4, ssprk3=SSP-RK3, etc.) |
+| hyp_space_scheme | weno5 | Spatial discretization for hyperbolic terms (weno5, crweno5, muscl3, etc.) |
+| hyp_interp_type | characteristic | Interpolation type (characteristic, components) |
+| dt | 0.04 | Time step size |
+| screen_op_iter | 1 | Iterations between screen output |
+| file_op_iter | 5 | Iterations between file output |
+| op_file_format | binary | Output format (text, binary, tecplot2d) |
+| ip_file_type | ascii | Parameter description |
+| op_overwrite | no | Overwrite output files (yes, no) |
+| model | navierstokes3d | Physical model (euler1d, navierstokes2d, navierstokes3d) |
+
+### boundary.inp
+
+```
+6
+extrapolate 0  1      0     0   -1e99  1e99  -1e99  1e99
+extrapolate 0 -1      0     0   -1e99  1e99  -1e99  1e99
+periodic    1  1  -1e99  1e99       0     0   -1e99  1e99
+periodic    1 -1  -1e99  1e99       0     0   -1e99  1e99
+extrapolate 2  1  -1e99  1e99   -1e99  1e99       0     0
+extrapolate 2 -1  -1e99  1e99   -1e99  1e99       0     0
+```
+
+The boundary.inp file format:
+- First line: Number of boundary specifications (6)
+- Each subsequent line: type dim face xmin xmax
+
+| Parameter | Description |
+|-----------|-------------|
+| type | Boundary condition type (periodic, extrapolate, noslip, slip-wall, supersonic_inflow, supersonic_outflow, subsonic_inflow, subsonic_outflow) |
+| dim | Spatial dimension (0=x, 1=y, 2=z) |
+| face | Face identifier (1=right/top/front, -1=left/bottom/back) |
+| xmin, xmax | Range where BC applies |
+
+### physics.inp
+
+```
+begin
+	gamma             1.4
+	upwinding         rf-char
+  Re                141.95
+  Pr                0.6517
+  include_chemistry yes
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| gamma | 1.4 | Ratio of specific heats (typically 1.4 for air) |
+| upwinding | rf-char | Upwinding scheme (rf-char=Roe-fixed characteristic, rusanov, etc.) |
+| Re | 141.95 | Reynolds number |
+| Pr | 0.6517 | Prandtl number |
+| include_chemistry | yes | Parameter description |
+
+### chemistry.inp
+
+```
+begin
+  lambda_UV   2.48e-7
+  theta       0.0029671
+  f_CO2       0.0
+  f_O3        0.01
+  Ptot        101325.0
+  Ti          288
+  z_mm        3.0
+  t_pulse     1e-8
+  F0          2000.0
+  sO3         1.1e-21
+end
+```
+
+Note: Chemistry parameters depend on the specific reaction model.
+
+
 ## How to Run
 
 1. **Generate the initial solution:**

@@ -82,6 +82,137 @@ where `r^2 = (x-x0)^2 + (y-y0)^2` and `b` is the vortex strength parameter.
 
 See the main PIAFS README for other optional input files.
 
+
+## Input File Details
+
+### solver.inp
+
+```
+begin
+  ndims             3
+  nvars             5
+  size              60 60 60
+  iproc             3 3 3
+  ghost             3
+  n_iter            400
+  time_scheme       rk
+  time_scheme_type  44
+  hyp_space_scheme  crweno5
+  hyp_interp_type   components
+  dt                0.05
+  screen_op_iter    1
+  file_op_iter      40
+  op_file_format    tecplot3d
+  op_overwrite      no
+  model             navierstokes3d
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| ndims | 3 | Number of spatial dimensions |
+| nvars | 5 | Number of solution variables |
+| size | 60 60 60 | Grid size (for 1D) or grid dimensions separated by spaces (for 2D/3D) |
+| iproc | 3 3 3 | Number of MPI ranks in each dimension (for parallel runs) |
+| ghost | 3 | Number of ghost points |
+| n_iter | 400 | Number of time iterations |
+| time_scheme | rk | Time integration scheme (rk=Runge-Kutta, euler=Forward Euler) |
+| time_scheme_type | 44 | RK scheme type (44=RK4, ssprk3=SSP-RK3, etc.) |
+| hyp_space_scheme | crweno5 | Spatial discretization for hyperbolic terms (weno5, crweno5, muscl3, etc.) |
+| hyp_interp_type | components | Interpolation type (characteristic, components) |
+| dt | 0.05 | Time step size |
+| screen_op_iter | 1 | Iterations between screen output |
+| file_op_iter | 40 | Iterations between file output |
+| op_file_format | tecplot3d | Output format (text, binary, tecplot2d) |
+| op_overwrite | no | Overwrite output files (yes, no) |
+| model | navierstokes3d | Physical model (euler1d, navierstokes2d, navierstokes3d) |
+
+### boundary.inp
+
+```
+6
+periodic      0     1     0     0      0   10.0     0     10.0
+periodic      0    -1     0     0      0   10.0     0     10.0
+periodic      1     1     0  10.0      0      0     0     10.0
+periodic      1    -1     0  10.0      0      0     0     10.0
+periodic      2     1     0  10.0      0   10.0     0        0
+periodic      2    -1     0  10.0      0   10.0     0        0
+```
+
+The boundary.inp file format:
+- First line: Number of boundary specifications (6)
+- Each subsequent line: type dim face xmin xmax
+
+| Parameter | Description |
+|-----------|-------------|
+| type | Boundary condition type (periodic, extrapolate, noslip, slip-wall, supersonic_inflow, supersonic_outflow, subsonic_inflow, subsonic_outflow) |
+| dim | Spatial dimension (0=x, 1=y, 2=z) |
+| face | Face identifier (1=right/top/front, -1=left/bottom/back) |
+| xmin, xmax | Range where BC applies |
+
+### physics.inp
+
+```
+begin
+  gamma     1.4
+  upwinding roe
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| gamma | 1.4 | Ratio of specific heats (typically 1.4 for air) |
+| upwinding | roe | Upwinding scheme (rf-char=Roe-fixed characteristic, rusanov, etc.) |
+
+### weno.inp
+
+```
+begin
+  mapped        1
+  borges        0
+  yc            0
+  no_limiting   0
+  epsilon       0.000001
+  p             2.0
+  rc            0.3
+  xi            0.001
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| mapped | 1 | Use mapped WENO (0=no, 1=yes) |
+| borges | 0 | Use Borges mapping (0=no, 1=yes) |
+| yc | 0 | Use Yamaleev-Carpenter mapping (0=no, 1=yes) |
+| no_limiting | 0 | Disable limiting (0=limiting on, 1=no limiting) |
+| epsilon | 0.000001 | Small number to avoid division by zero |
+| p | 2.0 | Exponent in WENO weights |
+| rc | 0.3 | Critical ratio for mapped WENO |
+| xi | 0.001 | Parameter for WENO-Z scheme |
+
+### lusolver.inp
+
+```
+begin
+  reducedsolvetype  jacobi
+  evaluate_norm     0
+  maxiter           4
+  atol              1e-12
+  rtol              1e-10
+  verbose           0
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| reducedsolvetype | jacobi | Parameter description |
+| evaluate_norm | 0 | Calculate norms (yes, no) |
+| maxiter | 4 | Maximum iterations |
+| atol | 1e-12 | Absolute tolerance |
+| rtol | 1e-10 | Relative tolerance |
+| verbose | 0 | Verbosity level (0=silent, 1=summary, 2=detailed) |
+
+
 ## How to Run
 
 1. **Generate the initial and exact solutions:**

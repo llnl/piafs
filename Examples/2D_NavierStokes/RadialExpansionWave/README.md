@@ -51,6 +51,111 @@ See `aux/init.C` for specific initial conditions defining the radially symmetric
 
 See the main PIAFS README for other optional input files.
 
+
+## Input File Details
+
+### solver.inp
+
+```
+begin
+  ndims             2
+  nvars             4
+  size              65 65
+  ghost             3
+  n_iter            100
+  time_scheme       rk
+  time_scheme_type  ssprk3
+  hyp_space_scheme  weno5
+  hyp_interp_type   characteristic
+  dt                0.01
+  screen_op_iter    1
+  file_op_iter      10
+  op_file_format    tecplot2d
+  op_overwrite      no
+  model             navierstokes2d
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| ndims | 2 | Number of spatial dimensions |
+| nvars | 4 | Number of solution variables |
+| size | 65 65 | Grid size (for 1D) or grid dimensions separated by spaces (for 2D/3D) |
+| ghost | 3 | Number of ghost points |
+| n_iter | 100 | Number of time iterations |
+| time_scheme | rk | Time integration scheme (rk=Runge-Kutta, euler=Forward Euler) |
+| time_scheme_type | ssprk3 | RK scheme type (44=RK4, ssprk3=SSP-RK3, etc.) |
+| hyp_space_scheme | weno5 | Spatial discretization for hyperbolic terms (weno5, crweno5, muscl3, etc.) |
+| hyp_interp_type | characteristic | Interpolation type (characteristic, components) |
+| dt | 0.01 | Time step size |
+| screen_op_iter | 1 | Iterations between screen output |
+| file_op_iter | 10 | Iterations between file output |
+| op_file_format | tecplot2d | Output format (text, binary, tecplot2d) |
+| op_overwrite | no | Overwrite output files (yes, no) |
+| model | navierstokes2d | Physical model (euler1d, navierstokes2d, navierstokes3d) |
+
+### boundary.inp
+
+```
+4
+extrapolate      0     1     0     0   -4.0    4.0
+extrapolate      0    -1     0     0   -4.0    4.0
+extrapolate      1     1  -4.0   4.0      0      0
+extrapolate      1    -1  -4.0   4.0      0      0
+```
+
+The boundary.inp file format:
+- First line: Number of boundary specifications (4)
+- Each subsequent line: type dim face xmin xmax
+
+| Parameter | Description |
+|-----------|-------------|
+| type | Boundary condition type (periodic, extrapolate, noslip, slip-wall, supersonic_inflow, supersonic_outflow, subsonic_inflow, subsonic_outflow) |
+| dim | Spatial dimension (0=x, 1=y, 2=z) |
+| face | Face identifier (1=right/top/front, -1=left/bottom/back) |
+| xmin, xmax | Range where BC applies |
+
+### physics.inp
+
+```
+begin
+  gamma     1.4
+  upwinding rf-char
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| gamma | 1.4 | Ratio of specific heats (typically 1.4 for air) |
+| upwinding | rf-char | Upwinding scheme (rf-char=Roe-fixed characteristic, rusanov, etc.) |
+
+### weno.inp
+
+```
+begin
+  mapped        1
+  borges        0
+  yc            0
+  no_limiting   0
+  epsilon       0.000001
+  p             2.0
+  rc            0.3
+  xi            0.001
+end
+```
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| mapped | 1 | Use mapped WENO (0=no, 1=yes) |
+| borges | 0 | Use Borges mapping (0=no, 1=yes) |
+| yc | 0 | Use Yamaleev-Carpenter mapping (0=no, 1=yes) |
+| no_limiting | 0 | Disable limiting (0=limiting on, 1=no limiting) |
+| epsilon | 0.000001 | Small number to avoid division by zero |
+| p | 2.0 | Exponent in WENO weights |
+| rc | 0.3 | Critical ratio for mapped WENO |
+| xi | 0.001 | Parameter for WENO-Z scheme |
+
+
 ## How to Run
 
 1. **Generate the initial solution:**
