@@ -209,10 +209,10 @@ end
 2. **Run the simulation:**
    ```bash
    # Serial mode
-   /path/to/piafs/bin/PIAFS-<compiler>-serial solver.inp
+   /path/to/piafs/bin/PIAFS-<compiler>-serial
 
    # Parallel mode (e.g., 8 processes as configured in solver.inp: 2x4)
-   mpiexec -n 8 /path/to/piafs/bin/PIAFS-<compiler>-mpi solver.inp
+   mpiexec -n 8 /path/to/piafs/bin/PIAFS-<compiler>-mpi
    ```
 
 3. **Visualize results:**
