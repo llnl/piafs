@@ -79,6 +79,16 @@ target_link_libraries(${PIAFS_EXECUTABLE_NAME}
   CommonFunctions
 )
 
+# If MPI is enabled, link MPI libraries
+if(NOT ENABLE_SERIAL)
+  if(MPI_CXX_FOUND)
+    target_link_libraries(${PIAFS_EXECUTABLE_NAME} MPI::MPI_CXX)
+  endif()
+  if(MPI_C_FOUND)
+    target_link_libraries(${PIAFS_EXECUTABLE_NAME} MPI::MPI_C)
+  endif()
+endif()
+
 # If OpenMP is enabled, link OpenMP library
 if(ENABLE_OMP)
   if(OpenMP_CXX_FOUND)

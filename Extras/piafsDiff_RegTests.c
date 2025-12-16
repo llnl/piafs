@@ -230,11 +230,23 @@ int readBinaryFile( const char* const a_filename,
     return 1;
   }
 
-  fread(&a_solution->ndims, sizeof(int), 1, in);
-  fread(&a_solution->nvars, sizeof(int), 1, in);
+  if (fread(&a_solution->ndims, sizeof(int), 1, in) != 1) {
+    fprintf(stderr,"ERROR: failed to read ndims from %s.\n",a_filename);
+    fclose(in);
+    return 1;
+  }
+  if (fread(&a_solution->nvars, sizeof(int), 1, in) != 1) {
+    fprintf(stderr,"ERROR: failed to read nvars from %s.\n",a_filename);
+    fclose(in);
+    return 1;
+  }
 
   a_solution->size = (int*) calloc(a_solution->ndims, sizeof(int));
-  fread(a_solution->size, sizeof(int), a_solution->ndims, in);
+  if (fread(a_solution->size, sizeof(int), a_solution->ndims, in) != (size_t)a_solution->ndims) {
+    fprintf(stderr,"ERROR: failed to read size array from %s.\n",a_filename);
+    fclose(in);
+    return 1;
+  }
 
   long sizex = 0;
   long sizeu = a_solution->nvars;
@@ -245,8 +257,16 @@ int readBinaryFile( const char* const a_filename,
 
   a_solution->x = (double*) calloc (sizex, sizeof(double));
   a_solution->u = (double*) calloc (sizeu, sizeof(double));
-  fread(a_solution->x, sizeof(double), sizex, in);
-  fread(a_solution->u, sizeof(double), sizeu, in);
+  if (fread(a_solution->x, sizeof(double), sizex, in) != (size_t)sizex) {
+    fprintf(stderr,"ERROR: failed to read x data from %s.\n",a_filename);
+    fclose(in);
+    return 1;
+  }
+  if (fread(a_solution->u, sizeof(double), sizeu, in) != (size_t)sizeu) {
+    fprintf(stderr,"ERROR: failed to read u data from %s.\n",a_filename);
+    fclose(in);
+    return 1;
+  }
 
   a_solution->is_periodic = (int*) calloc(a_solution->ndims,sizeof(int));
   _ArraySetValue_(a_solution->is_periodic, a_solution->ndims, 1);

@@ -13,6 +13,10 @@
 /*! Fourth order central scheme */
 #define _FOURTH_ORDER_CENTRAL_  "4"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* One-dimensional first derivative functions: Functions to calculate the
  * finite-difference approximation to the first derivative along a given
  * dimension at the cell-centers / grid points.
@@ -54,5 +58,9 @@ int FirstDerivativeSecondOrderCentral (double*,double*,int,int,void*,void*); /*!
 int FirstDerivativeFourthOrderCentral (double*,double*,int,int,void*,void*); /*!< Fourth order approximation to the first derivative (**note**: not divided by grid spacing) */
 
 int FirstDerivativeSecondOrderCentralNoGhosts (double*,double*,int,int,int,int*,int,int,void*); /*!< Second order approximation to the first derivative (**note**: not divided by grid spacing) */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

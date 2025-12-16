@@ -6,6 +6,10 @@
 #ifndef _TRIDIAGLU_H_
 #define _TRIDIAGLU_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
 
   Parallel direct solver for tridiagonal systems
@@ -114,5 +118,9 @@ int tridiagLUInit     (void*,void*);
 /* Block solvers */
 int blocktridiagLU         (double*,double*,double*,double*,int,int,int,void*,void*);
 int blocktridiagIterJacobi (double*,double*,double*,double*,int,int,int,void*,void*);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

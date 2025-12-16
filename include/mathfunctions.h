@@ -8,6 +8,10 @@
 
 #include <math_ops.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*! Function to calculate the grid points corresponding to a given interval */
 void FindInterval(double,double,double*,int,int*,int*);
 
@@ -26,5 +30,9 @@ int InterpolateGlobalnDVar( const int* const,
                             const int,
                             const int,
                             const int* const);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

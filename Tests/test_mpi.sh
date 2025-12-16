@@ -11,10 +11,33 @@ fi
 # PIAFS location (PIAFS_DIR should exist in the environment)
 piafs_dir=$PIAFS_DIR
 # other PIAFS-related stuff
-piafs_exec="PIAFS"
+
+# Executable selection:
+# - If PIAFS_EXEC_W_PATH is already set, use it.
+# - Else if PIAFS_EXEC is set, use ${PIAFS_DIR}/bin/${PIAFS_EXEC}.
+# - Else try ${PIAFS_DIR}/bin/PIAFS (legacy name).
+# - Else auto-detect the newest executable matching ${PIAFS_DIR}/bin/PIAFS*
+if [ -z "$PIAFS_EXEC_W_PATH" ]; then
+  if [ -n "$PIAFS_EXEC" ]; then
+    PIAFS_EXEC_W_PATH="${piafs_dir}/bin/${PIAFS_EXEC}"
+  else
+    if [ -x "${piafs_dir}/bin/PIAFS" ]; then
+      PIAFS_EXEC_W_PATH="${piafs_dir}/bin/PIAFS"
+    else
+      # Prefer MPI builds if present, otherwise take newest PIAFS* in bin/
+      cand=$(ls -1t "${piafs_dir}/bin"/PIAFS* 2>/dev/null | head -n 1)
+      cand_mpi=$(ls -1t "${piafs_dir}/bin"/PIAFS*-mpi* 2>/dev/null | head -n 1)
+      if [ -n "$cand_mpi" ]; then
+        PIAFS_EXEC_W_PATH="$cand_mpi"
+      else
+        PIAFS_EXEC_W_PATH="$cand"
+      fi
+    fi
+  fi
+fi
 
 #export env vars for other scripts to run PIAFS
-export PIAFS_EXEC_W_PATH="${piafs_dir}/bin/${piafs_exec}"
+export PIAFS_EXEC_W_PATH
 export PIAFS_EXEC_OTHER_ARGS=""
 
 # Set MPI executor - use MPIEXEC if provided, otherwise use mpiexec with --oversubscribe
@@ -31,12 +54,21 @@ else
   echo "Using custom MPI executor: $MPI_EXEC"
 fi
 
-# some details about PIAFS benchmarks
-# (benchmark solutions maintained on the public repository)
+
+# Root directory of the test execution, usually the build directory
+test_run_dir=$PIAFS_DIR/test_run_temp
+
+# Clean and create the test_run_dir
+rm -rf $test_run_dir && mkdir -p $test_run_dir
+
+# Benchmarks will be checked out here
+benchmarks_checkout_dir=$test_run_dir/benchmarks
+
 # do not change these, unless you know what you are doing
 piafs_benchmarks_repo="ssh://git@czgitlab.llnl.gov:7999/piafs/piafs_benchmarks.git"
 piafs_benchmarks_branch="master"
-piafs_benchmarks_dir="benchmarks"
+piafs_benchmarks_dir=$test_run_dir/benchmarks
+
 
 # stuff about test directory
 piafs_test_dir="_test"
@@ -48,10 +80,11 @@ diff_file="diff.log"
 RUN_SCRIPT="run.sh"
 DISABLED=".disabled"
 
-if [ -f "$PIAFS_EXEC_W_PATH" ]; then
+if [ -x "$PIAFS_EXEC_W_PATH" ]; then
 
   echo "PIAFS binary found."
   echo "-------------------------"
+  echo "Using: $PIAFS_EXEC_W_PATH"
 
 else
 
@@ -60,7 +93,8 @@ else
   echo " "
   echo "PIAFS binary NOT FOUND !!!"
   echo " "
-  echo "$PIAFS_EXEC_W_PATH does not exist"
+  echo "$PIAFS_EXEC_W_PATH does not exist or is not executable"
+  echo "Looked in: ${piafs_dir}/bin"
   echo " "
   echo "---------------------------------"
 
@@ -79,7 +113,7 @@ fi
 
 if [ -f "$piafs_src_dir/$piafs_diff_srcname" ]; then
   echo "Compiling PIAFS-diff."
-  gcc $piafs_src_dir/$piafs_diff_srcname -lm -o $root_dir/$PIAFS_DIFF
+  gcc $piafs_src_dir/$piafs_diff_srcname -lm -o $test_run_dir/$PIAFS_DIFF
 else
   echo "---------------------------------"
   echo "ERROR !!!"
@@ -90,7 +124,7 @@ else
   echo " "
   echo "---------------------------------"
 fi
-PIAFS_DIFF_CMD="$root_dir/$PIAFS_DIFF -r 1.0e-14 "
+PIAFS_DIFF_CMD="$test_run_dir/$PIAFS_DIFF -r 1.0e-14 "
 
 # clone benchmarks
 if [ -d "$piafs_benchmarks_dir" ]; then
@@ -122,13 +156,13 @@ echo "-------------------------"
 # create test dir and copy input files
 timestamp=`date | sed -e 's/ /_/g' -e 's/:/./g'`
 test_dirname=${piafs_test_dir}_${timestamp}
-rm -rf $test_dirname && mkdir $test_dirname
+rm -rf $test_run_dir/$test_dirname && mkdir $test_run_dir/$test_dirname
 echo "copying test cases to $test_dirname ..."
-rsync_cmd="rsync -a $exclude_flag $root_dir/$piafs_benchmarks_dir/ $root_dir/$test_dirname/"
+rsync_cmd="rsync -a $exclude_flag $piafs_benchmarks_dir/ $test_run_dir/$test_dirname/"
 eval $rsync_cmd
 
 # run the cases
-cd $root_dir/$test_dirname
+cd $test_run_dir/$test_dirname
 
 echo "PIAFS Tests"
 echo "Date/Time       : $(date '+%d/%m/%Y %H:%M:%S')"
@@ -156,7 +190,7 @@ for f in *; do
         chmod +x $RUN_SCRIPT && ./$RUN_SCRIPT
         while read F  ; do
           echo "    comparing $F ..."
-          result=$($PIAFS_DIFF_CMD $F $root_dir/$piafs_benchmarks_dir/$f/$F 2>&1 >> $diff_file)
+          result=$($PIAFS_DIFF_CMD $F $piafs_benchmarks_dir/$f/$F 2>&1 >> $diff_file)
           if [ -z "$result" ]; then
             if [ -s "$diff_file" ]; then
               ((n_fail+=1))
@@ -205,4 +239,4 @@ if [[ $n_fail -gt 0 ]]; then
 fi
 echo "-------------------------"
 
-rm -rf $root_dir/$PIAFS_DIFF
+rm -rf $test_run_dir/$PIAFS_DIFF

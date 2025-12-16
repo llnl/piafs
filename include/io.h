@@ -6,6 +6,10 @@
 #ifndef _IO_H_
 #define _IO_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int ReadArray(int,int,int*,int*,int,void*,void*,double*,double*,char*,int*);
 
 int ReadArraywInterp( int,
@@ -27,5 +31,9 @@ int WriteBinary   (int,int,int*,double*,double*,char*,int*);
 int WriteText     (int,int,int*,double*,double*,char*,int*);
 int WriteTecplot2D(int,int,int*,double*,double*,char*,int*);
 int WriteTecplot3D(int,int,int*,double*,double*,char*,int*);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

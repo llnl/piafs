@@ -6,6 +6,10 @@
 #ifndef _COMMON_H_
 #define _COMMON_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*! Get a string corresponding to an integer, i.e. 41 gives "00041" if
     \a width is 5, or "41" if \a width is 2, or "1" if \a width is 1.
 */
@@ -22,5 +26,9 @@ void takeExp(double* , int);
 /*! Check for NaN or Inf values in an array and abort if found
 */
 void checkNanInf(const double* const array, const int array_size, const char* const location);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

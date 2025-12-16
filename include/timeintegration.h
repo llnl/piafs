@@ -8,6 +8,10 @@
 
 #include <timeintegration_struct.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*! Initialize the explicit Runge-Kutta time-integration method */
 int TimeExplicitRKInitialize(char*,char*,void*,void*);
 /*! Clean up variables related to the explicit Runge-Kutta time-integration method */
@@ -32,5 +36,9 @@ int TimeError           (void*,void*,double*);
 int TimeForwardEuler  (void*);
 /*! Take a step in time using the explicit Runge-Kutta method */
 int TimeRK            (void*);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

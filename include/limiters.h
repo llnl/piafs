@@ -6,6 +6,10 @@
 #ifndef _LIMITERS_H_
 #define _LIMITERS_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*! Generalized MinMod Limiter: LimiterGeneralizedMinMod() */
 #define _LIM_GM_ "gmm"
 /*! MinMod Limiter: LimiterMinMod() */
@@ -23,5 +27,9 @@ double LimiterMinMod(double);
 double LimiterVanLeer(double);
 /*! Superbee Limiter */
 double LimiterSuperBee(double);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

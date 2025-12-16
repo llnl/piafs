@@ -43,7 +43,8 @@ if(NOT ENABLE_SERIAL)
   find_package(MPI REQUIRED)
   if(MPI_C_FOUND)
     message(STATUS "Found MPI C compiler: ${MPI_C_COMPILER}")
-    set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+    # Add MPI include directories globally for all C code
+    include_directories(${MPI_C_INCLUDE_DIRS})
   else()
     message(WARNING "MPI C compiler not found, building in serial mode")
     add_compile_definitions(serial)
@@ -52,7 +53,8 @@ if(NOT ENABLE_SERIAL)
 
   if(MPI_CXX_FOUND)
     message(STATUS "Found MPI C++ compiler: ${MPI_CXX_COMPILER}")
-    set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+    # Add MPI include directories globally for all C++ code
+    include_directories(${MPI_CXX_INCLUDE_DIRS})
   else()
     message(WARNING "MPI C++ compiler not found, building in serial mode")
     add_compile_definitions(serial)
@@ -227,26 +229,11 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 # Testing support
 enable_testing()
 
-# Create a custom target to copy PIAFS binary to bin/ before running tests
-# Note: PIAFS_EXECUTABLE_NAME is set in src/CMakeLists.txt, so we'll create this target
-# after src/CMakeLists.txt is processed (moved to end of file)
+# Add unit tests
+add_subdirectory(Tests/unit)
 
-# Set PIAFS_DIR environment variable for tests
-set(ENV{PIAFS_DIR} ${CMAKE_BINARY_DIR})
-
-# Add the test
-add_test(
-  NAME piafs_regression_tests
-  COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/Tests/test_mpi.sh
-  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-)
-
-# Set environment variables for the test
-set_tests_properties(piafs_regression_tests PROPERTIES
-  ENVIRONMENT "PIAFS_DIR=${CMAKE_BINARY_DIR};PIAFS_SRC_DIR=${CMAKE_SOURCE_DIR};MPIEXEC=${MPIEXEC}"
-  TIMEOUT 3600
-  FIXTURES_REQUIRED prepare_binary
-)
+# Add regression tests (CMake-based, replaces test_mpi.sh)
+add_subdirectory(Tests)
 
 # Add a fixture to ensure binary is prepared before testing
 add_test(

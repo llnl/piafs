@@ -81,6 +81,10 @@ typedef struct domain_boundaries {
 
 } DomainBoundary;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Functions */
 int BCInitialize(void*); /*!< Function to initialize the boundary conditions */
 int BCCleanup   (void*); /*!< Function to clean up boundary conditions-related variables and arrays */
@@ -113,5 +117,9 @@ int BCSupersonicOutflowU            (void*,void*,int,int,int*,int,double*,double
 int BCSpongeSource        (void*,int,int,int,int*,double*,double*,double*);
 /*! dummy function that get called during applying BCs - they don't do anything */
 int BCSpongeUDummy        (void*,void*,int,int,int*,int,double*,double);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

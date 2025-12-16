@@ -5,7 +5,8 @@ echo -n AC_PACKAGE_VERSION>VERSION
 AC_SUBST(PACKAGE_VERSION)
 AC_MSG_NOTICE([piafs AC_PACKAGE_VERSION])
 
-AM_INIT_AUTOMAKE
+AM_INIT_AUTOMAKE([subdir-objects])
+PKG_PROG_PKG_CONFIG
 AC_PREFIX_DEFAULT('$(top_srcdir)')
 includedir="${ac_pwd}/${srcdir}/include"
 if ! test -d ${includedir} ; then
@@ -228,9 +229,45 @@ if test "x$with_mpiexec" != "x" ; then
   MPIEXEC="$with_mpiexec"
   AC_MSG_NOTICE([Using custom MPI executor for tests: $MPIEXEC])
 else
-  MPIEXEC="mpiexec"
+  dnl Auto-detect MPI launcher like CMake does
+  AC_MSG_CHECKING([for MPI executor])
+
+  dnl Check for Slurm's srun
+  AC_PATH_PROG([SRUN], [srun], [no])
+  if test "x$SRUN" != "xno" ; then
+    MPIEXEC="$SRUN"
+    AC_MSG_RESULT([found srun (Slurm)])
+  else
+    dnl Check for LSF's jsrun (IBM systems like Summit)
+    AC_PATH_PROG([JSRUN], [jsrun], [no])
+    if test "x$JSRUN" != "xno" ; then
+      MPIEXEC="$JSRUN"
+      AC_MSG_RESULT([found jsrun (LSF)])
+    else
+      dnl Check for standard mpiexec
+      AC_PATH_PROG([MPIEXEC_BIN], [mpiexec], [no])
+      if test "x$MPIEXEC_BIN" != "xno" ; then
+        MPIEXEC="$MPIEXEC_BIN"
+        AC_MSG_RESULT([found mpiexec])
+      else
+        dnl Check for mpirun as fallback
+        AC_PATH_PROG([MPIRUN], [mpirun], [no])
+        if test "x$MPIRUN" != "xno" ; then
+          MPIEXEC="$MPIRUN"
+          AC_MSG_RESULT([found mpirun])
+        else
+          MPIEXEC="mpiexec"
+          AC_MSG_RESULT([not found, defaulting to mpiexec])
+          AC_MSG_WARN([MPI executor not found. Tests may fail. Use --with-mpiexec to specify.])
+        fi
+      fi
+    fi
+  fi
 fi
 AC_SUBST(MPIEXEC)
+
+dnl Unit tests are only supported via CMake build system
+dnl (CMake auto-downloads compatible Google Test version)
 
 dnl Generate build_info.h
 dnl Set PIAFS_VERSION from PACKAGE_VERSION for substitution
