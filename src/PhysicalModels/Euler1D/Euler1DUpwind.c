@@ -119,9 +119,9 @@ int Euler1DUpwindRF(
   _DECLARE_IERR_;
 
   const int ndims   = solver->ndims;
-  const const int *dim    = solver->dim_local;
-  const const const int ghosts  = solver->ghosts;
-  const const const int nvars = param->nvars;
+  const int *dim    = solver->dim_local;
+  const int ghosts  = solver->ghosts;
+  const int nvars = param->nvars;
 
   int index_outer[ndims], index_inter[ndims], bounds_outer[ndims], bounds_inter[ndims];
   _ArrayCopy1D_(dim,bounds_outer,ndims); bounds_outer[dir] =  1;
