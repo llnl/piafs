@@ -82,12 +82,14 @@ struct arguments
   char* args[2];
   char* abs_tol;
   char* rel_tol;
+  int verbose;
 };
 
 static struct argp_option options[] =
 {
   {"atol",'a', "ABS_TOL", 0, "Absolute tolerance"},
   {"rtol",'r', "REL_TOL", 0, "Relative tolerance"},
+  {"verbose",'v', 0, 0, "Print differences even when below tolerance"},
   {0}
 };
 
@@ -105,6 +107,9 @@ parse_opt (int key, char *arg, struct argp_state *state)
       break;
     case 'r':
       arguments->rel_tol = arg;
+      break;
+    case 'v':
+      arguments->verbose = 1;
       break;
     case ARGP_KEY_ARG:
       if (state->arg_num >= 2) argp_usage (state);
@@ -411,6 +416,7 @@ int main(int argc, char** argv)
 
   arguments.abs_tol = "1e-14";
   arguments.rel_tol = "1e-14";
+  arguments.verbose = 0;
 
   argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
@@ -446,14 +452,18 @@ int main(int argc, char** argv)
     if (diff_norm_rel[0] > rel_tol) flag_ok = 0;
     if (diff_norm_rel[1] > rel_tol) flag_ok = 0;
 
-    if (!flag_ok) {
-    printf( "%s and %s differ.\n",
-            sol_fname, ref_fname );
+    if (!flag_ok || arguments.verbose) {
+      if (!flag_ok) {
+        printf( "%s and %s differ.\n",
+                sol_fname, ref_fname );
+      } else {
+        printf( "%s and %s are identical within tolerance.\n",
+                sol_fname, ref_fname );
+      }
       printf("Norms of the difference between the two solutions:\n");
       printf("  L1  : %1.6e (abs), %1.6e (rel)\n", diff_norm_abs[0], diff_norm_rel[0]);
       printf("  L2  : %1.6e (abs), %1.6e (rel)\n", diff_norm_abs[1], diff_norm_rel[1]);
       printf("  Linf: %1.6e (abs), %1.6e (rel)\n", diff_norm_abs[2], diff_norm_rel[2]);
-
     }
 
   } else {

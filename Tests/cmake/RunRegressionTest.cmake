@@ -131,7 +131,7 @@ foreach(FILE ${FILES_TO_COMPARE})
     endif()
 
     execute_process(
-      COMMAND ${DIFF_TOOL} -r ${DIFF_TOLERANCE} ${FILE} ${BENCHMARKS_DIR}/${TEST_NAME}/${FILE}
+      COMMAND ${DIFF_TOOL} -v -r ${DIFF_TOLERANCE} ${FILE} ${BENCHMARKS_DIR}/${TEST_NAME}/${FILE}
       WORKING_DIRECTORY "${TEST_DIR}"
       RESULT_VARIABLE DIFF_RESULT
       OUTPUT_VARIABLE DIFF_OUTPUT
@@ -158,6 +158,9 @@ foreach(FILE ${FILES_TO_COMPARE})
       math(EXPR FAIL_COUNT "${FAIL_COUNT} + 1")
     else()
       message(STATUS "    PASSED")
+      if(DIFF_OUTPUT)
+        message(STATUS "${DIFF_OUTPUT}")
+      endif()
       math(EXPR PASS_COUNT "${PASS_COUNT} + 1")
     endif()
   endif()
