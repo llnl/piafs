@@ -11,6 +11,21 @@
 #include <physicalmodels/navierstokes3d.h>
 #include <mpivars.h>
 #include <hypar.h>
+#ifdef GPU_CUDA
+#include <gpu_runtime.h>
+#include <gpu_parabolic_function.h>
+#include <gpu_flux_function.h>
+#include <gpu_source_function.h>
+#include <gpu_upwind_function.h>
+#include <gpu_cfl.h>
+#elif defined(GPU_HIP)
+#include <gpu_runtime.h>
+#include <gpu_parabolic_function.h>
+#include <gpu_flux_function.h>
+#include <gpu_source_function.h>
+#include <gpu_upwind_function.h>
+#include <gpu_cfl.h>
+#endif
 
 double NavierStokes3DComputeCFL (void*,void*,double,double);
 
@@ -156,13 +171,106 @@ int NavierStokes3DInitialize( void *s, /*!< Solver object of type #HyPar */
 
   /* initializing physical model-specific functions */
   solver->PreStep               = NavierStokes3DPreStep;
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    solver->ComputeCFL = GPUNavierStokes3DComputeCFL;
+  } else {
+    solver->ComputeCFL = NavierStokes3DComputeCFL;
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    solver->ComputeCFL = GPUNavierStokes3DComputeCFL;
+  } else {
+    solver->ComputeCFL = NavierStokes3DComputeCFL;
+  }
+#else
   solver->ComputeCFL            = NavierStokes3DComputeCFL;
+#endif
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    solver->FFunction = (int(*)(double*,double*,int,void*,double))GPUNavierStokes3DFlux;
+    solver->ParabolicFunction = GPUNavierStokes3DParabolicFunction;
+    solver->SFunction = (int(*)(double*,double*,void*,void*,double))GPUNavierStokes3DSource;
+  } else {
+    solver->FFunction = NavierStokes3DFlux;
+    solver->ParabolicFunction = NavierStokes3DParabolicFunction;
+    solver->SFunction = NavierStokes3DSource;
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    solver->FFunction = (int(*)(double*,double*,int,void*,double))GPUNavierStokes3DFlux;
+    solver->ParabolicFunction = GPUNavierStokes3DParabolicFunction;
+    solver->SFunction = (int(*)(double*,double*,void*,void*,double))GPUNavierStokes3DSource;
+  } else {
+    solver->FFunction = NavierStokes3DFlux;
+    solver->ParabolicFunction = NavierStokes3DParabolicFunction;
+    solver->SFunction = NavierStokes3DSource;
+  }
+#else
   solver->FFunction             = NavierStokes3DFlux;
+  solver->ParabolicFunction     = NavierStokes3DParabolicFunction;
   solver->SFunction             = NavierStokes3DSource;
+#endif
   solver->AveragingFunction     = NavierStokes3DRoeAverage;
   solver->GetLeftEigenvectors   = NavierStokes3DLeftEigenvectors;
   solver->GetRightEigenvectors  = NavierStokes3DRightEigenvectors;
-  solver->ParabolicFunction     = NavierStokes3DParabolicFunction;
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes3DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes3DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes3DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes3DUpwindRusanov;
+    else {
+      if (!mpi->rank) {
+        fprintf(stderr,"Error in NavierStokes3DInitialize(): %s is not a valid upwinding scheme. ",
+                physics->upw_choice);
+        fprintf(stderr,"Choices are %s, %s, %s, and %s.\n",_ROE_,_RF_,_LLF_,_RUSANOV_);
+      }
+      return(1);
+    }
+  } else {
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = NavierStokes3DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = NavierStokes3DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = NavierStokes3DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = NavierStokes3DUpwindRusanov;
+    else {
+      if (!mpi->rank) {
+        fprintf(stderr,"Error in NavierStokes3DInitialize(): %s is not a valid upwinding scheme. ",
+                physics->upw_choice);
+        fprintf(stderr,"Choices are %s, %s, %s, and %s.\n",_ROE_,_ROE_,_LLF_,_RUSANOV_);
+      }
+      return(1);
+    }
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes3DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes3DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes3DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes3DUpwindRusanov;
+    else {
+      if (!mpi->rank) {
+        fprintf(stderr,"Error in NavierStokes3DInitialize(): %s is not a valid upwinding scheme. ",
+                physics->upw_choice);
+        fprintf(stderr,"Choices are %s, %s, %s, and %s.\n",_ROE_,_RF_,_LLF_,_RUSANOV_);
+      }
+      return(1);
+    }
+  } else {
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = NavierStokes3DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = NavierStokes3DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = NavierStokes3DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = NavierStokes3DUpwindRusanov;
+    else {
+      if (!mpi->rank) {
+        fprintf(stderr,"Error in NavierStokes3DInitialize(): %s is not a valid upwinding scheme. ",
+                physics->upw_choice);
+        fprintf(stderr,"Choices are %s, %s, %s, and %s.\n",_ROE_,_RF_,_LLF_,_RUSANOV_);
+      }
+      return(1);
+    }
+  }
+#else
   if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = NavierStokes3DUpwindRoe;
   else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = NavierStokes3DUpwindRF;
   else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = NavierStokes3DUpwindLLF;
@@ -175,6 +283,7 @@ int NavierStokes3DInitialize( void *s, /*!< Solver object of type #HyPar */
     }
     return(1);
   }
+#endif
 
   /* set the value of gamma in all the boundary objects */
   int n;

@@ -69,6 +69,7 @@
 #include <mpivars_cpp.h>
 #include <simulation_library.h>
 #include <build_info.h>
+#include <gpu_runtime.h>
 
 static const char help[] = "PIAFS - A finite-difference algorithm for the compressible Euler/Navier-Stokes equations";
 
@@ -79,6 +80,9 @@ static const char help[] = "PIAFS - A finite-difference algorithm for the compre
 */
 int main(int argc, char **argv)
 {
+  /* Set stdout to line-buffered mode for better output in multi-process context */
+  setvbuf(stdout, NULL, _IOLBF, 0);
+  
   int               ierr = 0, d, n;
   struct timeval    main_start, solve_start;
   struct timeval    main_end  , solve_end  ;
@@ -95,6 +99,21 @@ int main(int argc, char **argv)
   printf("  Build Type: %s\n", PIAFS_BUILD_TYPE);
   printf("  MPI Mode: %s\n", PIAFS_MPI_MODE);
   printf("  OpenMP: %s\n", PIAFS_OPENMP);
+#ifdef GPU_CUDA
+  {
+    int gpu_count = GPUGetDeviceCount();
+    if (gpu_count > 0) {
+      printf("  GPU Devices: %d\n", gpu_count);
+    }
+  }
+#elif defined(GPU_HIP)
+  {
+    int gpu_count = GPUGetDeviceCount();
+    if (gpu_count > 0) {
+      printf("  GPU Devices: %d\n", gpu_count);
+    }
+  }
+#endif
   printf("================================================================================\n");
 #else
   MPI_Comm world;
@@ -103,6 +122,40 @@ int main(int argc, char **argv)
   MPI_Comm_dup(MPI_COMM_WORLD, &world);
   MPI_Comm_rank(MPI_COMM_WORLD,&rank );
   MPI_Comm_size(MPI_COMM_WORLD,&nproc);
+  
+  /* Compute local rank (rank within the node) for GPU assignment */
+  int local_rank = 0;
+  int local_size = 1;
+  int gpu_count_local = 0;
+  int gpu_count_total = 0;
+  int num_nodes = 1;
+#if defined(GPU_CUDA) || defined(GPU_HIP)
+  {
+    MPI_Comm shmcomm;
+    MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, 0, MPI_INFO_NULL, &shmcomm);
+    MPI_Comm_rank(shmcomm, &local_rank);
+    MPI_Comm_size(shmcomm, &local_size);
+    MPI_Comm_free(&shmcomm);
+    
+    /* Initialize GPU for this MPI rank and get device count */
+    if (GPUShouldUse()) {
+      gpu_count_local = GPUInitializeMPI(rank, local_rank, local_size);
+      if (gpu_count_local < 0) {
+        fprintf(stderr, "[Rank %d] Error: GPU initialization failed\n", rank);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+      }
+    } else {
+      gpu_count_local = GPUGetDeviceCount();
+    }
+    
+    /* Count total GPUs across all nodes (only local rank 0 contributes to avoid double counting) */
+    int my_gpu_contribution = (local_rank == 0) ? gpu_count_local : 0;
+    int my_node_contribution = (local_rank == 0) ? 1 : 0;
+    MPI_Reduce(&my_gpu_contribution, &gpu_count_total, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&my_node_contribution, &num_nodes, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+  }
+#endif
+
   if (!rank) {
     printf("================================================================================\n");
     printf("PIAFS - Parallel (MPI) version with %d processes\n", nproc);
@@ -111,6 +164,31 @@ int main(int argc, char **argv)
     printf("  Build Date: %s\n", PIAFS_BUILD_DATE);
     printf("  Build Type: %s\n", PIAFS_BUILD_TYPE);
     printf("  OpenMP: %s\n", PIAFS_OPENMP);
+#ifdef GPU_CUDA
+    {
+      if (gpu_count_total > 0) {
+        printf("  GPU Devices: %d total (%d per node, %d node%s)", 
+               gpu_count_total, gpu_count_local, num_nodes, num_nodes > 1 ? "s" : "");
+        if (GPUShouldUse()) {
+          printf(" (GPU ENABLED)\n");
+        } else {
+          printf(" (GPU DISABLED - set PIAFS_USE_GPU=1 to enable)\n");
+        }
+      }
+    }
+#elif defined(GPU_HIP)
+    {
+      if (gpu_count_total > 0) {
+        printf("  GPU Devices: %d total (%d per node, %d node%s)", 
+               gpu_count_total, gpu_count_local, num_nodes, num_nodes > 1 ? "s" : "");
+        if (GPUShouldUse()) {
+          printf(" (GPU ENABLED)\n");
+        } else {
+          printf(" (GPU DISABLED - set PIAFS_USE_GPU=1 to enable)\n");
+        }
+      }
+    }
+#endif
     printf("================================================================================\n");
   }
 #endif

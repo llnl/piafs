@@ -12,6 +12,13 @@
 #include <interpolation.h>
 #include <mpivars.h>
 #include <simulation_object.h>
+#ifdef GPU_CUDA
+#include <gpu.h>
+#include <gpu_runtime.h>
+#elif defined(GPU_HIP)
+#include <gpu.h>
+#include <gpu_runtime.h>
+#endif
 
 /* include header files for each physical model */
 #include <physicalmodels/euler1d.h>
@@ -88,9 +95,103 @@ int Cleanup(  void  *s,   /*!< Array of simulation objects of type #SimulationOb
     free(solver->dim_global_ex);
     free(solver->dim_local);
     free(solver->index);
+#ifdef GPU_CUDA
+    if (GPUShouldUse()) {
+      GPUFree(solver->u);
+      GPUFree(solver->x);
+      GPUFree(solver->dxinv);
+      GPUFree(solver->hyp);
+      GPUFree(solver->par);
+      GPUFree(solver->source);
+      GPUFree(solver->fluxI);
+      GPUFree(solver->uL);
+      GPUFree(solver->uR);
+      GPUFree(solver->fL);
+      GPUFree(solver->fR);
+      GPUFree(solver->StageBoundaryIntegral);
+      GPUFree(solver->StepBoundaryIntegral);
+      /* Allocated on GPU in GPUAllocateSolutionArrays */
+      GPUFree(solver->uC);
+      GPUFree(solver->fluxC);
+      GPUFree(solver->Deriv1);
+      GPUFree(solver->Deriv2);
+    } else {
+      free(solver->u);
+      free(solver->x);
+      free(solver->dxinv);
+      free(solver->hyp);
+      free(solver->par);
+      free(solver->source);
+      free(solver->fluxI);
+      free(solver->uL);
+      free(solver->uR);
+      free(solver->fL);
+      free(solver->fR);
+      free(solver->StageBoundaryIntegral);
+      free(solver->StepBoundaryIntegral);
+      free(solver->uC);
+      free(solver->fluxC);
+      free(solver->Deriv1);
+      free(solver->Deriv2);
+    }
+#elif defined(GPU_HIP)
+    if (GPUShouldUse()) {
+      GPUFree(solver->u);
+      GPUFree(solver->x);
+      GPUFree(solver->dxinv);
+      GPUFree(solver->hyp);
+      GPUFree(solver->par);
+      GPUFree(solver->source);
+      GPUFree(solver->fluxI);
+      GPUFree(solver->uL);
+      GPUFree(solver->uR);
+      GPUFree(solver->fL);
+      GPUFree(solver->fR);
+      GPUFree(solver->StageBoundaryIntegral);
+      GPUFree(solver->StepBoundaryIntegral);
+      /* Allocated on GPU in GPUAllocateSolutionArrays */
+      GPUFree(solver->uC);
+      GPUFree(solver->fluxC);
+      GPUFree(solver->Deriv1);
+      GPUFree(solver->Deriv2);
+    } else {
+      free(solver->u);
+      free(solver->x);
+      free(solver->dxinv);
+      free(solver->hyp);
+      free(solver->par);
+      free(solver->source);
+      free(solver->fluxI);
+      free(solver->uL);
+      free(solver->uR);
+      free(solver->fL);
+      free(solver->fR);
+      free(solver->StageBoundaryIntegral);
+      free(solver->StepBoundaryIntegral);
+      free(solver->uC);
+      free(solver->fluxC);
+      free(solver->Deriv1);
+      free(solver->Deriv2);
+    }
+#else
     free(solver->u);
     free(solver->x);
     free(solver->dxinv);
+    free(solver->hyp);
+    free(solver->par);
+    free(solver->source);
+    free(solver->fluxI);
+    free(solver->uL);
+    free(solver->uR);
+    free(solver->fL);
+    free(solver->fR);
+    free(solver->StageBoundaryIntegral);
+    free(solver->StepBoundaryIntegral);
+    free(solver->uC);
+    free(solver->fluxC);
+    free(solver->Deriv1);
+    free(solver->Deriv2);
+#endif
     free(solver->isPeriodic);
     free(mpi->iproc);
     free(mpi->ip);
@@ -106,20 +207,7 @@ int Cleanup(  void  *s,   /*!< Array of simulation objects of type #SimulationOb
     free(solver->stride_with_ghosts);
     free(solver->stride_without_ghosts);
 
-    free(solver->hyp);
-    free(solver->par);
-    free(solver->source);
-    free(solver->uC);
-    free(solver->fluxC);
-    free(solver->Deriv1);
-    free(solver->Deriv2);
-    free(solver->fluxI);
-    free(solver->uL);
-    free(solver->uR);
-    free(solver->fL);
-    free(solver->fR);
-    free(solver->StageBoundaryIntegral);
-    free(solver->StepBoundaryIntegral);
+    /* uC/fluxC/Deriv1/Deriv2 are freed above (GPUFree or free depending on build/runtime) */
 
     if (solver->filename_index) free(solver->filename_index);
 

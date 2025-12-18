@@ -12,6 +12,10 @@
 #include <timeintegration_cpp.h>
 #include <mpivars_cpp.h>
 #include <simulation_object.h>
+#if defined(GPU_CUDA) || defined(GPU_HIP)
+#include <gpu.h>
+#include <gpu_runtime.h>
+#endif
 
 extern "C" int CalculateError(void*,void*); /*!< Calculate the error in the final solution */
 int OutputSolution(void*,int,double);   /*!< Write solutions to file */
@@ -50,6 +54,7 @@ int Solve(  void  *s,     /*!< Array of simulation objects of type #SimulationOb
   if (!rank) printf("Solving in time (from %d to %d iterations)\n",TS.restart_iter,TS.n_iter);
   for (TS.iter = TS.restart_iter; TS.iter < TS.n_iter; TS.iter++) {
 
+    
     /* Write initial solution to file if this is the first iteration */
     if (!TS.iter) {
       for (int ns = 0; ns < nsims; ns++) {
@@ -60,10 +65,31 @@ int Solve(  void  *s,     /*!< Array of simulation objects of type #SimulationOb
         }
       }
       OutputSolution(sim, nsims, TS.waqt);
+#if defined(GPU_CUDA) || defined(GPU_HIP)
+      if (!rank && GPUShouldUse()) { 
+        fflush(stderr); 
+        GPUSync();
+        int gpu_err = GPU_GET_LAST_ERROR();
+        if (gpu_err != GPU_SUCCESS) {
+        } else {
+        }
+        fflush(stderr);
+      }
+#endif
     }
 
     /* Call pre-step function */
     TimePreStep (&TS);
+#if defined(GPU_CUDA) || defined(GPU_HIP)
+    if (!rank && GPUShouldUse()) {
+      GPUSync();
+      int gpu_err = GPU_GET_LAST_ERROR();
+      if (gpu_err != GPU_SUCCESS) {
+      } else {
+      }
+      fflush(stderr);
+    }
+#endif
 
     /* Step in time */
     TimeStep (&TS);

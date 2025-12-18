@@ -11,6 +11,21 @@
 #include <physicalmodels/navierstokes2d.h>
 #include <mpivars.h>
 #include <hypar.h>
+#ifdef GPU_CUDA
+#include <gpu_runtime.h>
+#include <gpu_flux_function.h>
+#include <gpu_source_function.h>
+#include <gpu_parabolic_function.h>
+#include <gpu_upwind_function.h>
+#include <gpu_cfl.h>
+#elif defined(GPU_HIP)
+#include <gpu_runtime.h>
+#include <gpu_flux_function.h>
+#include <gpu_source_function.h>
+#include <gpu_parabolic_function.h>
+#include <gpu_upwind_function.h>
+#include <gpu_cfl.h>
+#endif
 
 double NavierStokes2DComputeCFL (void*,void*,double,double);
 
@@ -155,12 +170,60 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
 
   /* initializing physical model-specific functions */
   solver->PreStep               = NavierStokes2DPreStep;
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    solver->ComputeCFL = GPUNavierStokes2DComputeCFL;
+  } else {
+    solver->ComputeCFL = NavierStokes2DComputeCFL;
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    solver->ComputeCFL = GPUNavierStokes2DComputeCFL;
+  } else {
+    solver->ComputeCFL = NavierStokes2DComputeCFL;
+  }
+#else
   solver->ComputeCFL            = NavierStokes2DComputeCFL;
+#endif
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    solver->FFunction = (int(*)(double*,double*,int,void*,double))GPUNavierStokes2DFlux;
+    solver->ParabolicFunction = GPUNavierStokes2DParabolicFunction;
+    solver->SFunction = (int(*)(double*,double*,void*,void*,double))GPUNavierStokes2DSource;
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes2DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes2DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes2DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes2DUpwindRusanov;
+  } else {
+    solver->FFunction = NavierStokes2DFlux;
+    solver->ParabolicFunction = NavierStokes2DParabolicFunction;
+    solver->SFunction = NavierStokes2DSource;
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = NavierStokes2DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = NavierStokes2DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = NavierStokes2DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = NavierStokes2DUpwindRusanov;
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    solver->FFunction = (int(*)(double*,double*,int,void*,double))GPUNavierStokes2DFlux;
+    solver->ParabolicFunction = GPUNavierStokes2DParabolicFunction;
+    solver->SFunction = (int(*)(double*,double*,void*,void*,double))GPUNavierStokes2DSource;
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes2DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes2DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes2DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUNavierStokes2DUpwindRusanov;
+  } else {
+    solver->FFunction = NavierStokes2DFlux;
+    solver->ParabolicFunction = NavierStokes2DParabolicFunction;
+    solver->SFunction = NavierStokes2DSource;
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = NavierStokes2DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = NavierStokes2DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = NavierStokes2DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = NavierStokes2DUpwindRusanov;
+  }
+#else
   solver->FFunction             = NavierStokes2DFlux;
   solver->SFunction             = NavierStokes2DSource;
-  solver->AveragingFunction     = NavierStokes2DRoeAverage;
-  solver->GetLeftEigenvectors   = NavierStokes2DLeftEigenvectors;
-  solver->GetRightEigenvectors  = NavierStokes2DRightEigenvectors;
   solver->ParabolicFunction     = NavierStokes2DParabolicFunction;
   if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = NavierStokes2DUpwindRoe;
   else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = NavierStokes2DUpwindRF;
@@ -174,6 +237,12 @@ int NavierStokes2DInitialize( void *s, /*!< Solver object of type #HyPar */
     }
     return(1);
   }
+#endif
+
+  /* Set eigenvector functions for characteristic-based interpolation */
+  solver->AveragingFunction     = NavierStokes2DRoeAverage;
+  solver->GetLeftEigenvectors   = NavierStokes2DLeftEigenvectors;
+  solver->GetRightEigenvectors  = NavierStokes2DRightEigenvectors;
 
   /* set the value of gamma in all the boundary objects */
   int n;

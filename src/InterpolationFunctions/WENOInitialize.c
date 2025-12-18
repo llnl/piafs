@@ -123,6 +123,9 @@ int WENOInitialize(
   weno->w1 = NULL;
   weno->w2 = NULL;
   weno->w3 = NULL;
+  weno->w1_gpu = NULL;
+  weno->w2_gpu = NULL;
+  weno->w3_gpu = NULL;
 
   weno->offset = (int*) calloc (ndims,sizeof(int));
   int dir,d;

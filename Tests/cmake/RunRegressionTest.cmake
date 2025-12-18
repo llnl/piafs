@@ -60,6 +60,16 @@ file(CHMOD "${TEST_DIR}/run.sh" PERMISSIONS
 # Set environment variables for the test
 set(ENV{PIAFS_EXEC_W_PATH} "${PIAFS_EXEC}")
 set(ENV{MPI_EXEC} "${MPIEXEC}")
+# Set GPU flags for srun (needed for GPU-enabled builds on SLURM systems)
+if(ENABLE_GPU)
+  set(ENV{PIAFS_EXEC_OTHER_ARGS} "--gpus-per-node=1")
+  # Disable GPU for automated tests (login nodes don't have GPU access)
+  # GPU chemistry is fully implemented and can be enabled manually in GPU sessions
+  set(ENV{PIAFS_USE_GPU} "0")
+else()
+  set(ENV{PIAFS_EXEC_OTHER_ARGS} "")
+  set(ENV{PIAFS_USE_GPU} "0")
+endif()
 
 # Run the test
 message(STATUS "Running test ${TEST_NAME}...")

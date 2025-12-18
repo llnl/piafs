@@ -3,6 +3,7 @@
     @author Debojyoti Ghosh
 */
 
+#include <stdio.h>
 #include <basic.h>
 #include <simulation_object.h>
 #include <timeintegration.h>
@@ -15,7 +16,9 @@ int TimeStep(void *ts /*!< Object of type #TimeIntegration */)
   TimeIntegration *TS  = (TimeIntegration*) ts;
   SimulationObject* sim = (SimulationObject*) TS->simulation;
 
-  if (TS->TimeIntegrate) { TS->TimeIntegrate(TS); }
+  if (TS->TimeIntegrate) {
+    TS->TimeIntegrate(TS);
+  }
 
   return(0);
 }

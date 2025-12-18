@@ -11,6 +11,19 @@
 #include <physicalmodels/euler1d.h>
 #include <mpivars.h>
 #include <hypar.h>
+#ifdef GPU_CUDA
+#include <gpu_runtime.h>
+#include <gpu_flux_function.h>
+#include <gpu_source_function.h>
+#include <gpu_upwind_function.h>
+#include <gpu_cfl.h>
+#elif defined(GPU_HIP)
+#include <gpu_runtime.h>
+#include <gpu_flux_function.h>
+#include <gpu_source_function.h>
+#include <gpu_upwind_function.h>
+#include <gpu_cfl.h>
+#endif
 
 double Euler1DComputeCFL (void*,void*,double,double);
 int    Euler1DFlux       (double*,double*,int,void*,double);
@@ -120,7 +133,54 @@ int Euler1DInitialize(void *s, /*!< Solver object of type #HyPar */
 
   /* initializing physical model-specific functions */
   solver->PreStep            = Euler1DPreStep;
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    solver->ComputeCFL = GPUEuler1DComputeCFL;
+  } else {
+    solver->ComputeCFL = Euler1DComputeCFL;
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    solver->ComputeCFL = GPUEuler1DComputeCFL;
+  } else {
+    solver->ComputeCFL = Euler1DComputeCFL;
+  }
+#else
   solver->ComputeCFL         = Euler1DComputeCFL;
+#endif
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    solver->FFunction = (int(*)(double*,double*,int,void*,double))GPUEuler1DFlux;
+    solver->SFunction = (int(*)(double*,double*,void*,void*,double))GPUEuler1DSource;
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUEuler1DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUEuler1DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUEuler1DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUEuler1DUpwindRusanov;
+  } else {
+    solver->FFunction = Euler1DFlux;
+    solver->SFunction = Euler1DSource;
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = Euler1DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = Euler1DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = Euler1DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = Euler1DUpwindRusanov;
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    solver->FFunction = (int(*)(double*,double*,int,void*,double))GPUEuler1DFlux;
+    solver->SFunction = (int(*)(double*,double*,void*,void*,double))GPUEuler1DSource;
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUEuler1DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUEuler1DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUEuler1DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = (int(*)(double*,double*,double*,double*,double*,double*,int,void*,double))GPUEuler1DUpwindRusanov;
+  } else {
+    solver->FFunction = Euler1DFlux;
+    solver->SFunction = Euler1DSource;
+    if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = Euler1DUpwindRoe;
+    else if (!strcmp(physics->upw_choice,_RF_     )) solver->Upwind = Euler1DUpwindRF;
+    else if (!strcmp(physics->upw_choice,_LLF_    )) solver->Upwind = Euler1DUpwindLLF;
+    else if (!strcmp(physics->upw_choice,_RUSANOV_)) solver->Upwind = Euler1DUpwindRusanov;
+  }
+#else
   solver->FFunction          = Euler1DFlux;
   solver->SFunction          = Euler1DSource;
   if      (!strcmp(physics->upw_choice,_ROE_    )) solver->Upwind = Euler1DUpwindRoe;
@@ -132,6 +192,7 @@ int Euler1DInitialize(void *s, /*!< Solver object of type #HyPar */
                             physics->upw_choice);
     return(1);
   }
+#endif
   solver->AveragingFunction     = Euler1DRoeAverage;
   solver->GetLeftEigenvectors   = Euler1DLeftEigenvectors;
   solver->GetRightEigenvectors  = Euler1DRightEigenvectors;

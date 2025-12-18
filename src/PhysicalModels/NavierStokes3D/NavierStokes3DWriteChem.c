@@ -11,17 +11,41 @@
 #include <mpivars.h>
 #include <hypar.h>
 #include <physicalmodels/navierstokes3d.h>
+#if defined(GPU_CUDA) || defined(GPU_HIP)
+#include <gpu.h>
+#include <gpu_runtime.h>
+#endif
 
 /*! Write out the reacting species data to file */
 int NavierStokes3DWriteChem( void*   s,  /*!< Solver object of type #HyPar */
-                             void*   m,  /*!< MPI object of type #MPIVariables */
-                             double  a_t /*!< Current simulation time */ )
+                            void*   m,  /*!< MPI object of type #MPIVariables */
+                            double  a_t /*!< Current simulation time */ )
 {
   HyPar* solver = (HyPar*) s;
   MPIVariables* mpi = (MPIVariables*) m;
   NavierStokes3D* params = (NavierStokes3D*) solver->physics;
 
-  if (params->include_chem) ChemistryWriteSpecies(solver, solver->u, params->chem, mpi, a_t);
+  if (params->include_chem) {
+#if defined(GPU_CUDA) || defined(GPU_HIP)
+    if (GPUShouldUse()) {
+      /* ChemistryWriteSpecies needs host memory - copy u from device */
+      int size_u = solver->npoints_local_wghosts * solver->nvars;
+      double *u_host = (double*) malloc(size_u * sizeof(double));
+      if (!u_host) {
+        fprintf(stderr, "Error: Failed to allocate host buffer for ChemistryWriteSpecies\n");
+        return 1;
+      }
+      GPUCopyToHost(u_host, solver->u, size_u * sizeof(double));
+      GPUSync();
+      ChemistryWriteSpecies(solver, u_host, params->chem, mpi, a_t);
+      free(u_host);
+    } else {
+      ChemistryWriteSpecies(solver, solver->u, params->chem, mpi, a_t);
+    }
+#else
+    ChemistryWriteSpecies(solver, solver->u, params->chem, mpi, a_t);
+#endif
+  }
 
   return 0;
 }

@@ -11,6 +11,15 @@
 #include <mpivars.h>
 #include <simulation_object.h>
 #include <timeintegration.h>
+#ifdef GPU_CUDA
+#include <gpu.h>
+#include <gpu_runtime.h>
+#include <gpu_arrayfunctions.h>
+#elif defined(GPU_HIP)
+#include <gpu.h>
+#include <gpu_runtime.h>
+#include <gpu_arrayfunctions.h>
+#endif
 
 /*!
   Post-time-step function: this function is called at the end of
@@ -36,6 +45,61 @@ int TimePostStep(void *ts /*!< Object of type #TimeIntegration */)
     double sum = 0.0;
     double npts = 0;
     for (ns = 0; ns < nsims; ns++) {
+#ifdef GPU_CUDA
+      if (GPUShouldUse()) {
+        /* Use GPU operations */
+        GPUArrayAXPY(sim[ns].solver.u, -1.0, TS->u+TS->u_offsets[ns], TS->u_sizes[ns]);
+        if (GPUShouldSyncEveryOp()) GPUSync();
+        /* ArraySumSquarenD needs host array - copy to host first */
+        int size = TS->u_sizes[ns];
+        double *u_temp_host = (double*) malloc(size * sizeof(double));
+        if (u_temp_host) {
+          GPUCopyToHost(u_temp_host, TS->u+TS->u_offsets[ns], size * sizeof(double));
+          sum += ArraySumSquarenD( sim[ns].solver.nvars,
+                                   sim[ns].solver.ndims,
+                                   sim[ns].solver.dim_local,
+                                   sim[ns].solver.ghosts,
+                                   sim[ns].solver.index,
+                                   u_temp_host );
+          free(u_temp_host);
+        }
+      } else {
+        _ArrayAXPY_(sim[ns].solver.u,-1.0,(TS->u+TS->u_offsets[ns]),TS->u_sizes[ns]);
+        sum += ArraySumSquarenD( sim[ns].solver.nvars,
+                                 sim[ns].solver.ndims,
+                                 sim[ns].solver.dim_local,
+                                 sim[ns].solver.ghosts,
+                                 sim[ns].solver.index,
+                                 (TS->u+TS->u_offsets[ns]) );
+      }
+#elif defined(GPU_HIP)
+      if (GPUShouldUse()) {
+        /* Use GPU operations */
+        GPUArrayAXPY(sim[ns].solver.u, -1.0, TS->u+TS->u_offsets[ns], TS->u_sizes[ns]);
+        if (GPUShouldSyncEveryOp()) GPUSync();
+        /* ArraySumSquarenD needs host array - copy to host first */
+        int size = TS->u_sizes[ns];
+        double *u_temp_host = (double*) malloc(size * sizeof(double));
+        if (u_temp_host) {
+          GPUCopyToHost(u_temp_host, TS->u+TS->u_offsets[ns], size * sizeof(double));
+          sum += ArraySumSquarenD( sim[ns].solver.nvars,
+                                   sim[ns].solver.ndims,
+                                   sim[ns].solver.dim_local,
+                                   sim[ns].solver.ghosts,
+                                   sim[ns].solver.index,
+                                   u_temp_host );
+          free(u_temp_host);
+        }
+      } else {
+        _ArrayAXPY_(sim[ns].solver.u,-1.0,(TS->u+TS->u_offsets[ns]),TS->u_sizes[ns]);
+        sum += ArraySumSquarenD( sim[ns].solver.nvars,
+                                 sim[ns].solver.ndims,
+                                 sim[ns].solver.dim_local,
+                                 sim[ns].solver.ghosts,
+                                 sim[ns].solver.index,
+                                 (TS->u+TS->u_offsets[ns]) );
+      }
+#else
       _ArrayAXPY_(sim[ns].solver.u,-1.0,(TS->u+TS->u_offsets[ns]),TS->u_sizes[ns]);
       sum += ArraySumSquarenD( sim[ns].solver.nvars,
                                sim[ns].solver.ndims,
@@ -43,6 +107,7 @@ int TimePostStep(void *ts /*!< Object of type #TimeIntegration */)
                                sim[ns].solver.ghosts,
                                sim[ns].solver.index,
                                (TS->u+TS->u_offsets[ns]) );
+#endif
       npts += (double)sim[ns].solver.npoints_global;
     }
 
@@ -73,19 +138,119 @@ int TimePostStep(void *ts /*!< Object of type #TimeIntegration */)
 
     if (!strcmp(sim[ns].solver.ConservationCheck,"yes")) {
       /* calculate volume integral of the solution at this time step */
+#ifdef GPU_CUDA
+      if (GPUShouldUse()) {
+        /* VolumeIntegral accesses u - need to copy to host. dxinv is already on host */
+        int size_u = sim[ns].solver.npoints_local_wghosts * sim[ns].solver.nvars;
+        double *u_host = (double*) malloc(size_u * sizeof(double));
+        if (u_host) {
+          GPUCopyToHost(u_host, sim[ns].solver.u, size_u * sizeof(double));
+          IERR sim[ns].solver.VolumeIntegralFunction( sim[ns].solver.VolumeIntegral,
+                                                      u_host,
+                                                      &(sim[ns].solver),
+                                                      &(sim[ns].mpi) ); CHECKERR(ierr);
+        }
+        if (u_host) free(u_host);
+      } else {
+        IERR sim[ns].solver.VolumeIntegralFunction( sim[ns].solver.VolumeIntegral,
+                                                    sim[ns].solver.u,
+                                                    &(sim[ns].solver),
+                                                    &(sim[ns].mpi) ); CHECKERR(ierr);
+      }
+#elif defined(GPU_HIP)
+      if (GPUShouldUse()) {
+        /* VolumeIntegral accesses u - need to copy to host. dxinv is already on host */
+        int size_u = sim[ns].solver.npoints_local_wghosts * sim[ns].solver.nvars;
+        double *u_host = (double*) malloc(size_u * sizeof(double));
+        if (u_host) {
+          GPUCopyToHost(u_host, sim[ns].solver.u, size_u * sizeof(double));
+          IERR sim[ns].solver.VolumeIntegralFunction( sim[ns].solver.VolumeIntegral,
+                                                      u_host,
+                                                      &(sim[ns].solver),
+                                                      &(sim[ns].mpi) ); CHECKERR(ierr);
+        }
+        if (u_host) free(u_host);
+      } else {
+        IERR sim[ns].solver.VolumeIntegralFunction( sim[ns].solver.VolumeIntegral,
+                                                    sim[ns].solver.u,
+                                                    &(sim[ns].solver),
+                                                    &(sim[ns].mpi) ); CHECKERR(ierr);
+      }
+#else
       IERR sim[ns].solver.VolumeIntegralFunction( sim[ns].solver.VolumeIntegral,
                                                   sim[ns].solver.u,
                                                   &(sim[ns].solver),
                                                   &(sim[ns].mpi) ); CHECKERR(ierr);
+#endif
       /* calculate surface integral of the flux at this time step */
+#ifdef GPU_CUDA
+      if (GPUShouldUse()) {
+        /* BoundaryIntegral accesses StepBoundaryIntegral - need host copy. dxinv is already on host */
+        int bf_size = 2*sim[ns].solver.ndims*sim[ns].solver.nvars;
+        double *StepBoundaryIntegral_host = (double*) malloc(bf_size * sizeof(double));
+        
+        if (StepBoundaryIntegral_host) {
+          GPUCopyToHost(StepBoundaryIntegral_host, sim[ns].solver.StepBoundaryIntegral, bf_size * sizeof(double));
+          
+          /* Temporarily swap pointer */
+          double *StepBoundaryIntegral_save = sim[ns].solver.StepBoundaryIntegral;
+          sim[ns].solver.StepBoundaryIntegral = StepBoundaryIntegral_host;
+          
+          IERR sim[ns].solver.BoundaryIntegralFunction( &(sim[ns].solver),
+                                                        &(sim[ns].mpi)); CHECKERR(ierr);
+          
+          /* Restore original pointer */
+          sim[ns].solver.StepBoundaryIntegral = StepBoundaryIntegral_save;
+          
+          free(StepBoundaryIntegral_host);
+        } else {
+          fprintf(stderr, "Error: Failed to allocate host buffer for BoundaryIntegral\n");
+          return 1;
+        }
+      } else {
+        IERR sim[ns].solver.BoundaryIntegralFunction( &(sim[ns].solver),
+                                                      &(sim[ns].mpi)); CHECKERR(ierr);
+      }
+#elif defined(GPU_HIP)
+      if (GPUShouldUse()) {
+        /* BoundaryIntegral accesses StepBoundaryIntegral - need host copy. dxinv is already on host */
+        int bf_size = 2*sim[ns].solver.ndims*sim[ns].solver.nvars;
+        double *StepBoundaryIntegral_host = (double*) malloc(bf_size * sizeof(double));
+        
+        if (StepBoundaryIntegral_host) {
+          GPUCopyToHost(StepBoundaryIntegral_host, sim[ns].solver.StepBoundaryIntegral, bf_size * sizeof(double));
+          
+          /* Temporarily swap pointer */
+          double *StepBoundaryIntegral_save = sim[ns].solver.StepBoundaryIntegral;
+          sim[ns].solver.StepBoundaryIntegral = StepBoundaryIntegral_host;
+          
+          IERR sim[ns].solver.BoundaryIntegralFunction( &(sim[ns].solver),
+                                                        &(sim[ns].mpi)); CHECKERR(ierr);
+          
+          /* Restore original pointer */
+          sim[ns].solver.StepBoundaryIntegral = StepBoundaryIntegral_save;
+          
+          free(StepBoundaryIntegral_host);
+        } else {
+          fprintf(stderr, "Error: Failed to allocate host buffer for BoundaryIntegral\n");
+          return 1;
+        }
+      } else {
+        IERR sim[ns].solver.BoundaryIntegralFunction( &(sim[ns].solver),
+                                                      &(sim[ns].mpi)); CHECKERR(ierr);
+      }
+#else
       IERR sim[ns].solver.BoundaryIntegralFunction( &(sim[ns].solver),
                                                     &(sim[ns].mpi)); CHECKERR(ierr);
+#endif
       /* calculate the conservation error at this time step       */
       IERR sim[ns].solver.CalculateConservationError( &(sim[ns].solver),
                                                       &(sim[ns].mpi)); CHECKERR(ierr);
     }
 
     if (sim[ns].solver.PostStep) {
+      /* PostStep receives u which is on GPU - if it needs to access it, it should be GPU-aware */
+      /* For now, assume PostStep doesn't access arrays directly or is GPU-aware */
       sim[ns].solver.PostStep(sim[ns].solver.u,&(sim[ns].solver),&(sim[ns].mpi),TS->waqt,TS->iter);
     }
 

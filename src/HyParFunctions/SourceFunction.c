@@ -3,6 +3,7 @@
     @brief Evaluate the source term
 */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <basic.h>
@@ -10,6 +11,15 @@
 #include <boundaryconditions.h>
 #include <mpivars.h>
 #include <hypar.h>
+#ifdef GPU_CUDA
+#include <gpu.h>
+#include <gpu_runtime.h>
+#include <gpu_arrayfunctions.h>
+#elif defined(GPU_HIP)
+#include <gpu.h>
+#include <gpu_runtime.h>
+#include <gpu_arrayfunctions.h>
+#endif
 
 /*! Evaluate the source term \f${\bf S}\left({\bf u}\right)\f$ in the governing equation,
     if the physical model specifies one. In addition, if the simulation requires a sponge
@@ -28,7 +38,21 @@ int SourceFunction(
 
   /* initialize to zero */
   int size = solver->ndof_cells_wghosts;
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    GPUArraySetValue(source, 0.0, size);
+  } else {
+    _ArraySetValue_(source,size,0.0);
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    GPUArraySetValue(source, 0.0, size);
+  } else {
+    _ArraySetValue_(source,size,0.0);
+  }
+#else
   _ArraySetValue_(source,size,0.0);
+#endif
 
   /* call the source function of the physics model, if available */
   if (solver->SFunction) {
@@ -42,6 +66,7 @@ int SourceFunction(
   int nb = solver->nBoundaryZones;
   for (n = 0; n < nb; n++) {
     if (!strcmp(boundary[n].bctype,_SPONGE_)) {
+      /* x is always on host, no GPU copy needed */
       BCSpongeSource( &boundary[n],
                       solver->ndims,
                       solver->nvars,

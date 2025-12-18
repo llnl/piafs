@@ -13,6 +13,8 @@
 #include <physicalmodels/chemistry.h>
 #include <mpivars.h>
 #include <hypar.h>
+#include <gpu_runtime.h>
+#include <physicalmodels/gpu_chemistry.h>
 
 void ChemistrySetPhotonDensity(void*,void*,void*,double);
 
@@ -75,6 +77,10 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   int           ferr;
 
   static int count = 0;
+  
+  if (!mpi->rank) {
+    fflush(stdout);
+  }
 
   /* Number of flow variables (Euler/Navier-Stokes) */
   chem->n_flow_vars = n_flowvars;
@@ -469,7 +475,13 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   chem->nv_hnu   = (double*) calloc (solver->npoints_local_wghosts*nz, sizeof(double));
 
   /* allocate array to hold the beam intensity field */
+  if (!mpi->rank) {
+    fflush(stdout);
+  }
   chem->imap = (double*) calloc (solver->npoints_local_wghosts, sizeof(double));
+  if (!mpi->rank) {
+    fflush(stdout);
+  }
   /* read beam intensity from provided file, if available */
   int read_flag = 0;
   char fname_root[_MAX_STRING_SIZE_] = "imap";
@@ -483,12 +495,17 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
     if (!mpi->rank) {
       printf("ChemistryInitialize(): could not read intensity map from file; setting it as:.\n");
       printf("ChemistryInitialize():      IA + IB * cos( kg * x * (1-IC*x) )                \n");
+      fflush(stdout);
     }
 
     // get xmin of the domain
     double x0 = 0.0;
     _GetCoordinate_(0,0,solver->dim_local,solver->ghosts,solver->x,x0);
     MPIMin_double(&x0, &x0, 1, &mpi->world);
+
+    if (!mpi->rank) {
+      fflush(stdout);
+    }
 
     int index[solver->ndims];
     int done = 0; _ArraySetValue_(index,solver->ndims,0);
@@ -499,7 +516,25 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
       _ArrayIncrementIndex_(solver->ndims,solver->dim_local,index,done);
 
     }
+    
+    if (!mpi->rank) {
+      fflush(stdout);
+    }
   }
+
+  if (!mpi->rank) {
+    fflush(stdout);
+  }
+
+  // Allocate GPU memory for chemistry arrays if GPU is enabled
+#ifndef GPU_NONE
+  if (GPUShouldUse()) {
+    if (GPUChemistryAllocate(chem, solver->npoints_local_wghosts, nz)) {
+      fprintf(stderr, "Error: Failed to allocate GPU memory for chemistry\n");
+      return 1;
+    }
+  }
+#endif
 
   count++;
   return 0;

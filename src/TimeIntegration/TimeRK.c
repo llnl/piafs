@@ -3,12 +3,22 @@
     @author Debojyoti Ghosh
 */
 
+#include <stdio.h>
 #include <basic.h>
 #include <arrayfunctions.h>
 #include <simulation_object.h>
 #include <timeintegration.h>
 #include <time.h>
 #include <math.h>
+#ifdef GPU_CUDA
+#include <gpu.h>
+#include <gpu_runtime.h>
+#include <gpu_arrayfunctions.h>
+#elif defined(GPU_HIP)
+#include <gpu.h>
+#include <gpu_runtime.h>
+#include <gpu_arrayfunctions.h>
+#endif
 
 /*!
   Advance the ODE given by
@@ -30,9 +40,18 @@
 */
 int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
 {
+  
   TimeIntegration* TS = (TimeIntegration*) ts;
+  
   SimulationObject* sim = (SimulationObject*) TS->simulation;
+  
   ExplicitRKParameters *params = (ExplicitRKParameters*) sim[0].solver.msti;
+  
+  if (!params) {
+    return 1;
+  }
+  
+  
   int ns, stage, i, nsims = TS->nsims;
 
   /* Calculate stage values */
@@ -40,6 +59,68 @@ int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
 
     double stagetime = TS->waqt + params->c[stage]*TS->dt;
 
+
+#ifdef GPU_CUDA
+    if (GPUShouldUse()) {
+      /* Copy solver->u to TS->U[stage] on GPU */
+      for (ns = 0; ns < nsims; ns++) {
+        GPUArrayCopy(TS->U[stage] + TS->u_offsets[ns],
+                     sim[ns].solver.u,
+                     TS->u_sizes[ns]);
+      }
+
+      /* Compute stage values on GPU */
+      for (i = 0; i < stage; i++) {
+        GPUArrayAXPY(TS->Udot[i],
+                     TS->dt * params->A[stage*params->nstages+i],
+                     TS->U[stage],
+                     TS->u_size_total);
+      }
+    } else {
+      for (ns = 0; ns < nsims; ns++) {
+        _ArrayCopy1D_(  sim[ns].solver.u,
+                        (TS->U[stage] + TS->u_offsets[ns]),
+                        (TS->u_sizes[ns]) );
+      }
+
+      for (i = 0; i < stage; i++) {
+        _ArrayAXPY_(  TS->Udot[i],
+                      (TS->dt * params->A[stage*params->nstages+i]),
+                      TS->U[stage],
+                      TS->u_size_total );
+      }
+    }
+#elif defined(GPU_HIP)
+    if (GPUShouldUse()) {
+      /* Copy solver->u to TS->U[stage] on GPU */
+      for (ns = 0; ns < nsims; ns++) {
+        GPUArrayCopy(TS->U[stage] + TS->u_offsets[ns],
+                     sim[ns].solver.u,
+                     TS->u_sizes[ns]);
+      }
+
+      /* Compute stage values on GPU */
+      for (i = 0; i < stage; i++) {
+        GPUArrayAXPY(TS->Udot[i],
+                     TS->dt * params->A[stage*params->nstages+i],
+                     TS->U[stage],
+                     TS->u_size_total);
+      }
+    } else {
+      for (ns = 0; ns < nsims; ns++) {
+        _ArrayCopy1D_(  sim[ns].solver.u,
+                        (TS->U[stage] + TS->u_offsets[ns]),
+                        (TS->u_sizes[ns]) );
+      }
+
+      for (i = 0; i < stage; i++) {
+        _ArrayAXPY_(  TS->Udot[i],
+                      (TS->dt * params->A[stage*params->nstages+i]),
+                      TS->U[stage],
+                      TS->u_size_total );
+      }
+    }
+#else
     for (ns = 0; ns < nsims; ns++) {
       _ArrayCopy1D_(  sim[ns].solver.u,
                       (TS->U[stage] + TS->u_offsets[ns]),
@@ -52,36 +133,175 @@ int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
                     TS->U[stage],
                     TS->u_size_total );
     }
+#endif
 
     for (ns = 0; ns < nsims; ns++) {
       if (sim[ns].solver.PostStage) {
+#ifdef GPU_CUDA
+        if (GPUShouldUse()) {
+          /* PostStage receives GPU array - if it needs to access it, copy to host first */
+          /* For now, assume PostStage doesn't access arrays directly or is GPU-aware */
+          sim[ns].solver.PostStage(  (TS->U[stage] + TS->u_offsets[ns]),
+                                     &(sim[ns].solver),
+                                     &(sim[ns].mpi),
+                                     stagetime); CHECKERR(ierr);
+        } else {
+          sim[ns].solver.PostStage(  (TS->U[stage] + TS->u_offsets[ns]),
+                                     &(sim[ns].solver),
+                                     &(sim[ns].mpi),
+                                     stagetime); CHECKERR(ierr);
+        }
+#elif defined(GPU_HIP)
+        if (GPUShouldUse()) {
+          /* PostStage receives GPU array - if it needs to access it, copy to host first */
+          /* For now, assume PostStage doesn't access arrays directly or is GPU-aware */
+          sim[ns].solver.PostStage(  (TS->U[stage] + TS->u_offsets[ns]),
+                                     &(sim[ns].solver),
+                                     &(sim[ns].mpi),
+                                     stagetime); CHECKERR(ierr);
+        } else {
+          sim[ns].solver.PostStage(  (TS->U[stage] + TS->u_offsets[ns]),
+                                     &(sim[ns].solver),
+                                     &(sim[ns].mpi),
+                                     stagetime); CHECKERR(ierr);
+        }
+#else
         sim[ns].solver.PostStage(  (TS->U[stage] + TS->u_offsets[ns]),
                                    &(sim[ns].solver),
                                    &(sim[ns].mpi),
                                    stagetime); CHECKERR(ierr);
+#endif
       }
     }
 
     for (ns = 0; ns < nsims; ns++) {
-      TS->RHSFunction( (TS->Udot[stage] + TS->u_offsets[ns]),
-                       (TS->U[stage] + TS->u_offsets[ns]),
-                       &(sim[ns].solver),
-                       &(sim[ns].mpi),
-                       stagetime);
+      int rhs_ierr = TS->RHSFunction( (TS->Udot[stage] + TS->u_offsets[ns]),
+                                      (TS->U[stage] + TS->u_offsets[ns]),
+                                      &(sim[ns].solver),
+                                      &(sim[ns].mpi),
+                                      stagetime);
+      if (rhs_ierr) {
+        fprintf(stderr, "Error: TimeRK: RHSFunction failed (stage=%d, domain=%d, ierr=%d)\n",
+                stage, ns, rhs_ierr);
+        exit(1);
+      }
     }
 
+#ifdef GPU_CUDA
+    if (GPUShouldUse()) {
+      /* BoundaryFlux is on host, so use CPU operations */
+      _ArraySetValue_(TS->BoundaryFlux[stage], TS->bf_size_total, 0.0);
+      for (ns = 0; ns < nsims; ns++) {
+        /* StageBoundaryIntegral is on GPU, need to copy to host */
+        double *bf_host = (double*) malloc(TS->bf_sizes[ns] * sizeof(double));
+        GPUCopyToHost(bf_host, sim[ns].solver.StageBoundaryIntegral, TS->bf_sizes[ns] * sizeof(double));
+        _ArrayCopy1D_(bf_host, (TS->BoundaryFlux[stage] + TS->bf_offsets[ns]), TS->bf_sizes[ns]);
+        free(bf_host);
+      }
+    } else {
+      _ArraySetValue_(TS->BoundaryFlux[stage], TS->bf_size_total, 0.0);
+      for (ns = 0; ns < nsims; ns++) {
+        _ArrayCopy1D_(  sim[ns].solver.StageBoundaryIntegral,
+                        (TS->BoundaryFlux[stage] + TS->bf_offsets[ns]),
+                        TS->bf_sizes[ns] );
+      }
+    }
+#elif defined(GPU_HIP)
+    if (GPUShouldUse()) {
+      /* BoundaryFlux is on host, so use CPU operations */
+      _ArraySetValue_(TS->BoundaryFlux[stage], TS->bf_size_total, 0.0);
+      for (ns = 0; ns < nsims; ns++) {
+        /* StageBoundaryIntegral is on GPU, need to copy to host */
+        double *bf_host = (double*) malloc(TS->bf_sizes[ns] * sizeof(double));
+        GPUCopyToHost(bf_host, sim[ns].solver.StageBoundaryIntegral, TS->bf_sizes[ns] * sizeof(double));
+        _ArrayCopy1D_(bf_host, (TS->BoundaryFlux[stage] + TS->bf_offsets[ns]), TS->bf_sizes[ns]);
+        free(bf_host);
+      }
+    } else {
+      _ArraySetValue_(TS->BoundaryFlux[stage], TS->bf_size_total, 0.0);
+      for (ns = 0; ns < nsims; ns++) {
+        _ArrayCopy1D_(  sim[ns].solver.StageBoundaryIntegral,
+                        (TS->BoundaryFlux[stage] + TS->bf_offsets[ns]),
+                        TS->bf_sizes[ns] );
+      }
+    }
+#else
     _ArraySetValue_(TS->BoundaryFlux[stage], TS->bf_size_total, 0.0);
     for (ns = 0; ns < nsims; ns++) {
       _ArrayCopy1D_(  sim[ns].solver.StageBoundaryIntegral,
                       (TS->BoundaryFlux[stage] + TS->bf_offsets[ns]),
                       TS->bf_sizes[ns] );
     }
+#endif
 
   }
 
   /* Step completion */
   for (stage = 0; stage < params->nstages; stage++) {
 
+#ifdef GPU_CUDA
+    if (GPUShouldUse()) {
+      for (ns = 0; ns < nsims; ns++) {
+        GPUArrayAXPY(TS->Udot[stage] + TS->u_offsets[ns],
+                     TS->dt * params->b[stage],
+                     sim[ns].solver.u,
+                     TS->u_sizes[ns]);
+        /* StepBoundaryIntegral is on GPU, BoundaryFlux is on host */
+        double *bf_host = (double*) malloc(TS->bf_sizes[ns] * sizeof(double));
+        _ArrayCopy1D_((TS->BoundaryFlux[stage] + TS->bf_offsets[ns]), bf_host, TS->bf_sizes[ns]);
+        double *sbi_host = (double*) malloc(TS->bf_sizes[ns] * sizeof(double));
+        GPUCopyToHost(sbi_host, sim[ns].solver.StepBoundaryIntegral, TS->bf_sizes[ns] * sizeof(double));
+        for (int j = 0; j < TS->bf_sizes[ns]; j++) {
+          sbi_host[j] += TS->dt * params->b[stage] * bf_host[j];
+        }
+        GPUCopyToDevice(sim[ns].solver.StepBoundaryIntegral, sbi_host, TS->bf_sizes[ns] * sizeof(double));
+        free(bf_host);
+        free(sbi_host);
+      }
+    } else {
+      for (ns = 0; ns < nsims; ns++) {
+        _ArrayAXPY_(  (TS->Udot[stage] + TS->u_offsets[ns]),
+                      (TS->dt * params->b[stage]),
+                      (sim[ns].solver.u),
+                      (TS->u_sizes[ns]) );
+        _ArrayAXPY_(  (TS->BoundaryFlux[stage] + TS->bf_offsets[ns]),
+                      (TS->dt * params->b[stage]),
+                      (sim[ns].solver.StepBoundaryIntegral),
+                      (TS->bf_sizes[ns]) );
+      }
+    }
+#elif defined(GPU_HIP)
+    if (GPUShouldUse()) {
+      for (ns = 0; ns < nsims; ns++) {
+        GPUArrayAXPY(TS->Udot[stage] + TS->u_offsets[ns],
+                     TS->dt * params->b[stage],
+                     sim[ns].solver.u,
+                     TS->u_sizes[ns]);
+        /* StepBoundaryIntegral is on GPU, BoundaryFlux is on host */
+        double *bf_host = (double*) malloc(TS->bf_sizes[ns] * sizeof(double));
+        _ArrayCopy1D_((TS->BoundaryFlux[stage] + TS->bf_offsets[ns]), bf_host, TS->bf_sizes[ns]);
+        double *sbi_host = (double*) malloc(TS->bf_sizes[ns] * sizeof(double));
+        GPUCopyToHost(sbi_host, sim[ns].solver.StepBoundaryIntegral, TS->bf_sizes[ns] * sizeof(double));
+        for (int j = 0; j < TS->bf_sizes[ns]; j++) {
+          sbi_host[j] += TS->dt * params->b[stage] * bf_host[j];
+        }
+        GPUCopyToDevice(sim[ns].solver.StepBoundaryIntegral, sbi_host, TS->bf_sizes[ns] * sizeof(double));
+        free(bf_host);
+        free(sbi_host);
+      }
+    } else {
+      for (ns = 0; ns < nsims; ns++) {
+        _ArrayAXPY_(  (TS->Udot[stage] + TS->u_offsets[ns]),
+                      (TS->dt * params->b[stage]),
+                      (sim[ns].solver.u),
+                      (TS->u_sizes[ns]) );
+        _ArrayAXPY_(  (TS->BoundaryFlux[stage] + TS->bf_offsets[ns]),
+                      (TS->dt * params->b[stage]),
+                      (sim[ns].solver.StepBoundaryIntegral),
+                      (TS->bf_sizes[ns]) );
+      }
+    }
+#else
     for (ns = 0; ns < nsims; ns++) {
       _ArrayAXPY_(  (TS->Udot[stage] + TS->u_offsets[ns]),
                     (TS->dt * params->b[stage]),
@@ -92,10 +312,62 @@ int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
                     (sim[ns].solver.StepBoundaryIntegral),
                     (TS->bf_sizes[ns]) );
     }
+#endif
 
   }
 
   /* Check for NaN/Inf in final solution after all stages */
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    /* Copy to host for NaN check */
+    for (ns = 0; ns < nsims; ns++) {
+      double *u_host = (double*) malloc(TS->u_sizes[ns] * sizeof(double));
+      GPUCopyToHost(u_host, sim[ns].solver.u, TS->u_sizes[ns] * sizeof(double));
+      for (int i = 0; i < TS->u_sizes[ns]; i++) {
+        if (isnan(u_host[i]) || isinf(u_host[i])) {
+          fprintf(stderr,"ERROR in TimeRK: NaN/Inf detected in solution at index %d, time=%e, dt=%e.\n",i,TS->waqt,TS->dt);
+          free(u_host);
+          exit(1);
+        }
+      }
+      free(u_host);
+    }
+  } else {
+    for (ns = 0; ns < nsims; ns++) {
+      for (int i = 0; i < TS->u_sizes[ns]; i++) {
+        if (isnan(sim[ns].solver.u[i]) || isinf(sim[ns].solver.u[i])) {
+          fprintf(stderr,"ERROR in TimeRK: NaN/Inf detected in solution at index %d, time=%e, dt=%e.\n",i,TS->waqt,TS->dt);
+          exit(1);
+        }
+      }
+    }
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    /* Copy to host for NaN check */
+    for (ns = 0; ns < nsims; ns++) {
+      double *u_host = (double*) malloc(TS->u_sizes[ns] * sizeof(double));
+      GPUCopyToHost(u_host, sim[ns].solver.u, TS->u_sizes[ns] * sizeof(double));
+      for (int i = 0; i < TS->u_sizes[ns]; i++) {
+        if (isnan(u_host[i]) || isinf(u_host[i])) {
+          fprintf(stderr,"ERROR in TimeRK: NaN/Inf detected in solution at index %d, time=%e, dt=%e.\n",i,TS->waqt,TS->dt);
+          free(u_host);
+          exit(1);
+        }
+      }
+      free(u_host);
+    }
+  } else {
+    for (ns = 0; ns < nsims; ns++) {
+      for (int i = 0; i < TS->u_sizes[ns]; i++) {
+        if (isnan(sim[ns].solver.u[i]) || isinf(sim[ns].solver.u[i])) {
+          fprintf(stderr,"ERROR in TimeRK: NaN/Inf detected in solution at index %d, time=%e, dt=%e.\n",i,TS->waqt,TS->dt);
+          exit(1);
+        }
+      }
+    }
+  }
+#else
   for (ns = 0; ns < nsims; ns++) {
     for (int i = 0; i < TS->u_sizes[ns]; i++) {
       if (isnan(sim[ns].solver.u[i]) || isinf(sim[ns].solver.u[i])) {
@@ -104,6 +376,7 @@ int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
       }
     }
   }
+#endif
 
   return 0;
 }

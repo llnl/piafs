@@ -101,6 +101,10 @@ typedef struct main_parameters {
   /*! array containing (1.0/dx): layout same as that of x */
   double *dxinv;
 
+  /*! Device copies of x and dxinv for GPU kernels (NULL on CPU) */
+  double *d_x;
+  double *d_dxinv;
+
   /*! Solution vector: the #HyPar::ndims-dimensional solution vector with nvars components at each
    * grid point is stored as a 1D array. **Includes ghost points**
    * Use #_ArrayIndex1D_ to calculate the index in the 1D array

@@ -13,6 +13,13 @@
 #include <timeintegration.h>
 #include <mpivars.h>
 #include <hypar.h>
+#ifdef GPU_CUDA
+#include <gpu.h>
+#include <gpu_runtime.h>
+#elif defined(GPU_HIP)
+#include <gpu.h>
+#include <gpu_runtime.h>
+#endif
 
 int ExactSolution(void*,void*,double*,char*,int*);
 
@@ -88,7 +95,41 @@ int CalculateError(
     solution_norm[2] = global_sum;
 
     /* compute error = difference between exact and numerical solution */
+#ifdef GPU_CUDA
+    if (GPUShouldUse()) {
+      /* Copy solver->u to host for computation */
+      double *u_host = (double*) malloc(size * sizeof(double));
+      if (!u_host) {
+        fprintf(stderr, "Error: Failed to allocate host buffer for CalculateError\n");
+        free(uex);
+        return 1;
+      }
+      GPUCopyToHost(u_host, solver->u, size * sizeof(double));
+      /* GPUCopyToHost uses a synchronous copy; avoid forced device sync here. */
+      _ArrayAXPY_(u_host,-1.0,uex,size);
+      free(u_host);
+    } else {
+      _ArrayAXPY_(solver->u,-1.0,uex,size);
+    }
+#elif defined(GPU_HIP)
+    if (GPUShouldUse()) {
+      /* Copy solver->u to host for computation */
+      double *u_host = (double*) malloc(size * sizeof(double));
+      if (!u_host) {
+        fprintf(stderr, "Error: Failed to allocate host buffer for CalculateError\n");
+        free(uex);
+        return 1;
+      }
+      GPUCopyToHost(u_host, solver->u, size * sizeof(double));
+      /* GPUCopyToHost uses a synchronous copy; avoid forced device sync here. */
+      _ArrayAXPY_(u_host,-1.0,uex,size);
+      free(u_host);
+    } else {
+      _ArrayAXPY_(solver->u,-1.0,uex,size);
+    }
+#else
     _ArrayAXPY_(solver->u,-1.0,uex,size);
+#endif
 
     /* calculate L1 norm of error */
     sum = ArraySumAbsnD   (solver->nvars,solver->ndims,solver->dim_local,

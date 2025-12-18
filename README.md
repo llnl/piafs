@@ -41,7 +41,7 @@ PIAFS supports two build systems: **Autotools** (traditional) and **CMake** (mod
 
 ### Option 1: CMake Build (Recommended)
 
-CMake provides better IDE integration, faster configuration, and modern tooling support.
+CMake provides better IDE integration, faster configuration, modern tooling support, and **GPU acceleration (CUDA/HIP)**.
 
 **Basic build with MPI:**
 ```
@@ -67,6 +67,32 @@ cmake -DENABLE_OMP=ON ..
 make -j 4
 ```
 
+**Build with CUDA GPU support (NVIDIA):**
+```
+mkdir build
+cd build
+cmake -DENABLE_GPU=ON -DENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=<CUDA architecture> ..
+make -j 4
+```
+
+**Build with HIP GPU support (AMD):**
+```
+mkdir build
+cd build
+cmake -DENABLE_GPU=ON -DENABLE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=<AMD architecture> ..
+make -j 4
+```
+
+**Quick build for Matrix (NVIDIA H100):**
+```
+cmake -DENABLE_GPU=ON -DENABLE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=90 .. && make -j8
+```
+
+**Quick build for Tuolumne (AMD MI300A):**
+```
+cmake -DENABLE_GPU=ON -DENABLE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx942 .. && make -j8
+```
+
 If successful, the executable will be at `build/src/PIAFS-<compiler>-<mpi/serial>` (e.g., `PIAFS-gcc-mpi`).
 
 The binary name includes:
@@ -75,9 +101,11 @@ The binary name includes:
 - OpenMP suffix if enabled (e.g., `-omp`)
 - Build type suffix for non-Release builds (e.g., `-debug`)
 
-For detailed CMake build instructions and options, see [BUILD_CMAKE.md](BUILD_CMAKE.md).
+For detailed CMake build instructions, GPU support, and machine-specific examples, see `doc/CMake_Build.md`.
 
 ### Option 2: Autotools Build
+
+**Note:** Autotools builds do **not** support GPU acceleration (CUDA/HIP). For GPU support, use the CMake build system.
 
 After downloading or cloning the code, do the following:
 

@@ -36,7 +36,6 @@ int TimePrintStep(void *ts /*!< Object of type #TimeIntegration */)
 
     /* calculate and print conservation error */
     if (!strcmp(sim[0].solver.ConservationCheck,"yes")) {
-
       double error = 0;
       for  (ns = 0; ns < nsims; ns++) {
         int v;
@@ -46,11 +45,8 @@ int TimePrintStep(void *ts /*!< Object of type #TimeIntegration */)
       }
       error = sqrt(error);
       printf("  cons_err=%1.4E\n", error);
-
     } else {
-
       if (nsims == 1) printf("\n");
-
     }
 
     /* print physics-specific info, if available */

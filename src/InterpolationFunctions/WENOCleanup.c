@@ -7,6 +7,9 @@
 #include <interpolation.h>
 #include <mpivars.h>
 #include <hypar.h>
+#if defined(GPU_CUDA) || defined(GPU_HIP)
+#include <gpu.h>
+#endif
 
 /*!
     Cleans up all allocations related to the WENO-type methods.
@@ -19,6 +22,11 @@ int WENOCleanup(void *s /*!< WENO object of type #WENOParameters */)
   if (weno->w1) free(weno->w1);
   if (weno->w2) free(weno->w2);
   if (weno->w3) free(weno->w3);
+#if defined(GPU_CUDA) || defined(GPU_HIP)
+  if (weno->w1_gpu) GPUFree(weno->w1_gpu);
+  if (weno->w2_gpu) GPUFree(weno->w2_gpu);
+  if (weno->w3_gpu) GPUFree(weno->w3_gpu);
+#endif
 
   return(0);
 }

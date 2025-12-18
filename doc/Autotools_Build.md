@@ -10,6 +10,8 @@ PIAFS uses the GNU Autotools build system (autoconf/automake) as its traditional
 - Automatic dependency detection
 - Well-established build patterns
 
+**Important:** Autotools builds do **not** support GPU acceleration (CUDA/HIP). For GPU support, use the CMake build system (see \ref cmake_build "Building PIAFS with CMake").
+
 ## Quick Start
 
 ### Default Build (with MPI)
@@ -275,11 +277,12 @@ make install
 | Parallel builds | `make -jN` | `make -jN` |
 | Testing | `make check` | `make test` or `ctest` |
 | MPI executor | `--with-mpiexec=srun` | `-DMPIEXEC=srun` |
+| GPU support (CUDA/HIP) | **Not supported** | **Supported** |
 | Clean build | `make distclean` | `rm -rf build` |
 | IDE integration | Limited | Excellent |
 | Cross-platform | Unix-like | All platforms |
 
-For CMake build instructions, see \ref cmake_build "Building PIAFS with CMake".
+**For GPU-accelerated builds (CUDA/HIP), you must use CMake.** See \ref cmake_build "Building PIAFS with CMake".
 
 ## Advanced Configuration
 
@@ -323,26 +326,41 @@ For general autotools documentation:
 
 ## Startup Information
 
-When PIAFS starts, it displays detailed build information:
+When PIAFS starts, it displays build configuration and system information:
 
+**Serial mode:**
+```
+================================================================================
+PIAFS - Serial Version
+  Version: 0.1
+  Git Hash: abc1234 (branch: main)
+  Build Date: 2024-01-15 10:30:45
+  Build Type: Release
+  MPI Mode: serial
+  OpenMP: enabled
+================================================================================
+```
+
+**MPI parallel mode:**
 ```
 ================================================================================
 PIAFS - Parallel (MPI) version with 64 processes
   Version: 0.1
   Git Hash: abc1234 (branch: main)
   Build Date: 2024-01-15 10:30:45
-  Compiler: gcc 9.4.0
-  MPI: parallel 4.0.0
   Build Type: Release
   OpenMP: enabled
 ================================================================================
 ```
 
 This information helps identify:
-- Which version of the code is running
-- Build configuration (compiler, MPI, OpenMP)
-- Git commit information for reproducibility
+- Execution mode (serial vs MPI parallel)
+- Number of MPI processes
+- Version and git commit for reproducibility
+- Build configuration (OpenMP status)
+
+**Note:** GPU information is not displayed in Autotools builds as GPU support is only available through CMake.
 
 For PIAFS-specific information:
 - See README.md for project overview
-- See \ref cmake_build for CMake build alternative
+- See \ref cmake_build for CMake build alternative (includes GPU support)

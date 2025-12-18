@@ -199,6 +199,11 @@ typedef struct parameters_weno {
   double *w1, /*!< Array to save the first WENO weight */
          *w2, /*!< Array to save the second WENO weight */
          *w3;/*!< Array to save the third WENO weight */
+
+  /* Optional device-resident copies of WENO weights (GPU runs) */
+  double *w1_gpu,
+         *w2_gpu,
+         *w3_gpu;
   /* size and offset for the WENO weights arrays */
   int *offset /*! Array containing the offset information for the WENO weights */,
       size /*! Size of the WENO weights array */;

@@ -157,6 +157,10 @@ if test "x$enable_omp" = "xyes"; then
   PIAFS_NAME_SUFFIX="${PIAFS_NAME_SUFFIX}-omp"
 fi
 
+dnl Add GPU info (autotools doesn't currently support GPU, but add for consistency)
+dnl This would need to be set based on configure options if GPU support is added
+dnl For now, leave empty - can be extended later
+
 AC_SUBST(PIAFS_NAME_SUFFIX)
 
 dnl Get git information

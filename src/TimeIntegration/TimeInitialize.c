@@ -10,6 +10,17 @@
 #include <arrayfunctions.h>
 #include <simulation_object.h>
 #include <timeintegration.h>
+#ifdef GPU_CUDA
+#include <gpu.h>
+#include <gpu_runtime.h>
+#include <gpu_time_integration.h>
+#include <gpu_arrayfunctions.h>
+#elif defined(GPU_HIP)
+#include <gpu.h>
+#include <gpu_runtime.h>
+#include <gpu_time_integration.h>
+#include <gpu_arrayfunctions.h>
+#endif
 
 int TimeRHSFunctionExplicit(double*,double*,void*,void*,double);
 
@@ -61,10 +72,52 @@ int TimeInitialize( void  *s,     /*!< Array of simulation objects of type #Simu
     TS->u_size_total += TS->u_sizes[ns];
   }
 
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    /* Allocate on GPU */
+    if (GPUAllocate((void**)&TS->u, TS->u_size_total * sizeof(double))) {
+      fprintf(stderr, "Error: Failed to allocate TS->u on GPU\n");
+      return 1;
+    }
+    if (GPUAllocate((void**)&TS->rhs, TS->u_size_total * sizeof(double))) {
+      fprintf(stderr, "Error: Failed to allocate TS->rhs on GPU\n");
+      GPUFree(TS->u);
+      return 1;
+    }
+    GPUArraySetValue(TS->u, 0.0, TS->u_size_total);
+    GPUArraySetValue(TS->rhs, 0.0, TS->u_size_total);
+  } else {
+    TS->u   = (double*) calloc (TS->u_size_total,sizeof(double));
+    TS->rhs = (double*) calloc (TS->u_size_total,sizeof(double));
+    _ArraySetValue_(TS->u  ,TS->u_size_total,0.0);
+    _ArraySetValue_(TS->rhs,TS->u_size_total,0.0);
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    /* Allocate on GPU */
+    if (GPUAllocate((void**)&TS->u, TS->u_size_total * sizeof(double))) {
+      fprintf(stderr, "Error: Failed to allocate TS->u on GPU\n");
+      return 1;
+    }
+    if (GPUAllocate((void**)&TS->rhs, TS->u_size_total * sizeof(double))) {
+      fprintf(stderr, "Error: Failed to allocate TS->rhs on GPU\n");
+      GPUFree(TS->u);
+      return 1;
+    }
+    GPUArraySetValue(TS->u, 0.0, TS->u_size_total);
+    GPUArraySetValue(TS->rhs, 0.0, TS->u_size_total);
+  } else {
+    TS->u   = (double*) calloc (TS->u_size_total,sizeof(double));
+    TS->rhs = (double*) calloc (TS->u_size_total,sizeof(double));
+    _ArraySetValue_(TS->u  ,TS->u_size_total,0.0);
+    _ArraySetValue_(TS->rhs,TS->u_size_total,0.0);
+  }
+#else
   TS->u   = (double*) calloc (TS->u_size_total,sizeof(double));
   TS->rhs = (double*) calloc (TS->u_size_total,sizeof(double));
   _ArraySetValue_(TS->u  ,TS->u_size_total,0.0);
   _ArraySetValue_(TS->rhs,TS->u_size_total,0.0);
+#endif
 
   /* initialize arrays to NULL, then allocate as necessary */
   TS->U             = NULL;
@@ -87,10 +140,76 @@ int TimeInitialize( void  *s,     /*!< Array of simulation objects of type #Simu
     int nstages = params->nstages;
     TS->U     = (double**) calloc (nstages,sizeof(double*));
     TS->Udot  = (double**) calloc (nstages,sizeof(double*));
+#ifdef GPU_CUDA
+    if (GPUShouldUse()) {
+      /* Allocate stage arrays on GPU */
+      for (i = 0; i < nstages; i++) {
+        if (GPUAllocate((void**)&TS->U[i], TS->u_size_total * sizeof(double))) {
+          fprintf(stderr, "Error: Failed to allocate TS->U[%d] on GPU\n", i);
+          /* Free already allocated arrays */
+          for (int j = 0; j < i; j++) {
+            GPUFree(TS->U[j]);
+            GPUFree(TS->Udot[j]);
+          }
+          return 1;
+        }
+        if (GPUAllocate((void**)&TS->Udot[i], TS->u_size_total * sizeof(double))) {
+          fprintf(stderr, "Error: Failed to allocate TS->Udot[%d] on GPU\n", i);
+          GPUFree(TS->U[i]);
+          /* Free already allocated arrays */
+          for (int j = 0; j < i; j++) {
+            GPUFree(TS->U[j]);
+            GPUFree(TS->Udot[j]);
+          }
+          return 1;
+        }
+        GPUArraySetValue(TS->U[i], 0.0, TS->u_size_total);
+        GPUArraySetValue(TS->Udot[i], 0.0, TS->u_size_total);
+      }
+    } else {
+      for (i = 0; i < nstages; i++) {
+        TS->U[i]    = (double*) calloc (TS->u_size_total,sizeof(double));
+        TS->Udot[i] = (double*) calloc (TS->u_size_total,sizeof(double));
+      }
+    }
+#elif defined(GPU_HIP)
+    if (GPUShouldUse()) {
+      /* Allocate stage arrays on GPU */
+      for (i = 0; i < nstages; i++) {
+        if (GPUAllocate((void**)&TS->U[i], TS->u_size_total * sizeof(double))) {
+          fprintf(stderr, "Error: Failed to allocate TS->U[%d] on GPU\n", i);
+          /* Free already allocated arrays */
+          for (int j = 0; j < i; j++) {
+            GPUFree(TS->U[j]);
+            GPUFree(TS->Udot[j]);
+          }
+          return 1;
+        }
+        if (GPUAllocate((void**)&TS->Udot[i], TS->u_size_total * sizeof(double))) {
+          fprintf(stderr, "Error: Failed to allocate TS->Udot[%d] on GPU\n", i);
+          GPUFree(TS->U[i]);
+          /* Free already allocated arrays */
+          for (int j = 0; j < i; j++) {
+            GPUFree(TS->U[j]);
+            GPUFree(TS->Udot[j]);
+          }
+          return 1;
+        }
+        GPUArraySetValue(TS->U[i], 0.0, TS->u_size_total);
+        GPUArraySetValue(TS->Udot[i], 0.0, TS->u_size_total);
+      }
+    } else {
+      for (i = 0; i < nstages; i++) {
+        TS->U[i]    = (double*) calloc (TS->u_size_total,sizeof(double));
+        TS->Udot[i] = (double*) calloc (TS->u_size_total,sizeof(double));
+      }
+    }
+#else
     for (i = 0; i < nstages; i++) {
       TS->U[i]    = (double*) calloc (TS->u_size_total,sizeof(double));
       TS->Udot[i] = (double*) calloc (TS->u_size_total,sizeof(double));
     }
+#endif
 
     TS->BoundaryFlux = (double**) calloc (nstages,sizeof(double*));
     for (i=0; i<nstages; i++) {
@@ -108,7 +227,21 @@ int TimeInitialize( void  *s,     /*!< Array of simulation objects of type #Simu
   }
 
   /* set right-hand side function pointer */
+#ifdef GPU_CUDA
+  if (GPUShouldUse()) {
+    TS->RHSFunction = GPUTimeRHSFunctionExplicit;
+  } else {
+    TS->RHSFunction = TimeRHSFunctionExplicit;
+  }
+#elif defined(GPU_HIP)
+  if (GPUShouldUse()) {
+    TS->RHSFunction = GPUTimeRHSFunctionExplicit;
+  } else {
+    TS->RHSFunction = TimeRHSFunctionExplicit;
+  }
+#else
   TS->RHSFunction = TimeRHSFunctionExplicit;
+#endif
 
   /* open files for writing */
   if (!rank) {

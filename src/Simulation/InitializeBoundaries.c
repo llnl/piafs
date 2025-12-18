@@ -12,6 +12,13 @@
 #include <boundaryconditions.h>
 #include <mpivars.h>
 #include <simulation_object.h>
+#ifdef GPU_CUDA
+#include <gpu.h>
+#include <gpu_runtime.h>
+#elif defined(GPU_HIP)
+#include <gpu.h>
+#include <gpu_runtime.h>
+#endif
 
 static int CalculateLocalExtent(void*,void*);
 
@@ -274,6 +281,7 @@ int InitializeBoundaries( void  *s,   /*!< Array of simulation objects of type #
     solver->boundary = boundary;
 
     /* each process calculates its own part of these boundaries */
+    /* CalculateLocalExtent accesses solver->x - x is always on host */
     IERR CalculateLocalExtent(solver,mpi); CHECKERR(ierr);
 
     /* initialize function pointers for each boundary condition */

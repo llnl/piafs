@@ -3,6 +3,7 @@
     @author Debojyoti Ghosh
 */
 
+#include <stdio.h>
 #include <basic.h>
 #include <arrayfunctions.h>
 #include <simulation_object.h>
@@ -26,10 +27,14 @@ int TimeForwardEuler(
                       void *ts /*!< Time integrator object of type #TimeIntegration */
                     )
 {
+  
   TimeIntegration* TS = (TimeIntegration*) ts;
+  
   SimulationObject* sim = (SimulationObject*) TS->simulation;
+  
   int ns, nsims = TS->nsims;
   _DECLARE_IERR_;
+  
 
   for (ns = 0; ns < nsims; ns++) {
 
