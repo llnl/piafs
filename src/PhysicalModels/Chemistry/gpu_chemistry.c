@@ -17,10 +17,9 @@ int ChemistrySetPhotonDensity(void*, void*, void*, double*, double);
 
 /* GPU pointers for chemistry arrays */
 static double *nv_hnu_gpu = NULL;
-static double *nv_hnu_host = NULL;  // Host backup of nv_hnu for ChemistrySetPhotonDensity
-static double *u_host = NULL;
+static double *imap_gpu = NULL;
 static int nv_hnu_size = 0;
-static int u_host_size = 0;
+static int imap_size = 0;
 
 /*! Allocate GPU memory for chemistry arrays */
 int GPUChemistryAllocate(void* a_p, int npoints_total, int nz)
@@ -28,10 +27,7 @@ int GPUChemistryAllocate(void* a_p, int npoints_total, int nz)
   Chemistry *chem = (Chemistry*) a_p;
 
   nv_hnu_size = npoints_total * nz;
-  
-  // Keep the original CPU pointer (already allocated in ChemistryInitialize)
-  // DO NOT replace chem->nv_hnu - keep it as host pointer for CPU operations
-  nv_hnu_host = chem->nv_hnu;
+  imap_size = npoints_total;
   
   // Allocate GPU memory for nv_hnu
   if (GPUAllocate((void**)&nv_hnu_gpu, nv_hnu_size * sizeof(double))) {
@@ -46,17 +42,22 @@ int GPUChemistryAllocate(void* a_p, int npoints_total, int nz)
     return 1;
   }
   
-  // Allocate host memory for U array (for ChemistrySetPhotonDensity)
-  u_host_size = chem->grid_stride * npoints_total;
-  u_host = (double*) malloc(u_host_size * sizeof(double));
-  if (!u_host) {
-    fprintf(stderr, "Error: Failed to allocate host memory for U array\n");
+  // Allocate GPU memory for imap and copy from host
+  if (GPUAllocate((void**)&imap_gpu, imap_size * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to allocate GPU memory for imap\n");
     GPUFree(nv_hnu_gpu);
     return 1;
   }
   
-  // Keep chem->nv_hnu pointing to host memory - do NOT replace with GPU pointer
-  // The GPU pointer will be used internally in GPUChemistrySource
+  if (GPUCopyToDevice(imap_gpu, chem->imap, imap_size * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to copy imap to GPU\n");
+    GPUFree(nv_hnu_gpu);
+    GPUFree(imap_gpu);
+    return 1;
+  }
+  
+  // Keep chem->nv_hnu pointing to host memory (already allocated in ChemistryInitialize)
+  // The GPU pointers (nv_hnu_gpu, imap_gpu) will be used internally in GPU functions
   
   return 0;
 }
@@ -72,20 +73,16 @@ int GPUChemistryFree(void* a_p)
     nv_hnu_gpu = NULL;
   }
   
-  // Free host U array
-  if (u_host) {
-    free(u_host);
-    u_host = NULL;
+  if (imap_gpu) {
+    GPUFree(imap_gpu);
+    imap_gpu = NULL;
   }
   
-  // nv_hnu_host is just a pointer backup - don't free it!
-  // The actual memory is owned by chem->nv_hnu and will be freed in ChemistryCleanup
-  nv_hnu_host = NULL;
-  
   // Keep chem->nv_hnu pointing to host memory (don't set to NULL)
+  // The actual memory will be freed in ChemistryCleanup
   
   nv_hnu_size = 0;
-  u_host_size = 0;
+  imap_size = 0;
   
   return 0;
 }
@@ -107,32 +104,21 @@ int GPUChemistrySource(
   int npoints = solver->npoints_local_wghosts;
 
   /* Validate that GPU memory was properly allocated */
-  if (!nv_hnu_gpu || !u_host || nv_hnu_size <= 0 || u_host_size <= 0) {
+  if (!nv_hnu_gpu || nv_hnu_size <= 0) {
     fprintf(stderr, "Error: GPUChemistrySource called but GPU memory not allocated!\n");
-    fprintf(stderr, "  nv_hnu_gpu=%p, u_host=%p, nv_hnu_size=%d, u_host_size=%d\n",
-            (void*)nv_hnu_gpu, (void*)u_host, nv_hnu_size, u_host_size);
+    fprintf(stderr, "  nv_hnu_gpu=%p, nv_hnu_size=%d\n",
+            (void*)nv_hnu_gpu, nv_hnu_size);
     fprintf(stderr, "  Make sure GPUChemistryAllocate was called during initialization.\n");
     return 1;
   }
 
-  // Step 1: Copy U from GPU to host for ChemistrySetPhotonDensity
-  if (GPUCopyToHost(u_host, a_U, u_host_size * sizeof(double))) {
-    fprintf(stderr, "Error: Failed to copy U from GPU to host\n");
+  // Step 1: Compute photon density on GPU
+  if (GPUChemistrySetPhotonDensity(solver, chem, mpi, a_U, a_t)) {
+    fprintf(stderr, "Error: GPUChemistrySetPhotonDensity failed\n");
     return 1;
   }
   
-  // Step 2: Compute photon density on CPU (requires MPI communication)
-  // chem->nv_hnu already points to host memory (nv_hnu_host), so just call directly
-  ChemistrySetPhotonDensity(solver, chem, mpi, u_host, a_t);
-  
-  // Step 3: Copy nv_hnu from host to GPU
-  // nv_hnu_host and chem->nv_hnu point to the same memory
-  if (GPUCopyToDevice(nv_hnu_gpu, chem->nv_hnu, nv_hnu_size * sizeof(double))) {
-    fprintf(stderr, "Error: Failed to copy nv_hnu from host to GPU\n");
-    return 1;
-  }
-  
-  // Step 4: Launch GPU kernel to compute chemistry sources
+  // Step 2: Launch GPU kernel to compute chemistry sources
   double gamma_m1_inv = 1.0 / (chem->gamma - 1.0);
   
   gpu_launch_chemistry_source(
@@ -140,6 +126,8 @@ int GPUChemistrySource(
     npoints, solver->nvars, chem->n_flow_vars,
     chem->grid_stride, chem->z_stride, chem->z_i,
     solver->ndims,
+    solver->dim_local[0], solver->dim_local[1], solver->dim_local[2],
+    solver->ghosts,
     chem->k0a_norm, chem->k0b_norm, chem->k1a_norm, chem->k1b_norm,
     chem->k2a_norm, chem->k2b_norm, chem->k3a_norm, chem->k3b_norm,
     chem->k4_norm, chem->k5_norm, chem->k6_norm,
@@ -150,11 +138,165 @@ int GPUChemistrySource(
     256  // block size
   );
   
-  fflush(stderr);
-  
   if (GPUShouldSyncEveryOp()) GPUSync();
+
+  return 0;
+}
+
+/*! GPU-enabled set photon density function */
+int GPUChemistrySetPhotonDensity(
+  void*   a_s,  /*!< Solver object of type #HyPar */
+  void*   a_p,  /*!< Object of type #Chemistry */
+  void*   a_m,  /*!< MPI object of type #MPIVariables */
+  double* a_U,  /*!< Solution array (on GPU) */
+  double  a_t   /*!< Current simulation time */
+)
+{
+  HyPar        *solver = (HyPar*)        a_s;
+  MPIVariables *mpi    = (MPIVariables*) a_m;
+  Chemistry    *chem   = (Chemistry*)    a_p;
+
+  int *dim    = solver->dim_local;
+  int ghosts  = solver->ghosts;
+  int npoints = solver->npoints_local_wghosts;
+
+  /* Validate that GPU memory was properly allocated */
+  if (!nv_hnu_gpu || !imap_gpu || nv_hnu_size <= 0 || imap_size <= 0) {
+    fprintf(stderr, "Error: GPUChemistrySetPhotonDensity called but GPU memory not allocated!\n");
+    fprintf(stderr, "  nv_hnu_gpu=%p, imap_gpu=%p, nv_hnu_size=%d, imap_size=%d\n",
+            (void*)nv_hnu_gpu, (void*)imap_gpu, nv_hnu_size, imap_size);
+    return 1;
+  }
+
+  // imap_gpu is already on GPU (allocated and copied in GPUChemistryAllocate)
+
+  if (solver->ndims == 3) {
+    // 3D case: Sequential processing of k-layers with MPI synchronization
+    
+    int imax = dim[0], jmax = dim[1], kmax = dim[2];
+    int my_rank_z = mpi->ip[_ZDIR_];
+    int num_rank_z = mpi->iproc[_ZDIR_];
+    int first_rank_z = (mpi->ip[_ZDIR_] == 0 ? 1 : 0);
+
+    int *meow = (int*) calloc(num_rank_z, sizeof(int));
+    if (!meow) {
+      fprintf(stderr, "Error: Failed to allocate meow array\n");
+      return 1;
+    }
+
+    // Allocate host memory for nv_hnu boundary exchange (only if needed)
+    double *nv_hnu_host_temp = NULL;
+    if (num_rank_z > 1) {
+      nv_hnu_host_temp = (double*) malloc(npoints * sizeof(double));
+      if (!nv_hnu_host_temp) {
+        fprintf(stderr, "Error: Failed to allocate host temp memory\n");
+        free(meow);
+        return 1;
+      }
+    }
+
+    while (!meow[num_rank_z-1]) {
+
+      int go = (first_rank_z ? 1 : meow[my_rank_z-1]);
+
+      if (go && (!meow[my_rank_z])) {
+        
+        // First layer (k=0) for first rank in z
+        if (first_rank_z) {
+          gpu_launch_chemistry_photon_density_3d_first_layer(
+            nv_hnu_gpu, imap_gpu, imax, jmax,
+            dim[0], dim[1], dim[2], ghosts,
+            chem->I0, chem->c, chem->h, chem->nu, chem->n_O2,
+            chem->t_pulse_norm, chem->t_start_norm,
+            a_t,
+            16  // block size for 2D grid
+          );
+          GPUSync();
+        }
+        
+        // Subsequent layers (k > 0)
+        int kstart = (first_rank_z ? 1 : 0);
+        for (int k = kstart; k < kmax; k++) {
+          gpu_launch_chemistry_photon_density_3d_next_layer(
+            nv_hnu_gpu, a_U, imax, jmax, k,
+            dim[0], dim[1], dim[2], ghosts,
+            chem->grid_stride, chem->n_flow_vars,
+            chem->sO3, chem->n_O2, chem->dz,
+            16  // block size for 2D grid
+          );
+          GPUSync();
+        }
+        
+        meow[my_rank_z] = 1;
+      }
+
+      // Only do MPI exchange if there are multiple ranks in z
+      if (num_rank_z > 1) {
+        // Copy nv_hnu from GPU to host for MPI exchange
+        if (GPUCopyToHost(nv_hnu_host_temp, nv_hnu_gpu, npoints * sizeof(double))) {
+          fprintf(stderr, "Error: Failed to copy nv_hnu from GPU to host\n");
+          free(nv_hnu_host_temp);
+          free(meow);
+          return 1;
+        }
+        GPUSync();
+
+        // MPI boundary exchange on host
+        MPIExchangeBoundariesnD(solver->ndims, 1, dim, ghosts, mpi, nv_hnu_host_temp);
+        
+        // Copy back to GPU after exchange
+        if (GPUCopyToDevice(nv_hnu_gpu, nv_hnu_host_temp, npoints * sizeof(double))) {
+          fprintf(stderr, "Error: Failed to copy nv_hnu from host to GPU\n");
+          free(nv_hnu_host_temp);
+          free(meow);
+          return 1;
+        }
+      }
+      
+      // Synchronize meow array across all ranks
+      MPIMax_integer(meow, meow, num_rank_z, &mpi->world);
+    }
+
+    if (nv_hnu_host_temp) free(nv_hnu_host_temp);
+    free(meow);
+
+  } else {
+    // 1D/2D case: Each grid point processes its z-stack independently
+    
+    int nz = chem->z_i + 1;
+    
+    gpu_launch_chemistry_photon_density_1d2d(
+      nv_hnu_gpu, a_U, imap_gpu,
+      npoints, chem->grid_stride, chem->z_stride, chem->n_flow_vars, nz,
+      chem->I0, chem->c, chem->h, chem->nu, chem->n_O2,
+      chem->t_pulse_norm, chem->t_start_norm, chem->sO3, chem->dz,
+      a_t,
+      256  // block size
+    );
+    GPUSync();
+  }
   
-  fflush(stderr);
+  // nv_hnu stays on GPU - no need to copy back to host
+  // It will be used directly by gpu_launch_chemistry_source
+  // Use GPUChemistryCopyPhotonDensityToHost() when host access is needed
+
+  return 0;
+}
+
+/*! Copy nv_hnu from GPU to host for output/diagnostics */
+int GPUChemistryCopyPhotonDensityToHost(void* a_p)
+{
+  Chemistry *chem = (Chemistry*) a_p;
+  
+  if (!nv_hnu_gpu || nv_hnu_size <= 0) {
+    // GPU not enabled or not allocated
+    return 0;
+  }
+  
+  if (GPUCopyToHost(chem->nv_hnu, nv_hnu_gpu, nv_hnu_size * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to copy nv_hnu from GPU to host\n");
+    return 1;
+  }
   
   return 0;
 }

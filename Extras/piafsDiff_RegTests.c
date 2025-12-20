@@ -438,6 +438,8 @@ int main(int argc, char** argv)
   ierr = readBinaryFile(ref_fname, &reference);
   if (ierr) return ierr;
 
+  int flag_ok = 1;
+
   if (sameSize(&solution, &reference)) {
 
     double diff_norm_abs[3];
@@ -448,7 +450,6 @@ int main(int argc, char** argv)
                             diff_norm_rel );
     if (ierr) return ierr;
 
-    int flag_ok = 1;
     if (diff_norm_rel[0] > rel_tol) flag_ok = 0;
     if (diff_norm_rel[1] > rel_tol) flag_ok = 0;
 
@@ -470,6 +471,7 @@ int main(int argc, char** argv)
 
     printf( "%s and %s differ in size.\n",
             sol_fname, ref_fname );
+    flag_ok = 0;
 
   }
 
@@ -477,5 +479,5 @@ int main(int argc, char** argv)
   deleteSolObj(&solution);
   deleteSolObj(&reference);
 
-  return 0;
+  return (flag_ok ? 0 : 1);
 }

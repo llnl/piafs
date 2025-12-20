@@ -841,35 +841,32 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_char_kernel(
       }
     }
     
-    /* Compute Roe-averaged state at interface using unified dispatch */
-    /* Use fixed-size arrays - max nvars typically 10 or less */
-    double uavg[10]; /* Support up to 10 variables */
-    if (nvars > 10) {
-      /* This shouldn't happen for typical cases, but handle it */
-      return;
-    }
-    gpu_roe_average(uavg, u + qL*nvars, u + qR*nvars, nvars, ndims, gamma);
+    /* Determine base number of variables from ndims: 1D=3, 2D=4, 3D=5 */
+    const int base_nvars = ndims + 2;
     
-    /* Get left and right eigenvectors at averaged state using unified dispatch */
-    double L[10*10]; /* Support up to 10 variables */
-    double R[10*10]; /* Support up to 10 variables */
-    gpu_left_eigenvectors(uavg, L, gamma, nvars, ndims, dir);
-    gpu_right_eigenvectors(uavg, R, gamma, nvars, ndims, dir);
+    /* Compute Roe-averaged state at interface for base variables only */
+    double uavg[5];  /* max base_nvars = 5 */
+    gpu_roe_average(uavg, u + qL*nvars, u + qR*nvars, base_nvars, ndims, gamma);
+    
+    /* Get left and right eigenvectors at averaged state for base variables only */
+    double L[25], R[25];  /* max 5x5 */
+    gpu_left_eigenvectors(uavg, L, gamma, base_nvars, ndims, dir);
+    gpu_right_eigenvectors(uavg, R, gamma, base_nvars, ndims, dir);
     
     /* Candidate stencils */
     static const double one_sixth = 1.0/6.0;
     
-    /* For each characteristic field */
-    double fchar[10]; /* Support up to 10 variables */
-    for (int v = 0; v < nvars; v++) {
+    /* Characteristic decomposition for base flow variables */
+    double fchar[5];  /* max base_nvars = 5 */
+    for (int v = 0; v < base_nvars; v++) {
       /* Transform flux to characteristic space */
       double fm3 = 0.0, fm2 = 0.0, fm1 = 0.0, fp1 = 0.0, fp2 = 0.0;
-      for (int k = 0; k < nvars; k++) {
-        fm3 += L[v*nvars+k] * fC[qm3*nvars+k];
-        fm2 += L[v*nvars+k] * fC[qm2*nvars+k];
-        fm1 += L[v*nvars+k] * fC[qm1*nvars+k];
-        fp1 += L[v*nvars+k] * fC[qp1*nvars+k];
-        fp2 += L[v*nvars+k] * fC[qp2*nvars+k];
+      for (int k = 0; k < base_nvars; k++) {
+        fm3 += L[v*base_nvars+k] * fC[qm3*nvars+k];
+        fm2 += L[v*base_nvars+k] * fC[qm2*nvars+k];
+        fm1 += L[v*base_nvars+k] * fC[qm1*nvars+k];
+        fp1 += L[v*base_nvars+k] * fC[qp1*nvars+k];
+        fp2 += L[v*base_nvars+k] * fC[qp2*nvars+k];
       }
       
       /* Candidate stencils */
@@ -886,8 +883,37 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_char_kernel(
       fchar[v] = w1_val*f1 + w2_val*f2 + w3_val*f3;
     }
     
-    /* Transform back to physical space */
-    gpu_matvecmult(nvars, fI + p*nvars, R, fchar);
+    /* Transform back to physical space for base variables */
+    for (int k = 0; k < base_nvars; k++) {
+      double s = 0.0;
+      for (int v = 0; v < base_nvars; v++) {
+        s += R[k*base_nvars + v] * fchar[v];
+      }
+      fI[p*nvars + k] = s;
+    }
+    
+    /* Component-wise WENO5 for passive scalars (chemistry variables) */
+    for (int k = base_nvars; k < nvars; k++) {
+      /* Get stencil values */
+      double fm3 = fC[qm3*nvars + k];
+      double fm2 = fC[qm2*nvars + k];
+      double fm1 = fC[qm1*nvars + k];
+      double fp1 = fC[qp1*nvars + k];
+      double fp2 = fC[qp2*nvars + k];
+      
+      /* Candidate stencils */
+      double f1 = (2*one_sixth)*fm3 + (-7*one_sixth)*fm2 + (11*one_sixth)*fm1;
+      double f2 = (-one_sixth)*fm2 + (5*one_sixth)*fm1 + (2*one_sixth)*fp1;
+      double f3 = (2*one_sixth)*fm1 + (5*one_sixth)*fp1 + (-one_sixth)*fp2;
+      
+      /* WENO weights */
+      double w1_val = w1[p*nvars+k];
+      double w2_val = w2[p*nvars+k];
+      double w3_val = w3[p*nvars+k];
+      
+      /* Fifth order WENO approximation */
+      fI[p*nvars + k] = w1_val*f1 + w2_val*f2 + w3_val*f3;
+    }
   }
 }
 

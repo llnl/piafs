@@ -24,6 +24,7 @@ int GPUNavierStokes2DParabolicFunction(double *par, double *u, void *s, void *m,
   int *dim = solver->dim_local;
   int size = solver->npoints_local_wghosts;
 
+
   if (GPUShouldUse()) {
     GPUArraySetValue(par, 0.0, size * nvars);
     if (physics->Re <= 0) { return 0; }
@@ -39,14 +40,22 @@ int GPUNavierStokes2DParabolicFunction(double *par, double *u, void *s, void *m,
     if (GPUAllocate((void**)&QDerivY, size * nvars * sizeof(double))) { GPUFree(Q); GPUFree(QDerivX); return 1; }
     if (GPUAllocate((void**)&FViscous, size * nvars * sizeof(double))) { GPUFree(Q); GPUFree(QDerivX); GPUFree(QDerivY); return 1; }
     if (GPUAllocate((void**)&FDeriv, size * nvars * sizeof(double))) { GPUFree(Q); GPUFree(QDerivX); GPUFree(QDerivY); GPUFree(FViscous); return 1; }
+    
+    /* Initialize derivative arrays to zero - GPUAllocate does not zero-initialize memory */
+    GPUMemset(QDerivX, 0, size * nvars * sizeof(double));
+    GPUMemset(QDerivY, 0, size * nvars * sizeof(double));
+    GPUMemset(FViscous, 0, size * nvars * sizeof(double));
+    GPUMemset(FDeriv, 0, size * nvars * sizeof(double));
 
     gpu_launch_ns2d_get_primitive(Q, u, nvars, size, physics->gamma, 256);
     if (GPUShouldSyncEveryOp()) GPUSync();
 
     solver->FirstDerivativePar(QDerivX, Q, _XDIR_, 1, solver, mpi);
     solver->FirstDerivativePar(QDerivY, Q, _YDIR_, 1, solver, mpi);
+    
     GPUMPIExchangeBoundariesnD(solver->ndims, solver->nvars, dim, solver->ghosts, mpi, QDerivX);
     GPUMPIExchangeBoundariesnD(solver->ndims, solver->nvars, dim, solver->ghosts, mpi, QDerivY);
+    GPUSync(); // Ensure MPI exchange is complete before proceeding
 
     int *dim_gpu = NULL, *stride_gpu = NULL;
     if (GPUAllocate((void**)&dim_gpu, solver->ndims * sizeof(int))) {

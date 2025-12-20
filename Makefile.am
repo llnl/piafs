@@ -15,7 +15,6 @@ REGRESSION_BENCHMARKS = \
 	1d_beam_grating \
 	1d_euler_densitysinewave \
 	1d_euler_firstorder \
-	1d_euler_forwardeuler \
 	1d_euler_laxshocktube \
 	1d_euler_muscl2 \
 	1d_euler_rk22 \

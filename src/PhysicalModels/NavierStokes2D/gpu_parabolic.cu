@@ -60,7 +60,7 @@ GPU_KERNEL void gpu_ns2d_viscous_flux_x_kernel(
     double T_d = T * Tref;
     double mu = exp(1.5 * log(T_d / T0)) * (T0 + TS) / (T_d + TS);
     double kappa = exp(1.5 * log(T_d / T0)) * (T0 + TA * exp(-TB / T0)) / (T_d + TA * exp(-TB / T_d));
-    static const double two_third = 2.0/3.0;
+    const double two_third = 2.0/3.0;
     double tau_xx = two_third * (mu * inv_Re) * (2*ux - vy);
     double tau_xy = (mu * inv_Re) * (uy + vx);
     double qx = (kappa * inv_Re * inv_gamma_m1 * inv_Pr) * Tx;
@@ -91,7 +91,7 @@ GPU_KERNEL void gpu_ns2d_viscous_flux_y_kernel(
     double T_d = T * Tref;
     double mu = exp(1.5 * log(T_d / T0)) * (T0 + TS) / (T_d + TS);
     double kappa = exp(1.5 * log(T_d / T0)) * (T0 + TA * exp(-TB / T0)) / (T_d + TA * exp(-TB / T_d));
-    static const double two_third = 2.0/3.0;
+    const double two_third = 2.0/3.0;
     double tau_yx = (mu * inv_Re) * (uy + vx);
     double tau_yy = two_third * (mu * inv_Re) * (-ux + 2*vy);
     double qy = (kappa * inv_Re * inv_gamma_m1 * inv_Pr) * Ty;

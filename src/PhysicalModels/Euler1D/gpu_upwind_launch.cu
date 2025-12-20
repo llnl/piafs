@@ -1,5 +1,5 @@
 /*! @file gpu_upwind_launch.cu
-    @brief GPU upwind kernel launch wrappers for Euler1D
+    @brief GPU upwind kernel launch wrappers for Euler1D with dynamic workspace allocation
 */
 
 #include <gpu.h>
@@ -10,25 +10,25 @@
 extern GPU_KERNEL void gpu_euler1d_upwind_roe_kernel(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
-  int ghosts, int dir, double gamma
+  int ghosts, int dir, double gamma, double *workspace
 );
 
 extern GPU_KERNEL void gpu_euler1d_upwind_rf_kernel(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
-  int ghosts, int dir, double gamma
+  int ghosts, int dir, double gamma, double *workspace
 );
 
 extern GPU_KERNEL void gpu_euler1d_upwind_llf_kernel(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
-  int ghosts, int dir, double gamma
+  int ghosts, int dir, double gamma, double *workspace
 );
 
 extern GPU_KERNEL void gpu_euler1d_upwind_rusanov_kernel(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
-  int ghosts, int dir, double gamma
+  int ghosts, int dir, double gamma, double *workspace
 );
 
 /* Static device buffers for dimension arrays */
@@ -77,18 +77,33 @@ void gpu_launch_euler1d_upwind_roe(
   GPUCopyToDevice(d_stride_with_ghosts, stride_with_ghosts, ndims * sizeof(int));
   GPUCopyToDevice(d_bounds_inter, bounds_inter, ndims * sizeof(int));
 
-  /* Calculate total number of interface points */
+  /* Calculate total number of interface points and threads */
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) {
     total_interfaces *= bounds_inter[i];
   }
 
-  /* Launch kernel */
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
+  int total_threads = numBlocks * blockSize;
+  
+  /* Allocate workspace for Roe scheme: per thread needs 
+   * 3*nvars (udiff, uavg, udiss) + 5*nvars*nvars (D, L, R, DL, modA) */
+  size_t workspace_per_thread = 3 * nvars + 5 * nvars * nvars;
+  size_t total_workspace = total_threads * workspace_per_thread;
+  double *workspace = NULL;
+  if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to allocate workspace for Roe upwinding\n");
+    return;
+  }
+
+  /* Launch kernel */
   GPU_KERNEL_LAUNCH(gpu_euler1d_upwind_roe_kernel, numBlocks, blockSize)(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
-    ghosts, dir, gamma
+    ghosts, dir, gamma, workspace
   );
+  
+  /* Free workspace */
+  GPUFree(workspace);
 }
 
 void gpu_launch_euler1d_upwind_rf(
@@ -108,10 +123,24 @@ void gpu_launch_euler1d_upwind_rf(
   }
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
+  int total_threads = numBlocks * blockSize;
+  
+  /* Allocate workspace for RF scheme: per thread needs 
+   * 9*nvars (uavg, fcL, fcR, ucL, ucR, fc, eigL, eigC, eigR) + 3*nvars*nvars (L, R, D) */
+  size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
+  size_t total_workspace = total_threads * workspace_per_thread;
+  double *workspace = NULL;
+  if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to allocate workspace for RF upwinding\n");
+    return;
+  }
+
   GPU_KERNEL_LAUNCH(gpu_euler1d_upwind_rf_kernel, numBlocks, blockSize)(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
-    ghosts, dir, gamma
+    ghosts, dir, gamma, workspace
   );
+  
+  GPUFree(workspace);
 }
 
 void gpu_launch_euler1d_upwind_llf(
@@ -131,10 +160,23 @@ void gpu_launch_euler1d_upwind_llf(
   }
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
+  int total_threads = numBlocks * blockSize;
+  
+  /* Allocate workspace for LLF scheme: same as RF */
+  size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
+  size_t total_workspace = total_threads * workspace_per_thread;
+  double *workspace = NULL;
+  if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to allocate workspace for LLF upwinding\n");
+    return;
+  }
+
   GPU_KERNEL_LAUNCH(gpu_euler1d_upwind_llf_kernel, numBlocks, blockSize)(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
-    ghosts, dir, gamma
+    ghosts, dir, gamma, workspace
   );
+  
+  GPUFree(workspace);
 }
 
 void gpu_launch_euler1d_upwind_rusanov(
@@ -154,10 +196,24 @@ void gpu_launch_euler1d_upwind_rusanov(
   }
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
+  int total_threads = numBlocks * blockSize;
+  
+  /* Allocate workspace for Rusanov scheme: per thread needs 
+   * 2*nvars (uavg, udiff) */
+  size_t workspace_per_thread = 2 * nvars;
+  size_t total_workspace = total_threads * workspace_per_thread;
+  double *workspace = NULL;
+  if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to allocate workspace for Rusanov upwinding\n");
+    return;
+  }
+
   GPU_KERNEL_LAUNCH(gpu_euler1d_upwind_rusanov_kernel, numBlocks, blockSize)(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
-    ghosts, dir, gamma
+    ghosts, dir, gamma, workspace
   );
+  
+  GPUFree(workspace);
 }
 
 } /* extern "C" */

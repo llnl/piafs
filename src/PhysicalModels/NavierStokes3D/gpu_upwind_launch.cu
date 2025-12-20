@@ -1,67 +1,102 @@
 /*! @file gpu_upwind_launch.cu
-    @brief GPU upwind kernel launch wrappers
+    @brief GPU upwind kernel launch wrappers for NavierStokes3D with dynamic workspace allocation
 */
 
 #include <gpu.h>
+#include <gpu_runtime.h>
 #include <gpu_upwind.h>
 
-#define DEFAULT_BLOCK_SIZE 256
+/* Kernel declarations */
+extern GPU_KERNEL void gpu_ns3d_upwind_roe_kernel(
+  double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
+  int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, double gamma, double *workspace
+);
+
+extern GPU_KERNEL void gpu_ns3d_upwind_rf_kernel(
+  double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
+  int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, double gamma, double *workspace
+);
+
+extern GPU_KERNEL void gpu_ns3d_upwind_llf_kernel(
+  double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
+  int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, double gamma, double *workspace
+);
+
+extern GPU_KERNEL void gpu_ns3d_upwind_rusanov_kernel(
+  double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
+  int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, double gamma, double *workspace
+);
+
+/* Static device buffers for dimension arrays */
+static int *d_dim = NULL;
+static int *d_stride_with_ghosts = NULL;
+static int *d_bounds_inter = NULL;
+static int d_arrays_capacity = 0;
+
+static int ensure_device_arrays(int ndims) {
+  if (ndims <= d_arrays_capacity) return 0;
+
+  /* Free old buffers */
+  if (d_dim) { GPUFree(d_dim); d_dim = NULL; }
+  if (d_stride_with_ghosts) { GPUFree(d_stride_with_ghosts); d_stride_with_ghosts = NULL; }
+  if (d_bounds_inter) { GPUFree(d_bounds_inter); d_bounds_inter = NULL; }
+
+  /* Allocate new buffers */
+  if (GPUAllocate((void**)&d_dim, ndims * sizeof(int))) return 1;
+  if (GPUAllocate((void**)&d_stride_with_ghosts, ndims * sizeof(int))) {
+    GPUFree(d_dim); d_dim = NULL;
+    return 1;
+  }
+  if (GPUAllocate((void**)&d_bounds_inter, ndims * sizeof(int))) {
+    GPUFree(d_dim); d_dim = NULL;
+    GPUFree(d_stride_with_ghosts); d_stride_with_ghosts = NULL;
+    return 1;
+  }
+
+  d_arrays_capacity = ndims;
+  return 0;
+}
 
 extern "C" {
+
 void gpu_launch_ns3d_upwind_roe(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
   int ghosts, int dir, double gamma, int blockSize
 )
 {
-#ifdef GPU_NONE
-  /* CPU fallback - simplified version */
-  /* Would need full CPU implementation here */
-#else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  
-  /* Copy dim, stride_with_ghosts, and bounds_inter to GPU if needed */
-  int *dim_gpu = NULL;
-  int *stride_gpu = NULL;
-  int *bounds_inter_gpu = NULL;
-  
-  if (GPUAllocate((void**)&dim_gpu, ndims * sizeof(int))) {
-    fprintf(stderr, "Error: Failed to allocate dim_gpu for upwind\n");
-    return;
-  }
-  if (GPUAllocate((void**)&stride_gpu, ndims * sizeof(int))) {
-    fprintf(stderr, "Error: Failed to allocate stride_gpu for upwind\n");
-    GPUFree(dim_gpu);
-    return;
-  }
-  if (GPUAllocate((void**)&bounds_inter_gpu, ndims * sizeof(int))) {
-    fprintf(stderr, "Error: Failed to allocate bounds_inter_gpu for upwind\n");
-    GPUFree(dim_gpu);
-    GPUFree(stride_gpu);
-    return;
-  }
-  
-  GPUCopyToDevice(dim_gpu, dim, ndims * sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims * sizeof(int));
-  GPUCopyToDevice(bounds_inter_gpu, bounds_inter, ndims * sizeof(int));
-  
-  /* Compute total number of interface points */
+  if (ensure_device_arrays(ndims)) return;
+  GPUCopyToDevice(d_dim, dim, ndims * sizeof(int));
+  GPUCopyToDevice(d_stride_with_ghosts, stride_with_ghosts, ndims * sizeof(int));
+  GPUCopyToDevice(d_bounds_inter, bounds_inter, ndims * sizeof(int));
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) {
     total_interfaces *= bounds_inter[i];
   }
+
+  int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
+  int total_threads = numBlocks * blockSize;
   
-  int gridSize = (total_interfaces + blockSize - 1) / blockSize;
-  
-  GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_roe_kernel, gridSize, blockSize)(
-    fI, fL, fR, uL, uR, u, nvars, ndims, dim_gpu, stride_gpu, bounds_inter_gpu, ghosts, dir, gamma
+  /* Allocate workspace for Roe scheme: 3*nvars + 5*nvars*nvars per thread */
+  size_t workspace_per_thread = 3 * nvars + 5 * nvars * nvars;
+  size_t total_workspace = total_threads * workspace_per_thread;
+  double *workspace = NULL;
+  if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to allocate workspace for NS3D Roe upwinding\n");
+    return;
+  }
+
+  GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_roe_kernel, numBlocks, blockSize)(
+    fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
+    ghosts, dir, gamma, workspace
   );
-  GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
   
-  GPUFree(dim_gpu);
-  GPUFree(stride_gpu);
-  GPUFree(bounds_inter_gpu);
-#endif
+  GPUFree(workspace);
 }
 
 void gpu_launch_ns3d_upwind_rf(
@@ -70,26 +105,34 @@ void gpu_launch_ns3d_upwind_rf(
   int ghosts, int dir, double gamma, int blockSize
 )
 {
-#ifdef GPU_NONE
-  /* CPU fallback */
-#else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_inter_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims * sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims * sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_inter_gpu, ndims * sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims * sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims * sizeof(int));
-  GPUCopyToDevice(bounds_inter_gpu, bounds_inter, ndims * sizeof(int));
+  if (ensure_device_arrays(ndims)) return;
+  GPUCopyToDevice(d_dim, dim, ndims * sizeof(int));
+  GPUCopyToDevice(d_stride_with_ghosts, stride_with_ghosts, ndims * sizeof(int));
+  GPUCopyToDevice(d_bounds_inter, bounds_inter, ndims * sizeof(int));
+
   int total_interfaces = 1;
-  for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  int gridSize = (total_interfaces + blockSize - 1) / blockSize;
-  GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_rf_kernel, gridSize, blockSize)(
-    fI, fL, fR, uL, uR, u, nvars, ndims, dim_gpu, stride_gpu, bounds_inter_gpu, ghosts, dir, gamma
+  for (int i = 0; i < ndims; i++) {
+    total_interfaces *= bounds_inter[i];
+  }
+
+  int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
+  int total_threads = numBlocks * blockSize;
+  
+  /* Allocate workspace for RF scheme: 9*nvars + 3*nvars*nvars per thread */
+  size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
+  size_t total_workspace = total_threads * workspace_per_thread;
+  double *workspace = NULL;
+  if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to allocate workspace for NS3D RF upwinding\n");
+    return;
+  }
+
+  GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_rf_kernel, numBlocks, blockSize)(
+    fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
+    ghosts, dir, gamma, workspace
   );
-  GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_inter_gpu);
-#endif
+  
+  GPUFree(workspace);
 }
 
 void gpu_launch_ns3d_upwind_llf(
@@ -98,26 +141,34 @@ void gpu_launch_ns3d_upwind_llf(
   int ghosts, int dir, double gamma, int blockSize
 )
 {
-#ifdef GPU_NONE
-  /* CPU fallback */
-#else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_inter_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims * sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims * sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_inter_gpu, ndims * sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims * sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims * sizeof(int));
-  GPUCopyToDevice(bounds_inter_gpu, bounds_inter, ndims * sizeof(int));
+  if (ensure_device_arrays(ndims)) return;
+  GPUCopyToDevice(d_dim, dim, ndims * sizeof(int));
+  GPUCopyToDevice(d_stride_with_ghosts, stride_with_ghosts, ndims * sizeof(int));
+  GPUCopyToDevice(d_bounds_inter, bounds_inter, ndims * sizeof(int));
+
   int total_interfaces = 1;
-  for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  int gridSize = (total_interfaces + blockSize - 1) / blockSize;
-  GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_llf_kernel, gridSize, blockSize)(
-    fI, fL, fR, uL, uR, u, nvars, ndims, dim_gpu, stride_gpu, bounds_inter_gpu, ghosts, dir, gamma
+  for (int i = 0; i < ndims; i++) {
+    total_interfaces *= bounds_inter[i];
+  }
+
+  int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
+  int total_threads = numBlocks * blockSize;
+  
+  /* Allocate workspace for LLF scheme: 9*nvars + 3*nvars*nvars per thread */
+  size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
+  size_t total_workspace = total_threads * workspace_per_thread;
+  double *workspace = NULL;
+  if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to allocate workspace for NS3D LLF upwinding\n");
+    return;
+  }
+
+  GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_llf_kernel, numBlocks, blockSize)(
+    fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
+    ghosts, dir, gamma, workspace
   );
-  GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_inter_gpu);
-#endif
+  
+  GPUFree(workspace);
 }
 
 void gpu_launch_ns3d_upwind_rusanov(
@@ -126,26 +177,34 @@ void gpu_launch_ns3d_upwind_rusanov(
   int ghosts, int dir, double gamma, int blockSize
 )
 {
-#ifdef GPU_NONE
-  /* CPU fallback */
-#else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_inter_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims * sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims * sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_inter_gpu, ndims * sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims * sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims * sizeof(int));
-  GPUCopyToDevice(bounds_inter_gpu, bounds_inter, ndims * sizeof(int));
-  int total_interfaces = 1;
-  for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  int gridSize = (total_interfaces + blockSize - 1) / blockSize;
-  GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_rusanov_kernel, gridSize, blockSize)(
-    fI, fL, fR, uL, uR, u, nvars, ndims, dim_gpu, stride_gpu, bounds_inter_gpu, ghosts, dir, gamma
-  );
-  GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_inter_gpu);
-#endif
-}
-} /* extern "C" */
+  if (ensure_device_arrays(ndims)) return;
+  GPUCopyToDevice(d_dim, dim, ndims * sizeof(int));
+  GPUCopyToDevice(d_stride_with_ghosts, stride_with_ghosts, ndims * sizeof(int));
+  GPUCopyToDevice(d_bounds_inter, bounds_inter, ndims * sizeof(int));
 
+  int total_interfaces = 1;
+  for (int i = 0; i < ndims; i++) {
+    total_interfaces *= bounds_inter[i];
+  }
+
+  int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
+  int total_threads = numBlocks * blockSize;
+  
+  /* Allocate workspace for Rusanov scheme: 2*nvars per thread */
+  size_t workspace_per_thread = 2 * nvars;
+  size_t total_workspace = total_threads * workspace_per_thread;
+  double *workspace = NULL;
+  if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
+    fprintf(stderr, "Error: Failed to allocate workspace for NS3D Rusanov upwinding\n");
+    return;
+  }
+
+  GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_rusanov_kernel, numBlocks, blockSize)(
+    fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
+    ghosts, dir, gamma, workspace
+  );
+  
+  GPUFree(workspace);
+}
+
+} /* extern "C" */

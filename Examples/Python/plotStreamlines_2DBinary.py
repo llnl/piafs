@@ -134,6 +134,7 @@ if solver_inp_data['op_overwrite'] == 'no':
         plt_fname = plt_dir_name+'/streamlines_'+'_'+f'{i:05d}'+'.png'
       print('Saving %s' % plt_fname)
       plt.savefig(plt_fname)
+      plt.close()
 
 else:
 
@@ -192,3 +193,4 @@ else:
         plt_fname = plt_dir_name+'/streamlines.png'
     print('Saving %s' % plt_fname)
     plt.savefig(plt_fname)
+    plt.close()

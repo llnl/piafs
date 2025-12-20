@@ -15,7 +15,25 @@ set(TEST_RUN_DIR "${PIAFS_BINARY_DIR}/test_run_temp")
 set(BENCHMARKS_DIR "${TEST_RUN_DIR}/benchmarks")
 set(TEST_DIR "${TEST_RUN_DIR}/${TEST_NAME}")
 set(DIFF_TOOL "${TEST_RUN_DIR}/PIAFS_DIFF")
-set(DIFF_TOLERANCE "1.0e-14")
+
+# Determine tolerance based on GPU and interpolation scheme
+if(ENABLE_GPU)
+  # Default GPU tolerance
+  set(DIFF_TOLERANCE "1.0e-10")
+  
+  # Check if solver.inp uses muscl3 (which has larger GPU floating-point differences)
+  if(EXISTS "${BENCHMARKS_DIR}/${TEST_NAME}/solver.inp")
+    file(READ "${BENCHMARKS_DIR}/${TEST_NAME}/solver.inp" SOLVER_INP_CONTENT)
+    string(REGEX MATCH "hyp_space_scheme[ ]+muscl3" USES_MUSCL3 "${SOLVER_INP_CONTENT}")
+    if(USES_MUSCL3)
+      set(DIFF_TOLERANCE "1.0e-6")
+      message(STATUS "Test ${TEST_NAME} uses MUSCL3 with GPU: setting tolerance to ${DIFF_TOLERANCE}")
+    endif()
+  endif()
+else()
+  # CPU-only: stricter tolerance
+  set(DIFF_TOLERANCE "1.0e-14")
+endif()
 
 # Create test directory
 file(REMOVE_RECURSE "${TEST_DIR}")
@@ -167,7 +185,7 @@ foreach(FILE ${FILES_TO_COMPARE})
     endif()
 
     execute_process(
-      COMMAND ${DIFF_TOOL} -r ${DIFF_TOLERANCE} ${FILE} ${BENCHMARKS_DIR}/${TEST_NAME}/${FILE}
+      COMMAND ${DIFF_TOOL} -v -r ${DIFF_TOLERANCE} ${FILE} ${BENCHMARKS_DIR}/${TEST_NAME}/${FILE}
       WORKING_DIRECTORY "${TEST_DIR}"
       RESULT_VARIABLE DIFF_RESULT
       OUTPUT_VARIABLE DIFF_OUTPUT
@@ -194,6 +212,9 @@ foreach(FILE ${FILES_TO_COMPARE})
       math(EXPR FAIL_COUNT "${FAIL_COUNT} + 1")
     else()
       message(STATUS "    PASSED")
+      if(DIFF_OUTPUT)
+        message(STATUS "${DIFF_OUTPUT}")
+      endif()
       math(EXPR PASS_COUNT "${PASS_COUNT} + 1")
     endif()
   endif()

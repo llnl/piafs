@@ -12,6 +12,7 @@
 /* Git information */
 #define PIAFS_GIT_HASH "@PIAFS_GIT_HASH@"
 #define PIAFS_GIT_BRANCH "@PIAFS_GIT_BRANCH@"
+#define PIAFS_GIT_DIRTY "@PIAFS_GIT_DIRTY@"
 
 /* Build configuration */
 #define PIAFS_BUILD_TYPE "@PIAFS_BUILD_TYPE@"

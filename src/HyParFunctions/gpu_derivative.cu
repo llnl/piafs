@@ -25,26 +25,23 @@ GPU_KERNEL void gpu_first_derivative_second_order_kernel(
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= npoints) return;
   
-  int i = idx - ghosts;  /* convert to interior index */
+  /* Compute derivatives at ALL points including ghosts, matching CPU behavior */
+  int qC = idx * stride;  /* current point */
+  int qL = (idx - 1) * stride;  /* left neighbor */
+  int qR = (idx + 1) * stride;  /* right neighbor */
   
-  if (i >= 0 && i < npoints - 2*ghosts) {
-    int qC = idx * stride;  /* current point */
-    int qL = (idx - 1) * stride;  /* left neighbor */
-    int qR = (idx + 1) * stride;  /* right neighbor */
-    
-    for (int v = 0; v < nvars; v++) {
-      if (i == 0) {
-        /* Left boundary: one-sided */
-        int qRR = (idx + 2) * stride;
-        Df[qC*nvars+v] = 0.5 * (-3*f[qC*nvars+v] + 4*f[qR*nvars+v] - f[qRR*nvars+v]);
-      } else if (i == npoints - 2*ghosts - 1) {
-        /* Right boundary: one-sided */
-        int qLL = (idx - 2) * stride;
-        Df[qC*nvars+v] = 0.5 * (3*f[qC*nvars+v] - 4*f[qL*nvars+v] + f[qLL*nvars+v]);
-      } else {
-        /* Interior: central difference */
-        Df[qC*nvars+v] = 0.5 * (f[qR*nvars+v] - f[qL*nvars+v]);
-      }
+  for (int v = 0; v < nvars; v++) {
+    if (idx == 0) {
+      /* First point: one-sided forward */
+      int qRR = (idx + 2) * stride;
+      Df[qC*nvars+v] = 0.5 * (-3.0*f[qC*nvars+v] + 4.0*f[qR*nvars+v] - f[qRR*nvars+v]);
+    } else if (idx == npoints - 1) {
+      /* Last point: one-sided backward */
+      int qLL = (idx - 2) * stride;
+      Df[qC*nvars+v] = 0.5 * (3.0*f[qC*nvars+v] - 4.0*f[qL*nvars+v] + f[qLL*nvars+v]);
+    } else {
+      /* All other points: central difference */
+      Df[qC*nvars+v] = 0.5 * (f[qR*nvars+v] - f[qL*nvars+v]);
     }
   }
 }
@@ -62,28 +59,59 @@ GPU_KERNEL void gpu_first_derivative_fourth_order_kernel(
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= npoints) return;
   
-  int i = idx - ghosts;  /* convert to interior index */
+  const double one_twelve = 1.0/12.0;
+  int qC = idx * stride;
   
-  if (i >= 0 && i < npoints - 2*ghosts) {
-    int qC = idx * stride;
+  /* Match CPU: use different schemes depending on position */
+  if (idx == 0) {
+    /* First point: 4th order forward biased */
+    int qp1 = (idx + 1) * stride;
+    int qp2 = (idx + 2) * stride;
+    int qp3 = (idx + 3) * stride;
+    int qp4 = (idx + 4) * stride;
+    
+    for (int v = 0; v < nvars; v++) {
+      Df[qC*nvars+v] = one_twelve * (-25.0*f[qC*nvars+v] + 48.0*f[qp1*nvars+v] - 36.0*f[qp2*nvars+v] + 16.0*f[qp3*nvars+v] - 3.0*f[qp4*nvars+v]);
+    }
+  } else if (idx == 1) {
+    /* Second point: 4th order forward biased */
+    int qm1 = (idx - 1) * stride;
+    int qp1 = (idx + 1) * stride;
+    int qp2 = (idx + 2) * stride;
+    int qp3 = (idx + 3) * stride;
+    
+    for (int v = 0; v < nvars; v++) {
+      Df[qC*nvars+v] = one_twelve * (-3.0*f[qm1*nvars+v] - 10.0*f[qC*nvars+v] + 18.0*f[qp1*nvars+v] - 6.0*f[qp2*nvars+v] + f[qp3*nvars+v]);
+    }
+  } else if (idx >= 2 && idx < npoints - 2) {
+    /* Interior: 4th order central */
     int qL = (idx - 1) * stride;
     int qR = (idx + 1) * stride;
     int qLL = (idx - 2) * stride;
     int qRR = (idx + 2) * stride;
     
-    static const double c0 = -1.0/12.0;
-    static const double c1 = 2.0/3.0;
-    static const double c2 = -2.0/3.0;
-    static const double c3 = 1.0/12.0;
+    for (int v = 0; v < nvars; v++) {
+      Df[qC*nvars+v] = one_twelve * (f[qLL*nvars+v] - 8.0*f[qL*nvars+v] + 8.0*f[qR*nvars+v] - f[qRR*nvars+v]);
+    }
+  } else if (idx == npoints - 2) {
+    /* Second-to-last point: 4th order backward biased */
+    int qm3 = (idx - 3) * stride;
+    int qm2 = (idx - 2) * stride;
+    int qm1 = (idx - 1) * stride;
+    int qp1 = (idx + 1) * stride;
     
     for (int v = 0; v < nvars; v++) {
-      if (i == 0 || i == npoints - 2*ghosts - 1) {
-        /* Boundary: fall back to 2nd order */
-        Df[qC*nvars+v] = 0.5 * (f[qR*nvars+v] - f[qL*nvars+v]);
-      } else {
-        /* Interior: 4th order central */
-        Df[qC*nvars+v] = c0*f[qLL*nvars+v] + c1*f[qL*nvars+v] + c2*f[qR*nvars+v] + c3*f[qRR*nvars+v];
-      }
+      Df[qC*nvars+v] = one_twelve * (-f[qm3*nvars+v] + 6.0*f[qm2*nvars+v] - 18.0*f[qm1*nvars+v] + 10.0*f[qC*nvars+v] + 3.0*f[qp1*nvars+v]);
+    }
+  } else if (idx == npoints - 1) {
+    /* Last point: 4th order backward biased */
+    int qm4 = (idx - 4) * stride;
+    int qm3 = (idx - 3) * stride;
+    int qm2 = (idx - 2) * stride;
+    int qm1 = (idx - 1) * stride;
+    
+    for (int v = 0; v < nvars; v++) {
+      Df[qC*nvars+v] = one_twelve * (3.0*f[qm4*nvars+v] - 16.0*f[qm3*nvars+v] + 36.0*f[qm2*nvars+v] - 48.0*f[qm1*nvars+v] + 25.0*f[qC*nvars+v]);
     }
   }
 }
@@ -100,22 +128,21 @@ GPU_KERNEL void gpu_first_derivative_first_order_kernel(
 )
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  int i = idx - ghosts;
   
-  if (i >= 0 && i < npoints - 2*ghosts) {
-    int qC = idx;
-    int qL = idx - stride;
-    int qR = idx + stride;
+  if (idx < npoints) {
+    int qC = idx * stride;
+    int qL = (idx - 1) * stride;
+    int qR = (idx + 1) * stride;
     
     for (int v = 0; v < nvars; v++) {
-      if (i == 0) {
-        /* Left boundary */
+      if (idx == 0) {
+        /* Left boundary ghost point: forward difference */
         Df[qC*nvars+v] = f[qR*nvars+v] - f[qC*nvars+v];
-      } else if (i == npoints - 2*ghosts - 1) {
-        /* Right boundary */
+      } else if (idx == npoints - 1) {
+        /* Right boundary ghost point: backward difference */
         Df[qC*nvars+v] = f[qC*nvars+v] - f[qL*nvars+v];
       } else {
-        /* Interior: biased difference */
+        /* Interior and other ghost points: biased difference */
         Df[qC*nvars+v] = (bias > 0 ? f[qR*nvars+v] - f[qC*nvars+v] :
                          bias < 0 ? f[qC*nvars+v] - f[qL*nvars+v] :
                          0.5 * (f[qR*nvars+v] - f[qL*nvars+v]));

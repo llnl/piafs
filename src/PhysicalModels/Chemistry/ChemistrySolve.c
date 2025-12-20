@@ -4,6 +4,7 @@
 */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <basic.h>
 #include <common.h>
 #include <arrayfunctions.h>
@@ -133,6 +134,7 @@ int ChemistrySource( void*   a_s,  /*!< Solver object of type #HyPar */
   int *dim    = solver->dim_local;
   int ghosts  = solver->ghosts;
   int nspecies = chem->nspecies;
+  int npoints = solver->npoints_local_wghosts;
 
   ChemistrySetPhotonDensity( solver, chem, mpi, a_U, a_t );
 

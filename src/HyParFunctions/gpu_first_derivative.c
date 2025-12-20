@@ -50,7 +50,7 @@ int GPUFirstDerivativeSecondOrderCentral(
       int base_offset = 0;
       for (int d = 0; d < ndims; d++) {
         if (d != dir) {
-          base_offset += index_outer[d] * solver->stride_with_ghosts[d];
+          base_offset += (index_outer[d] + ghosts) * solver->stride_with_ghosts[d];
         }
       }
 
@@ -114,7 +114,7 @@ int GPUFirstDerivativeFourthOrderCentral(
       int base_offset = 0;
       for (int d = 0; d < ndims; d++) {
         if (d != dir) {
-          base_offset += index_outer[d] * solver->stride_with_ghosts[d];
+          base_offset += (index_outer[d] + ghosts) * solver->stride_with_ghosts[d];
         }
       }
 
@@ -172,7 +172,7 @@ int GPUFirstDerivativeFirstOrder(
       int base_offset = 0;
       for (int d = 0; d < ndims; d++) {
         if (d != dir) {
-          base_offset += index_outer[d] * solver->stride_with_ghosts[d];
+          base_offset += (index_outer[d] + ghosts) * solver->stride_with_ghosts[d];
         }
       }
 

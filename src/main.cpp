@@ -63,6 +63,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 #include <string>
 
@@ -94,7 +95,8 @@ int main(int argc, char **argv)
   printf("================================================================================\n");
   printf("PIAFS - Serial Version\n");
   printf("  Version: %s\n", PIAFS_VERSION);
-  printf("  Git Hash: %s (branch: %s)\n", PIAFS_GIT_HASH, PIAFS_GIT_BRANCH);
+  printf("  Git Hash: %s (branch: %s)%s\n", PIAFS_GIT_HASH, PIAFS_GIT_BRANCH,
+         (strcmp(PIAFS_GIT_DIRTY, "yes") == 0) ? " [dirty]" : "");
   printf("  Build Date: %s\n", PIAFS_BUILD_DATE);
   printf("  Build Type: %s\n", PIAFS_BUILD_TYPE);
   printf("  MPI Mode: %s\n", PIAFS_MPI_MODE);
@@ -160,7 +162,8 @@ int main(int argc, char **argv)
     printf("================================================================================\n");
     printf("PIAFS - Parallel (MPI) version with %d processes\n", nproc);
     printf("  Version: %s\n", PIAFS_VERSION);
-    printf("  Git Hash: %s (branch: %s)\n", PIAFS_GIT_HASH, PIAFS_GIT_BRANCH);
+    printf("  Git Hash: %s (branch: %s)%s\n", PIAFS_GIT_HASH, PIAFS_GIT_BRANCH,
+           (strcmp(PIAFS_GIT_DIRTY, "yes") == 0) ? " [dirty]" : "");
     printf("  Build Date: %s\n", PIAFS_BUILD_DATE);
     printf("  Build Type: %s\n", PIAFS_BUILD_TYPE);
     printf("  OpenMP: %s\n", PIAFS_OPENMP);

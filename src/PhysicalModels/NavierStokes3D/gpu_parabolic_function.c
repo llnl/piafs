@@ -92,17 +92,24 @@ int GPUNavierStokes3DParabolicFunction(
       GPUFree(FViscous);
       return 1;
     }
+    
+    /* Initialize derivative arrays to zero - GPUAllocate does not zero-initialize memory */
+    GPUMemset(QDerivX, 0, size * nvars * sizeof(double));
+    GPUMemset(QDerivY, 0, size * nvars * sizeof(double));
+    GPUMemset(QDerivZ, 0, size * nvars * sizeof(double));
+    GPUMemset(FViscous, 0, size * nvars * sizeof(double));
+    GPUMemset(FDeriv, 0, size * nvars * sizeof(double));
 
     /* Convert conserved to primitive variables on GPU */
     gpu_launch_ns3d_get_primitive(Q, u, nvars, size, physics->gamma, 256);
     if (GPUShouldSyncEveryOp()) GPUSync();
 
     /* Compute derivatives using GPU */
-    IERR GPUFirstDerivativeSecondOrderCentral(QDerivX, Q, _XDIR_, 1, solver, mpi);
+    IERR solver->FirstDerivativePar(QDerivX, Q, _XDIR_, 1, solver, mpi);
     CHECKERR(ierr);
-    IERR GPUFirstDerivativeSecondOrderCentral(QDerivY, Q, _YDIR_, 1, solver, mpi);
+    IERR solver->FirstDerivativePar(QDerivY, Q, _YDIR_, 1, solver, mpi);
     CHECKERR(ierr);
-    IERR GPUFirstDerivativeSecondOrderCentral(QDerivZ, Q, _ZDIR_, 1, solver, mpi);
+    IERR solver->FirstDerivativePar(QDerivZ, Q, _ZDIR_, 1, solver, mpi);
     CHECKERR(ierr);
 
     /* Exchange boundaries using GPU-aware MPI */
@@ -115,6 +122,7 @@ int GPUNavierStokes3DParabolicFunction(
     IERR GPUMPIExchangeBoundariesnD(_MODEL_NDIMS_, nvars, solver->dim_local,
                                       solver->ghosts, mpi, QDerivZ);
     CHECKERR(ierr);
+    GPUSync(); // Ensure MPI exchange is complete before proceeding
 
     /* Scale derivatives by dxinv, dyinv, dzinv using GPU kernels */
     /* Allocate GPU arrays for dim and stride_with_ghosts */
@@ -167,8 +175,7 @@ int GPUNavierStokes3DParabolicFunction(
     GPUFree(dim_gpu);
     GPUFree(stride_gpu);
 
-    /* Compute viscous fluxes using GPU kernels */
-    /* For X direction */
+    /* Compute viscous fluxes and their derivatives for X direction */
     gpu_launch_ns3d_viscous_flux_x(
       FViscous, Q, QDerivX, QDerivY, QDerivZ,
       nvars, size, physics->Tref, physics->T0, physics->TS, physics->TA, physics->TB,
@@ -176,8 +183,8 @@ int GPUNavierStokes3DParabolicFunction(
     );
     if (GPUShouldSyncEveryOp()) GPUSync();
 
-    /* Compute derivative of viscous flux */
-    IERR GPUFirstDerivativeSecondOrderCentral(FDeriv, FViscous, _XDIR_, -1, solver, mpi);
+    /* Compute derivative of viscous flux in X direction */
+    IERR solver->FirstDerivativePar(FDeriv, FViscous, _XDIR_, -1, solver, mpi);
     CHECKERR(ierr);
 
     /* Add to parabolic term using GPU kernel */
@@ -219,11 +226,42 @@ int GPUNavierStokes3DParabolicFunction(
                                      ghosts, _XDIR_, offset_x_add, 256);
     if (GPUShouldSyncEveryOp()) GPUSync();
     
+    /* Y direction */
+    gpu_launch_ns3d_viscous_flux_y(
+      FViscous, Q, QDerivX, QDerivY, QDerivZ,
+      nvars, size, physics->Tref, physics->T0, physics->TS, physics->TA, physics->TB,
+      inv_Re, inv_gamma_m1, inv_Pr, 256
+    );
+    if (GPUShouldSyncEveryOp()) GPUSync();
+
+    IERR solver->FirstDerivativePar(FDeriv, FViscous, _YDIR_, -1, solver, mpi);
+    CHECKERR(ierr);
+    
+    int offset_y_add = dim[0] + 2 * ghosts;
+    gpu_launch_add_scaled_derivative(par, FDeriv, solver->d_dxinv, nvars, npoints_interior,
+                                     _MODEL_NDIMS_, dim_gpu, stride_gpu,
+                                     ghosts, _YDIR_, offset_y_add, 256);
+    if (GPUShouldSyncEveryOp()) GPUSync();
+
+    /* Z direction */
+    gpu_launch_ns3d_viscous_flux_z(
+      FViscous, Q, QDerivX, QDerivY, QDerivZ,
+      nvars, size, physics->Tref, physics->T0, physics->TS, physics->TA, physics->TB,
+      inv_Re, inv_gamma_m1, inv_Pr, 256
+    );
+    if (GPUShouldSyncEveryOp()) GPUSync();
+
+    IERR solver->FirstDerivativePar(FDeriv, FViscous, _ZDIR_, -1, solver, mpi);
+    CHECKERR(ierr);
+    
+    int offset_z_add = offset_y + dim[1] + 2 * ghosts;
+    gpu_launch_add_scaled_derivative(par, FDeriv, solver->d_dxinv, nvars, npoints_interior,
+                                     _MODEL_NDIMS_, dim_gpu, stride_gpu,
+                                     ghosts, _ZDIR_, offset_z_add, 256);
+    if (GPUShouldSyncEveryOp()) GPUSync();
+    
     GPUFree(dim_gpu);
     GPUFree(stride_gpu);
-
-    /* Similar for Y and Z directions */
-    /* TODO: Complete Y and Z direction computation */
 
     /* Free GPU memory */
     GPUFree(Q);

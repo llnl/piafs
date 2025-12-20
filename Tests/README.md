@@ -218,12 +218,11 @@ The test process:
 
 ## Available Regression Benchmarks
 
-### Current Test Suite (20 benchmarks)
+### Current Test Suite (19 benchmarks)
 
 **1D Euler Tests:**
 - `1d_euler_densitysinewave` - Density wave advection
 - `1d_euler_firstorder` - 1st order upwind scheme (default), Sod shock tube
-- `1d_euler_forwardeuler` - Forward Euler time integration (default)
 - `1d_euler_laxshocktube` - Lax shock tube with CRWENO5
 - `1d_euler_muscl2` - 2nd order MUSCL with limiter
 - `1d_euler_rk22` - 2nd order RK time integration

@@ -96,7 +96,7 @@ int InitializeSolvers(  void  *s,   /*!< Array of simulation objects of type #Si
 #ifdef GPU_CUDA
     if (GPUShouldUse()) {
       if (!strcmp(solver->spatial_scheme_par,_SECOND_ORDER_CENTRAL_)) {
-        solver->FirstDerivativePar = GPUFirstDerivativeSecondOrderCentral;
+        solver->FirstDerivativePar = GPUFirstDerivativeFirstOrder;
       } else if (!strcmp(solver->spatial_scheme_par,_FOURTH_ORDER_CENTRAL_)) {
         solver->FirstDerivativePar = GPUFirstDerivativeFourthOrderCentral;
       } else {
@@ -118,7 +118,7 @@ int InitializeSolvers(  void  *s,   /*!< Array of simulation objects of type #Si
 #elif defined(GPU_HIP)
     if (GPUShouldUse()) {
       if (!strcmp(solver->spatial_scheme_par,_SECOND_ORDER_CENTRAL_)) {
-        solver->FirstDerivativePar = GPUFirstDerivativeSecondOrderCentral;
+        solver->FirstDerivativePar = GPUFirstDerivativeFirstOrder;
       } else if (!strcmp(solver->spatial_scheme_par,_FOURTH_ORDER_CENTRAL_)) {
         solver->FirstDerivativePar = GPUFirstDerivativeFourthOrderCentral;
       } else {

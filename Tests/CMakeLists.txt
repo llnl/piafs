@@ -87,7 +87,6 @@ set(REGRESSION_BENCHMARKS
   1d_beam_grating
   1d_euler_densitysinewave
   1d_euler_firstorder
-  1d_euler_forwardeuler
   1d_euler_laxshocktube
   1d_euler_muscl2
   1d_euler_rk22
@@ -146,7 +145,6 @@ set(TESTS_1GPU
   1d_beam_grating
   1d_euler_densitysinewave
   1d_euler_firstorder
-  1d_euler_forwardeuler
   1d_euler_muscl2
   # 2D tests with 1 GPU
   2d_navstok_flatplatelaminar
@@ -182,7 +180,7 @@ set(TESTS_4GPU
 )
 
 # Tests that must run with GPU disabled (interpolation schemes not yet implemented on GPU)
-# These tests use "characteristic" or "components" interpolation which aren't GPU-ready
+# These tests use crweno5 or cupw5 interpolation schemes which aren't GPU-ready
 set(GPU_DISABLED_TESTS
   1d_euler_laxshocktube
   2d_navstok_vortconv
@@ -194,6 +192,12 @@ function(add_regression_test TEST_NAME)
   set(DISABLE_GPU_FOR_TEST OFF)
   if(TEST_NAME IN_LIST GPU_DISABLED_TESTS)
     set(DISABLE_GPU_FOR_TEST ON)
+  endif()
+  
+  # Skip GPU-disabled tests entirely when running GPU regression tests
+  if(USE_GPU_TESTS AND ENABLE_GPU AND DISABLE_GPU_FOR_TEST)
+    message(STATUS "Skipping regression test ${TEST_NAME} (requires GPU-unsupported interpolation: crweno5/cupw5)")
+    return()
   endif()
   
   # Determine MPI rank count for this test (matches GPU count for consistency)

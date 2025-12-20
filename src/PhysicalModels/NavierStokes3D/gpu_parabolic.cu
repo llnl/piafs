@@ -139,7 +139,7 @@ GPU_KERNEL void gpu_ns3d_viscous_flux_x_kernel(
                    * (T0 + TA * exp(-TB / T0)) 
                    / (T_d + TA * exp(-TB / T_d));
     
-    static const double two_third = 2.0/3.0;
+    const double two_third = 2.0/3.0;
     
     /* Compute stress tensor components */
     double tau_xx = two_third * (mu * inv_Re) * (2*ux - vy - wz);
@@ -198,7 +198,7 @@ GPU_KERNEL void gpu_ns3d_viscous_flux_y_kernel(
                    * (T0 + TA * exp(-TB / T0)) 
                    / (T_d + TA * exp(-TB / T_d));
     
-    static const double two_third = 2.0/3.0;
+    const double two_third = 2.0/3.0;
     
     double tau_yx = (mu * inv_Re) * (uy + vx);
     double tau_yy = two_third * (mu * inv_Re) * (-ux + 2*vy - wz);
@@ -255,7 +255,7 @@ GPU_KERNEL void gpu_ns3d_viscous_flux_z_kernel(
                    * (T0 + TA * exp(-TB / T0)) 
                    / (T_d + TA * exp(-TB / T_d));
     
-    static const double two_third = 2.0/3.0;
+    const double two_third = 2.0/3.0;
     
     double tau_zx = (mu * inv_Re) * (uz + wx);
     double tau_zy = (mu * inv_Re) * (vz + wy);

@@ -14,6 +14,7 @@
 #if defined(GPU_CUDA) || defined(GPU_HIP)
 #include <gpu.h>
 #include <gpu_runtime.h>
+#include <physicalmodels/gpu_chemistry.h>
 #endif
 
 /*! Write out the reacting species data to file */
@@ -28,7 +29,7 @@ int NavierStokes3DWriteChem( void*   s,  /*!< Solver object of type #HyPar */
   if (params->include_chem) {
 #if defined(GPU_CUDA) || defined(GPU_HIP)
     if (GPUShouldUse()) {
-      /* ChemistryWriteSpecies needs host memory - copy u from device */
+      /* ChemistryWriteSpecies needs host memory - copy u and nv_hnu from device */
       int size_u = solver->npoints_local_wghosts * solver->nvars;
       double *u_host = (double*) malloc(size_u * sizeof(double));
       if (!u_host) {
@@ -36,6 +37,7 @@ int NavierStokes3DWriteChem( void*   s,  /*!< Solver object of type #HyPar */
         return 1;
       }
       GPUCopyToHost(u_host, solver->u, size_u * sizeof(double));
+      GPUChemistryCopyPhotonDensityToHost(params->chem);
       GPUSync();
       ChemistryWriteSpecies(solver, u_host, params->chem, mpi, a_t);
       free(u_host);

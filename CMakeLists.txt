@@ -311,6 +311,7 @@ add_subdirectory(src)
 find_package(Git QUIET)
 set(PIAFS_GIT_HASH "unknown")
 set(PIAFS_GIT_BRANCH "unknown")
+set(PIAFS_GIT_DIRTY "unknown")
 if(GIT_FOUND)
   execute_process(
     COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
@@ -326,6 +327,18 @@ if(GIT_FOUND)
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
   )
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} status --porcelain
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    OUTPUT_VARIABLE PIAFS_GIT_STATUS
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+  )
+  if(PIAFS_GIT_STATUS)
+    set(PIAFS_GIT_DIRTY "yes")
+  else()
+    set(PIAFS_GIT_DIRTY "no")
+  endif()
 endif()
 
 # Get build date

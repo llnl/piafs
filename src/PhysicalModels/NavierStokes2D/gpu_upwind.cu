@@ -104,7 +104,8 @@ GPU_KERNEL void gpu_ns2d_upwind_roe_kernel(
   const int *bounds_inter, /* bounds for interface array */
   int ghosts,              /* number of ghost points */
   int dir,                 /* direction */
-  double gamma             /* gamma parameter */
+  double gamma,            /* gamma parameter */
+  double *workspace        /* dynamically allocated workspace */
 )
 {
   /* Compute total number of interface points */
@@ -144,10 +145,21 @@ GPU_KERNEL void gpu_ns2d_upwind_roe_kernel(
       pR += (indexR[i] + ghosts) * stride_with_ghosts[i];
     }
 
-    /* Roe's upwinding scheme */
-    const int max_nvars = 10;
-    double udiff[10], uavg[10], udiss[10];
-    if (nvars > max_nvars) return; /* Safety check */
+    /* Roe's upwinding scheme - use dynamic workspace */
+    /* Workspace layout: [udiff, uavg, udiss, D, L, R, DL, modA] */
+    /* Total: 3*nvars + 5*nvars*nvars per thread */
+    int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t workspace_per_thread = 3 * nvars + 5 * nvars * nvars;
+    double *thread_workspace = workspace + threadId * workspace_per_thread;
+    
+    double *udiff = thread_workspace;
+    double *uavg = udiff + nvars;
+    double *udiss = uavg + nvars;
+    double *D = udiss + nvars;
+    double *L = D + nvars * nvars;
+    double *R = L + nvars * nvars;
+    double *DL = R + nvars * nvars;
+    double *modA = DL + nvars * nvars;
 
     for (int k = 0; k < nvars; k++) {
       udiff[k] = 0.5 * (uR[p*nvars+k] - uL[p*nvars+k]);
@@ -157,8 +169,6 @@ GPU_KERNEL void gpu_ns2d_upwind_roe_kernel(
     gpu_ns2d_roe_average(uavg, u + pL*nvars, u + pR*nvars, nvars, gamma);
 
     /* Compute eigenvalues, left and right eigenvectors */
-    double D[100], L[100], R[100], DL[100], modA[100];
-    if (nvars * nvars > 100) return; /* Safety check */
 
     gpu_ns2d_eigenvalues(uavg, D, gamma, nvars, dir);
     gpu_ns2d_left_eigenvectors(uavg, L, gamma, nvars, dir);
@@ -189,7 +199,7 @@ GPU_KERNEL void gpu_ns2d_upwind_roe_kernel(
 GPU_KERNEL void gpu_ns2d_upwind_rf_kernel(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
-  int ghosts, int dir, double gamma
+  int ghosts, int dir, double gamma, double *workspace
 )
 {
   int total_interfaces = 1;
@@ -224,10 +234,25 @@ GPU_KERNEL void gpu_ns2d_upwind_rf_kernel(
       pR += (indexR[i] + ghosts) * stride_with_ghosts[i];
     }
 
-    const int max_nvars = 10;
-    double uavg[10], fcL[10], fcR[10], ucL[10], ucR[10], fc[10];
-    double L[100], R[100], D[100];
-    if (nvars > max_nvars || nvars * nvars > 100) return;
+    /* RF scheme - use dynamic workspace */
+    /* Workspace layout: [uavg, fcL, fcR, ucL, ucR, fc, eigL, eigC, eigR, D, L, R] */
+    /* Total: 9*nvars + 3*nvars*nvars per thread */
+    int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
+    double *thread_workspace = workspace + threadId * workspace_per_thread;
+    
+    double *uavg = thread_workspace;
+    double *fcL = uavg + nvars;
+    double *fcR = fcL + nvars;
+    double *ucL = fcR + nvars;
+    double *ucR = ucL + nvars;
+    double *fc = ucR + nvars;
+    double *eigL = fc + nvars;
+    double *eigC = eigL + nvars;
+    double *eigR = eigC + nvars;
+    double *D = eigR + nvars;
+    double *L = D + nvars * nvars;
+    double *R = L + nvars * nvars;
 
     gpu_ns2d_roe_average(uavg, uL + p*nvars, uR + p*nvars, nvars, gamma);
     gpu_ns2d_left_eigenvectors(uavg, L, gamma, nvars, dir);
@@ -238,7 +263,6 @@ GPU_KERNEL void gpu_ns2d_upwind_rf_kernel(
     gpu_ns2d_matvecmult(nvars, fcL, L, fL + p*nvars);
     gpu_ns2d_matvecmult(nvars, fcR, L, fR + p*nvars);
 
-    double eigL[10], eigC[10], eigR[10];
     gpu_ns2d_eigenvalues(uL + p*nvars, D, gamma, nvars, dir);
     for (int k = 0; k < nvars; k++) eigL[k] = D[k*nvars+k];
     gpu_ns2d_eigenvalues(uR + p*nvars, D, gamma, nvars, dir);
@@ -265,7 +289,7 @@ GPU_KERNEL void gpu_ns2d_upwind_rf_kernel(
 GPU_KERNEL void gpu_ns2d_upwind_llf_kernel(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
-  int ghosts, int dir, double gamma
+  int ghosts, int dir, double gamma, double *workspace
 )
 {
   int total_interfaces = 1;
@@ -300,10 +324,25 @@ GPU_KERNEL void gpu_ns2d_upwind_llf_kernel(
       pR += (indexR[i] + ghosts) * stride_with_ghosts[i];
     }
 
-    const int max_nvars = 10;
-    double uavg[10], fcL[10], fcR[10], ucL[10], ucR[10], fc[10];
-    double L[100], R[100], D[100];
-    if (nvars > max_nvars || nvars * nvars > 100) return;
+    /* LLF scheme - use dynamic workspace */
+    /* Workspace layout: [uavg, fcL, fcR, ucL, ucR, fc, eigL, eigC, eigR, D, L, R] */
+    /* Total: 9*nvars + 3*nvars*nvars per thread */
+    int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
+    double *thread_workspace = workspace + threadId * workspace_per_thread;
+    
+    double *uavg = thread_workspace;
+    double *fcL = uavg + nvars;
+    double *fcR = fcL + nvars;
+    double *ucL = fcR + nvars;
+    double *ucR = ucL + nvars;
+    double *fc = ucR + nvars;
+    double *eigL = fc + nvars;
+    double *eigC = eigL + nvars;
+    double *eigR = eigC + nvars;
+    double *D = eigR + nvars;
+    double *L = D + nvars * nvars;
+    double *R = L + nvars * nvars;
 
     gpu_ns2d_roe_average(uavg, uL + p*nvars, uR + p*nvars, nvars, gamma);
     gpu_ns2d_left_eigenvectors(uavg, L, gamma, nvars, dir);
@@ -314,7 +353,6 @@ GPU_KERNEL void gpu_ns2d_upwind_llf_kernel(
     gpu_ns2d_matvecmult(nvars, fcL, L, fL + p*nvars);
     gpu_ns2d_matvecmult(nvars, fcR, L, fR + p*nvars);
 
-    double eigL[10], eigC[10], eigR[10];
     gpu_ns2d_eigenvalues(uL + p*nvars, D, gamma, nvars, dir);
     for (int k = 0; k < nvars; k++) eigL[k] = D[k*nvars+k];
     gpu_ns2d_eigenvalues(uR + p*nvars, D, gamma, nvars, dir);
@@ -335,7 +373,7 @@ GPU_KERNEL void gpu_ns2d_upwind_llf_kernel(
 GPU_KERNEL void gpu_ns2d_upwind_rusanov_kernel(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
-  int ghosts, int dir, double gamma
+  int ghosts, int dir, double gamma, double *workspace
 )
 {
   int total_interfaces = 1;
@@ -370,9 +408,15 @@ GPU_KERNEL void gpu_ns2d_upwind_rusanov_kernel(
       pR += (indexR[i] + ghosts) * stride_with_ghosts[i];
     }
 
-    const int max_nvars = 10;
-    double uavg[10], udiff[10];
-    if (nvars > max_nvars) return;
+    /* Rusanov scheme - use dynamic workspace */
+    /* Workspace layout: [uavg, udiff] */
+    /* Total: 2*nvars per thread */
+    int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t workspace_per_thread = 2 * nvars;
+    double *thread_workspace = workspace + threadId * workspace_per_thread;
+    
+    double *uavg = thread_workspace;
+    double *udiff = uavg + nvars;
 
     for (int k = 0; k < nvars; k++) {
       udiff[k] = 0.5 * (uR[p*nvars+k] - uL[p*nvars+k]);

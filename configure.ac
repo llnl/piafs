@@ -167,12 +167,19 @@ dnl Get git information
 AC_CHECK_PROG([GIT_FOUND], [git], [yes], [no])
 PIAFS_GIT_HASH="unknown"
 PIAFS_GIT_BRANCH="unknown"
+PIAFS_GIT_DIRTY="unknown"
 if test "$GIT_FOUND" = "yes"; then
   PIAFS_GIT_HASH=`git rev-parse --short HEAD 2>/dev/null || echo "unknown"`
   PIAFS_GIT_BRANCH=`git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown"`
+  if test -n "`git status --porcelain 2>/dev/null`"; then
+    PIAFS_GIT_DIRTY="yes"
+  else
+    PIAFS_GIT_DIRTY="no"
+  fi
 fi
 AC_SUBST(PIAFS_GIT_HASH)
 AC_SUBST(PIAFS_GIT_BRANCH)
+AC_SUBST(PIAFS_GIT_DIRTY)
 
 dnl Get build date
 PIAFS_BUILD_DATE=`date -u +"%Y-%m-%d %H:%M:%S" 2>/dev/null || date +"%Y-%m-%d %H:%M:%S" || echo "unknown"`
