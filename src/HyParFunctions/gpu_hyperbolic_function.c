@@ -99,6 +99,8 @@ int GPUHyperbolicFunction(
         use_gpu_interp = 1;
       }
 
+      /* DEBUG: Print once which path is taken */
+
       if (use_gpu_interp) {
         /* GPU interpolation path */
         /* Precalculate WENO nonlinear interpolation coefficients if required */
@@ -286,24 +288,9 @@ int GPUHyperbolicFunction(
 
     /* Calculate the first derivative using GPU kernel */
     if (GPUShouldUse()) {
-      /* Allocate GPU arrays for dim and stride_with_ghosts if needed */
-      /* For now, copy to host and pass to kernel - TODO: optimize */
-      int *dim_gpu = NULL;
-      int *stride_gpu = NULL;
-      
-      if (GPUAllocate((void**)&dim_gpu, ndims * sizeof(int))) {
-        fprintf(stderr, "Error: Failed to allocate dim_gpu\n");
-        return 1;
-      }
-      if (GPUAllocate((void**)&stride_gpu, ndims * sizeof(int))) {
-        fprintf(stderr, "Error: Failed to allocate stride_gpu\n");
-        GPUFree(dim_gpu);
-        return 1;
-      }
-      
-      GPUCopyToDevice(dim_gpu, dim, ndims * sizeof(int));
-      GPUCopyToDevice(stride_gpu, solver->stride_with_ghosts, ndims * sizeof(int));
-      if (GPUShouldSyncEveryOp()) GPUSync();
+      /* Use cached metadata arrays (already on device) */
+      int *dim_gpu = solver->gpu_dim_local;
+      int *stride_gpu = solver->gpu_stride_with_ghosts;
       
       /* Launch multi-dimensional GPU kernel */
       gpu_launch_hyperbolic_flux_derivative_nd(
@@ -311,9 +298,6 @@ int GPUHyperbolicFunction(
         nvars, ndims, dim_gpu, stride_gpu, ghosts, d, offset, 256
       );
       if (GPUShouldSyncEveryOp()) GPUSync();
-      
-      GPUFree(dim_gpu);
-      GPUFree(stride_gpu);
     } else {
       /* CPU path */
       done = 0;

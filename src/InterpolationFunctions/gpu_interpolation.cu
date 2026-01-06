@@ -3,10 +3,105 @@
 */
 
 #include <gpu.h>
+#include <gpu_config.h>
 #include <physicalmodels/gpu_euler1d_helpers.h>
 #include <physicalmodels/gpu_ns2d_helpers.h>
 #include <physicalmodels/gpu_ns3d_helpers.h>
 #include <math.h>
+
+/* Helper struct to manage device arrays - avoids repeated alloc/free */
+struct GPUInterpMetadata {
+  int *dim_gpu;
+  int *stride_gpu;
+  int *bounds_gpu;
+  int ndims;
+  bool allocated;
+  bool dim_stride_cached;  /* Track if dim/stride have been copied */
+  int cached_dim[3];       /* Cached host-side dim values */
+  int cached_stride[3];    /* Cached host-side stride values */
+  
+  GPUInterpMetadata() : dim_gpu(NULL), stride_gpu(NULL), bounds_gpu(NULL), ndims(0), allocated(false), dim_stride_cached(false) {
+    cached_dim[0] = cached_dim[1] = cached_dim[2] = 0;
+    cached_stride[0] = cached_stride[1] = cached_stride[2] = 0;
+  }
+  
+  int setup(const int *dim_host, const int *stride_host, const int *bounds_host, int nd) {
+    /* Only reallocate if ndims changed; otherwise reuse existing device buffers */
+    if (!allocated || ndims != nd) {
+      cleanup();
+      ndims = nd;
+
+      if (GPUAllocate((void**)&dim_gpu, ndims * sizeof(int))) return 1;
+      if (GPUAllocate((void**)&stride_gpu, ndims * sizeof(int))) {
+        GPUFree(dim_gpu); dim_gpu = NULL;
+        return 1;
+      }
+      if (GPUAllocate((void**)&bounds_gpu, ndims * sizeof(int))) {
+        GPUFree(dim_gpu); GPUFree(stride_gpu);
+        dim_gpu = NULL; stride_gpu = NULL;
+        return 1;
+      }
+      allocated = true;
+      dim_stride_cached = false;
+    }
+
+    /* Check if dim or stride have changed - important for multi-simulation runs */
+    bool dims_changed = false;
+    if (dim_stride_cached) {
+      /* Compare with cached host-side values (no device-to-host transfer needed) */
+      for (int i = 0; i < ndims; i++) {
+        if (cached_dim[i] != dim_host[i] || cached_stride[i] != stride_host[i]) {
+          dims_changed = true;
+          break;
+        }
+      }
+    }
+
+    /* Copy dim and stride if not cached or if dimensions have changed */
+    if (!dim_stride_cached || dims_changed) {
+      GPUCopyToDevice(dim_gpu, dim_host, ndims * sizeof(int));
+      GPUCopyToDevice(stride_gpu, stride_host, ndims * sizeof(int));
+      /* Cache the host-side values */
+      for (int i = 0; i < ndims; i++) {
+        cached_dim[i] = dim_host[i];
+        cached_stride[i] = stride_host[i];
+      }
+      dim_stride_cached = true;
+      #ifdef GPU_INTERP_DEBUG
+      fprintf(stderr, "[GPU_INTERP] %s: copied dim and stride (ndims=%d)\n", 
+              dims_changed ? "Dimensions changed" : "First call", ndims);
+      #endif
+    }
+    
+    /* Always copy bounds_inter - it changes per direction */
+    GPUCopyToDevice(bounds_gpu, bounds_host, ndims * sizeof(int));
+    #ifdef GPU_INTERP_DEBUG
+    fprintf(stderr, "[GPU_INTERP] Copied bounds_inter (ndims=%d)\n", ndims);
+    #endif
+
+    return 0;
+  }
+  
+  void cleanup() {
+    if (allocated) {
+      GPUFree(dim_gpu);
+      GPUFree(stride_gpu);
+      GPUFree(bounds_gpu);
+      dim_gpu = NULL;
+      stride_gpu = NULL;
+      bounds_gpu = NULL;
+      allocated = false;
+      dim_stride_cached = false;
+      cached_dim[0] = cached_dim[1] = cached_dim[2] = 0;
+      cached_stride[0] = cached_stride[1] = cached_stride[2] = 0;
+    }
+  }
+  
+  ~GPUInterpMetadata() { cleanup(); }
+};
+
+/* Thread-local cache for metadata (avoids repeated allocations) */
+static thread_local GPUInterpMetadata cached_metadata;
 
 /* Helper: Unified Roe average dispatch based on ndims */
 static __device__ __forceinline__ void gpu_roe_average(
@@ -698,32 +793,13 @@ void gpu_launch_weno5_interpolation_nd(
     /* Simplified CPU version - would need full index computation */
   }
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
   
-  /* Copy dim, stride_with_ghosts, and bounds_inter to GPU if needed */
-  int *dim_gpu = NULL;
-  int *stride_gpu = NULL;
-  int *bounds_inter_gpu = NULL;
-  
-  if (GPUAllocate((void**)&dim_gpu, ndims * sizeof(int))) {
-    fprintf(stderr, "Error: Failed to allocate dim_gpu for interpolation\n");
+  /* Use cached metadata to avoid repeated alloc/copy/free */
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
     return;
   }
-  if (GPUAllocate((void**)&stride_gpu, ndims * sizeof(int))) {
-    fprintf(stderr, "Error: Failed to allocate stride_gpu for interpolation\n");
-    GPUFree(dim_gpu);
-    return;
-  }
-  if (GPUAllocate((void**)&bounds_inter_gpu, ndims * sizeof(int))) {
-    fprintf(stderr, "Error: Failed to allocate bounds_inter_gpu for interpolation\n");
-    GPUFree(dim_gpu);
-    GPUFree(stride_gpu);
-    return;
-  }
-  
-  GPUCopyToDevice(dim_gpu, dim, ndims * sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims * sizeof(int));
-  GPUCopyToDevice(bounds_inter_gpu, bounds_inter, ndims * sizeof(int));
   
   /* Compute total number of interface points */
   int total_interfaces = 1;
@@ -734,13 +810,12 @@ void gpu_launch_weno5_interpolation_nd(
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
   
   GPU_KERNEL_LAUNCH(gpu_weno5_interpolation_nd_kernel, gridSize, blockSize)(
-    fI, fC, w1, w2, w3, nvars, ndims, dim_gpu, stride_gpu, bounds_inter_gpu, ghosts, dir, upw
+    fI, fC, w1, w2, w3, nvars, ndims, cached_metadata.dim_gpu, cached_metadata.stride_gpu, 
+    cached_metadata.bounds_gpu, ghosts, dir, upw
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
   
-  GPUFree(dim_gpu);
-  GPUFree(stride_gpu);
-  GPUFree(bounds_inter_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -927,32 +1002,13 @@ void gpu_launch_weno5_interpolation_nd_char(
 #ifdef GPU_NONE
   /* CPU fallback */
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
   
-  /* Copy dim, stride_with_ghosts, and bounds_inter to GPU if needed */
-  int *dim_gpu = NULL;
-  int *stride_gpu = NULL;
-  int *bounds_inter_gpu = NULL;
-  
-  if (GPUAllocate((void**)&dim_gpu, ndims * sizeof(int))) {
-    fprintf(stderr, "Error: Failed to allocate dim_gpu for characteristic interpolation\n");
+  /* Use cached metadata to avoid repeated alloc/copy/free */
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for characteristic interpolation\n");
     return;
   }
-  if (GPUAllocate((void**)&stride_gpu, ndims * sizeof(int))) {
-    fprintf(stderr, "Error: Failed to allocate stride_gpu for characteristic interpolation\n");
-    GPUFree(dim_gpu);
-    return;
-  }
-  if (GPUAllocate((void**)&bounds_inter_gpu, ndims * sizeof(int))) {
-    fprintf(stderr, "Error: Failed to allocate bounds_inter_gpu for characteristic interpolation\n");
-    GPUFree(dim_gpu);
-    GPUFree(stride_gpu);
-    return;
-  }
-  
-  GPUCopyToDevice(dim_gpu, dim, ndims * sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims * sizeof(int));
-  GPUCopyToDevice(bounds_inter_gpu, bounds_inter, ndims * sizeof(int));
   
   /* Compute total number of interface points */
   int total_interfaces = 1;
@@ -963,13 +1019,12 @@ void gpu_launch_weno5_interpolation_nd_char(
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
   
   GPU_KERNEL_LAUNCH(gpu_weno5_interpolation_nd_char_kernel, gridSize, blockSize)(
-    fI, fC, u, w1, w2, w3, nvars, ndims, dim_gpu, stride_gpu, bounds_inter_gpu, ghosts, dir, upw, gamma
+    fI, fC, u, w1, w2, w3, nvars, ndims, cached_metadata.dim_gpu, cached_metadata.stride_gpu, 
+    cached_metadata.bounds_gpu, ghosts, dir, upw, gamma
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
   
-  GPUFree(dim_gpu);
-  GPUFree(stride_gpu);
-  GPUFree(bounds_inter_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 } /* extern "C" */
@@ -987,14 +1042,14 @@ extern "C" void gpu_launch_muscl2_interpolation_nd(
   (void)fI; (void)fC; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)upw; (void)limiter_id; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\\n");
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
 
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
@@ -1003,7 +1058,7 @@ extern "C" void gpu_launch_muscl2_interpolation_nd(
     fI, fC, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, upw, limiter_id
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1020,14 +1075,15 @@ extern "C" void gpu_launch_muscl3_interpolation_nd(
   (void)fI; (void)fC; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)upw; (void)eps; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
 
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
@@ -1036,7 +1092,7 @@ extern "C" void gpu_launch_muscl3_interpolation_nd(
     fI, fC, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, upw, eps
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1053,14 +1109,16 @@ extern "C" void gpu_launch_muscl2_interpolation_nd_char_ns3d(
   (void)fI; (void)fC; (void)u; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)upw; (void)limiter_id; (void)gamma; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
@@ -1068,7 +1126,7 @@ extern "C" void gpu_launch_muscl2_interpolation_nd_char_ns3d(
     fI, fC, u, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, upw, limiter_id, gamma
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1085,14 +1143,16 @@ extern "C" void gpu_launch_muscl3_interpolation_nd_char_ns3d(
   (void)fI; (void)fC; (void)u; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)upw; (void)eps; (void)gamma; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
@@ -1100,7 +1160,7 @@ extern "C" void gpu_launch_muscl3_interpolation_nd_char_ns3d(
     fI, fC, u, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, upw, eps, gamma
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1593,14 +1653,16 @@ extern "C" void gpu_launch_first_order_upwind_nd(
   (void)fI; (void)fC; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)upw; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
@@ -1608,7 +1670,7 @@ extern "C" void gpu_launch_first_order_upwind_nd(
     fI, fC, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, upw
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1622,14 +1684,16 @@ extern "C" void gpu_launch_second_order_central_nd(
   (void)fI; (void)fC; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
@@ -1637,7 +1701,7 @@ extern "C" void gpu_launch_second_order_central_nd(
     fI, fC, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1651,14 +1715,16 @@ extern "C" void gpu_launch_fourth_order_central_nd(
   (void)fI; (void)fC; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
@@ -1666,7 +1732,7 @@ extern "C" void gpu_launch_fourth_order_central_nd(
     fI, fC, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1680,14 +1746,16 @@ extern "C" void gpu_launch_fifth_order_upwind_nd(
   (void)fI; (void)fC; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)upw; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
@@ -1695,7 +1763,7 @@ extern "C" void gpu_launch_fifth_order_upwind_nd(
     fI, fC, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, upw
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1710,14 +1778,16 @@ extern "C" void gpu_launch_first_order_upwind_nd_char_ns3d(
   (void)fI; (void)fC; (void)u; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)upw; (void)gamma; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
@@ -1725,7 +1795,7 @@ extern "C" void gpu_launch_first_order_upwind_nd_char_ns3d(
     fI, fC, u, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, upw, gamma
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1739,14 +1809,16 @@ extern "C" void gpu_launch_second_order_central_nd_char_ns3d(
   (void)fI; (void)fC; (void)u; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)gamma; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
@@ -1754,7 +1826,7 @@ extern "C" void gpu_launch_second_order_central_nd_char_ns3d(
     fI, fC, u, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, gamma
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1768,14 +1840,16 @@ extern "C" void gpu_launch_fourth_order_central_nd_char_ns3d(
   (void)fI; (void)fC; (void)u; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)gamma; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
@@ -1783,7 +1857,7 @@ extern "C" void gpu_launch_fourth_order_central_nd_char_ns3d(
     fI, fC, u, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, gamma
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1797,14 +1871,16 @@ extern "C" void gpu_launch_fifth_order_upwind_nd_char_ns3d(
   (void)fI; (void)fC; (void)u; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
   (void)bounds_inter; (void)ghosts; (void)dir; (void)upw; (void)gamma; (void)blockSize;
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  int *dim_gpu = NULL, *stride_gpu = NULL, *bounds_gpu = NULL;
-  if (GPUAllocate((void**)&dim_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&stride_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); return; }
-  if (GPUAllocate((void**)&bounds_gpu, ndims*sizeof(int))) { GPUFree(dim_gpu); GPUFree(stride_gpu); return; }
-  GPUCopyToDevice(dim_gpu, dim, ndims*sizeof(int));
-  GPUCopyToDevice(stride_gpu, stride_with_ghosts, ndims*sizeof(int));
-  GPUCopyToDevice(bounds_gpu, bounds_inter, ndims*sizeof(int));
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+
+    return;
+  }
+  int *dim_gpu = cached_metadata.dim_gpu;
+  int *stride_gpu = cached_metadata.stride_gpu;
+  int *bounds_gpu = cached_metadata.bounds_gpu;
+
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
@@ -1812,7 +1888,7 @@ extern "C" void gpu_launch_fifth_order_upwind_nd_char_ns3d(
     fI, fC, u, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, upw, gamma
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPUFree(dim_gpu); GPUFree(stride_gpu); GPUFree(bounds_gpu);
+  /* No need to free - metadata cached for reuse */
 #endif
 }
 

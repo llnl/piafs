@@ -24,7 +24,6 @@ int gpu_launch_euler1d_compute_cfl(
   int ndims = solver->ndims;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
-  int *stride_with_ghosts = solver->stride_with_ghosts;
   
   int npoints = 1;
   for (int i = 0; i < ndims; i++) {
@@ -35,17 +34,9 @@ int gpu_launch_euler1d_compute_cfl(
     return 0;
   }
   
-  int *dim_gpu = NULL;
-  int *stride_gpu = NULL;
-  int size_dim = ndims * sizeof(int);
-  int size_stride = ndims * sizeof(int);
-  
-  GPU_MALLOC((void**)&dim_gpu, size_dim);
-  GPU_MALLOC((void**)&stride_gpu, size_stride);
-  
-  GPU_MEMCPY(dim_gpu, dim, size_dim, GPU_MEMCPY_H2D);
-  GPU_MEMCPY(stride_gpu, stride_with_ghosts, size_stride, GPU_MEMCPY_H2D);
-  GPU_DEVICE_SYNC();
+  /* Use cached metadata arrays - already on device */
+  int *dim_gpu = solver->gpu_dim_local;
+  int *stride_gpu = solver->gpu_stride_with_ghosts;
   
   int blockSize = 256;
   int gridSize = (npoints + blockSize - 1) / blockSize;
@@ -64,11 +55,8 @@ int gpu_launch_euler1d_compute_cfl(
   );
   
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  GPU_DEVICE_SYNC();
   
-  GPU_FREE(dim_gpu);
-  GPU_FREE(stride_gpu);
-  
+  /* No need to sync or free - using cached metadata */
   return 0;
 }
 

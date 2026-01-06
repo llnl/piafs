@@ -47,5 +47,32 @@ void gpu_launch_array_subtract(double *z, const double *x, const double *y, int 
 void gpu_launch_array_multiply(double *z, const double *x, const double *y, int n, int blockSize);
 double gpu_launch_array_max(const double *x, int n, int blockSize);
 
+/* Fused kernel operations for performance */
+void gpu_launch_array_axpy_chain2(
+  const double *x1, double a1,
+  const double *x2, double a2,
+  double *y, int n, int blockSize);
+
+void gpu_launch_array_axpy_chain3(
+  const double *x1, double a1,
+  const double *x2, double a2,
+  const double *x3, double a3,
+  double *y, int n, int blockSize);
+
+void gpu_launch_array_axpy_chain4(
+  const double *x1, double a1,
+  const double *x2, double a2,
+  const double *x3, double a3,
+  const double *x4, double a4,
+  double *y, int n, int blockSize);
+
+void gpu_launch_array_axpy_chain_general(
+  const double **x_arrays,
+  const double *coeffs,
+  double *y,
+  int n_arrays,
+  int n,
+  int blockSize);
+
 #endif /* _GPU_KERNELS_H_ */
 

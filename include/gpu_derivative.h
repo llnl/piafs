@@ -29,6 +29,47 @@ GPU_KERNEL void gpu_first_derivative_first_order_kernel(
   double *Df, const double *f, int nvars, int npoints, int ghosts, int stride, double bias
 );
 
+/* 3D batched derivative kernels - process entire domain in single launch */
+
+/* First-order 3D kernels - ghosts parameter to skip ghost regions in non-derivative directions */
+GPU_KERNEL void gpu_first_derivative_first_order_3d_kernel(
+  double *Df, const double *f, int nvars, int ni, int nj, int nk, int ghosts, int dir, double bias
+);
+
+GPU_KERNEL void gpu_first_derivative_first_order_3d_nvars5_kernel(
+  double *Df, const double *f, int ni, int nj, int nk, int ghosts, int dir, double bias
+);
+
+GPU_KERNEL void gpu_first_derivative_first_order_3d_nvars12_kernel(
+  double *Df, const double *f, int ni, int nj, int nk, int ghosts, int dir, double bias
+);
+
+/* Second-order 3D kernels */
+GPU_KERNEL void gpu_first_derivative_second_order_3d_kernel(
+  double *Df, const double *f, int nvars, int ni, int nj, int nk, int ghosts, int dir
+);
+
+GPU_KERNEL void gpu_first_derivative_second_order_3d_nvars5_kernel(
+  double *Df, const double *f, int ni, int nj, int nk, int ghosts, int dir
+);
+
+GPU_KERNEL void gpu_first_derivative_second_order_3d_nvars12_kernel(
+  double *Df, const double *f, int ni, int nj, int nk, int ghosts, int dir
+);
+
+/* Fourth-order 3D kernels */
+GPU_KERNEL void gpu_first_derivative_fourth_order_3d_kernel(
+  double *Df, const double *f, int nvars, int ni, int nj, int nk, int ghosts, int dir
+);
+
+GPU_KERNEL void gpu_first_derivative_fourth_order_3d_nvars5_kernel(
+  double *Df, const double *f, int ni, int nj, int nk, int ghosts, int dir
+);
+
+GPU_KERNEL void gpu_first_derivative_fourth_order_3d_nvars12_kernel(
+  double *Df, const double *f, int ni, int nj, int nk, int ghosts, int dir
+);
+
 /* Launch wrappers */
 #ifdef __cplusplus
 extern "C" {
@@ -44,6 +85,19 @@ void gpu_launch_first_derivative_fourth_order(
 
 void gpu_launch_first_derivative_first_order(
   double *Df, const double *f, int nvars, int npoints, int ghosts, int stride, double bias, int blockSize
+);
+
+/* 3D batched launch wrappers - ghosts parameter to skip ghost regions in non-derivative directions */
+void gpu_launch_first_derivative_first_order_3d(
+  double *Df, const double *f, int nvars, int ni, int nj, int nk, int ghosts, int dir, double bias, int blockSize
+);
+
+void gpu_launch_first_derivative_second_order_3d(
+  double *Df, const double *f, int nvars, int ni, int nj, int nk, int ghosts, int dir, int blockSize
+);
+
+void gpu_launch_first_derivative_fourth_order_3d(
+  double *Df, const double *f, int nvars, int ni, int nj, int nk, int ghosts, int dir, int blockSize
 );
 
 #ifdef __cplusplus

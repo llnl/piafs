@@ -42,6 +42,7 @@ endif()
 set(GPU_SOURCES
   gpu.c
   gpu_arrayfunctions.c
+  gpu_config.c
   gpu_initialize.c
   gpu_io.c
   gpu_mpi.c
@@ -54,6 +55,7 @@ if(ENABLE_GPU)
   if(ENABLE_CUDA)
     set(GPU_KERNEL_SOURCES
       gpu_kernels.cu
+      gpu_kernels_optimized.cu
       gpu_launch.cu
       gpu_mpi_kernels.cu
     )
@@ -65,6 +67,7 @@ if(ENABLE_GPU)
   elseif(ENABLE_HIP)
     set(GPU_KERNEL_SOURCES
       gpu_kernels.cu
+      gpu_kernels_optimized.cu
       gpu_launch.cu
       gpu_mpi_kernels.cu
     )

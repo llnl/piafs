@@ -63,8 +63,11 @@ double GPUNavierStokes3DComputeCFL(
     return -1.0;
   }
   
-  /* Find maximum CFL using GPU reduction */
-  double max_cfl = gpu_launch_array_max(cfl_local_gpu, npoints, 256);
+  /* Find maximum CFL using GPU reduction with persistent buffers */
+  double max_cfl = gpu_launch_array_max_opt(cfl_local_gpu, npoints,
+                                              solver->gpu_reduce_buffer,
+                                              solver->gpu_reduce_buffer_size,
+                                              solver->gpu_reduce_result, 256);
   GPUFree(cfl_local_gpu);
   
   /* Get global maximum across MPI ranks */

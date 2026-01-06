@@ -6,6 +6,9 @@
 #include <physicalmodels/gpu_ns3d_helpers.h>
 #include <math.h>
 
+/* Compile-time constant for 3D - enables loop unrolling and better optimization */
+#define NS3D_NDIMS 3
+
 #ifdef GPU_CUDA
   #define GPU_KERNEL __global__
 #elif defined(GPU_HIP)
@@ -102,42 +105,33 @@ GPU_KERNEL void gpu_ns3d_upwind_roe_kernel(
   double *workspace        /* dynamically allocated workspace */
 )
 {
-  /* Compute total number of interface points */
-  int total_interfaces = 1;
-  for (int i = 0; i < ndims; i++) {
-    total_interfaces *= bounds_inter[i];
-  }
+  /* Compute total number of interface points - unrolled for 3D */
+  int total_interfaces = bounds_inter[0] * bounds_inter[1] * bounds_inter[2];
   
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < total_interfaces) {
-    /* Decompose idx into multi-dimensional interface index */
-    int indexI[3]; /* Support up to 3D */
+    /* Decompose idx into 3D interface index - unrolled for compiler optimization */
+    int indexI[NS3D_NDIMS];
     int temp = idx;
-    for (int i = ndims - 1; i >= 0; i--) {
-      indexI[i] = temp % bounds_inter[i];
-      temp /= bounds_inter[i];
-    }
+    indexI[2] = temp % bounds_inter[2]; temp /= bounds_inter[2];
+    indexI[1] = temp % bounds_inter[1]; temp /= bounds_inter[1];
+    indexI[0] = temp;
     
-    /* Compute 1D index for interface point (no ghosts) */
-    int p = indexI[ndims-1];
-    for (int i = ndims-2; i >= 0; i--) {
-      p = p * bounds_inter[i] + indexI[i];
-    }
+    /* Compute 1D index for interface point (no ghosts) - unrolled */
+    int p = indexI[2] + bounds_inter[2] * (indexI[1] + bounds_inter[1] * indexI[0]);
     
-    /* Compute cell indices for left and right cells */
-    int indexL[3], indexR[3];
-    for (int i = 0; i < ndims; i++) {
-      indexL[i] = indexI[i];
-      indexR[i] = indexI[i];
-    }
+    /* Compute cell indices for left and right cells - unrolled */
+    int indexL[NS3D_NDIMS] = {indexI[0], indexI[1], indexI[2]};
+    int indexR[NS3D_NDIMS] = {indexI[0], indexI[1], indexI[2]};
     indexL[dir]--;
     
-    /* Compute 1D indices for cell-centered arrays (with ghosts) */
-    int pL = 0, pR = 0;
-    for (int i = 0; i < ndims; i++) {
-      pL += (indexL[i] + ghosts) * stride_with_ghosts[i];
-      pR += (indexR[i] + ghosts) * stride_with_ghosts[i];
-    }
+    /* Compute 1D indices for cell-centered arrays (with ghosts) - unrolled */
+    int pL = (indexL[0] + ghosts) * stride_with_ghosts[0] +
+             (indexL[1] + ghosts) * stride_with_ghosts[1] +
+             (indexL[2] + ghosts) * stride_with_ghosts[2];
+    int pR = (indexR[0] + ghosts) * stride_with_ghosts[0] +
+             (indexR[1] + ghosts) * stride_with_ghosts[1] +
+             (indexR[2] + ghosts) * stride_with_ghosts[2];
     
     /* Roe's upwinding scheme - use dynamic workspace */
     /* Workspace layout: [udiff, uavg, udiss, D, L, R, DL, modA] */
@@ -195,50 +189,172 @@ __device__ double gpu_max3(double a, double b, double c) {
   return (ab > c) ? ab : c;
 }
 
-/* Kernel: RF (Roe-Fixed) upwinding for NavierStokes3D */
-GPU_KERNEL void gpu_ns3d_upwind_rf_kernel(
+/* Helper: Optimized matvec multiply for nvars=5 - fully unrolled */
+__device__ void gpu_matvecmult_5(double *y, const double *A, const double *x) {
+  #pragma unroll
+  for (int i = 0; i < 5; i++) {
+    y[i] = A[i*5+0]*x[0] + A[i*5+1]*x[1] + A[i*5+2]*x[2] + A[i*5+3]*x[3] + A[i*5+4]*x[4];
+  }
+}
+
+/* Helper: Optimized matvec multiply for nvars=12 - fully unrolled */
+__device__ void gpu_matvecmult_12(double *y, const double *A, const double *x) {
+  #pragma unroll
+  for (int i = 0; i < 12; i++) {
+    y[i] = A[i*12+0]*x[0] + A[i*12+1]*x[1] + A[i*12+2]*x[2] + A[i*12+3]*x[3] +
+           A[i*12+4]*x[4] + A[i*12+5]*x[5] + A[i*12+6]*x[6] + A[i*12+7]*x[7] +
+           A[i*12+8]*x[8] + A[i*12+9]*x[9] + A[i*12+10]*x[10] + A[i*12+11]*x[11];
+  }
+}
+
+/* Helper: Extract eigenvalues directly without full matrix - optimized for NS3D */
+__device__ void gpu_ns3d_eigenvalues_diag(const double *u, double *eig, double gamma, int nvars, int dir) {
+  double rho = u[0];
+  if (rho == 0.0) {
+    #pragma unroll
+    for (int i = 0; i < 12; i++) eig[i] = 0.0;  /* Max nvars we optimize for */
+    return;
+  }
+  double vx = u[1] / rho;
+  double vy = u[2] / rho;
+  double vz = u[3] / rho;
+  double e = u[4];
+  double vsq = vx*vx + vy*vy + vz*vz;
+  double P = (gamma - 1.0) * (e - 0.5 * rho * vsq);
+  if (P <= 0.0 || rho <= 0.0) {
+    #pragma unroll
+    for (int i = 0; i < 12; i++) eig[i] = 0.0;
+    return;
+  }
+  double c = sqrt(gamma * P / rho);
+  
+  double vn = (dir == _XDIR_) ? vx : ((dir == _YDIR_) ? vy : vz);
+  
+  /* Extract diagonal eigenvalues directly - pattern depends on direction */
+  eig[0] = vn;
+  if (dir == _XDIR_) {
+    eig[1] = vn - c;
+    eig[2] = vn;
+    eig[3] = vn;
+  } else if (dir == _YDIR_) {
+    eig[1] = vn;
+    eig[2] = vn - c;
+    eig[3] = vn;
+  } else {  /* _ZDIR_ */
+    eig[1] = vn;
+    eig[2] = vn;
+    eig[3] = vn - c;
+  }
+  eig[4] = vn + c;
+  /* Passively advected species have eigenvalue vn */
+  #pragma unroll
+  for (int m_i = 5; m_i < nvars; m_i++) {
+    eig[m_i] = vn;
+  }
+}
+
+/* Kernel: RF upwinding optimized for nvars=5 */
+GPU_KERNEL void gpu_ns3d_upwind_rf_kernel_nvars5(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
-  int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
   int ghosts, int dir, double gamma, double *workspace
 )
 {
-  int total_interfaces = 1;
-  for (int i = 0; i < ndims; i++) {
-    total_interfaces *= bounds_inter[i];
-  }
+  /* Compile-time constants for optimization */
+  const int nvars = 5;
+  
+  /* Unrolled for 3D */
+  int total_interfaces = bounds_inter[0] * bounds_inter[1] * bounds_inter[2];
   
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < total_interfaces) {
+    /* Decompose idx - unrolled for 3D */
     int indexI[3];
     int temp = idx;
-    for (int i = ndims - 1; i >= 0; i--) {
-      indexI[i] = temp % bounds_inter[i];
-      temp /= bounds_inter[i];
-    }
+    indexI[2] = temp % bounds_inter[2]; temp /= bounds_inter[2];
+    indexI[1] = temp % bounds_inter[1]; temp /= bounds_inter[1];
+    indexI[0] = temp;
     
-    int p = indexI[ndims-1];
-    for (int i = ndims-2; i >= 0; i--) {
-      p = p * bounds_inter[i] + indexI[i];
-    }
+    /* Compute 1D interface index - unrolled */
+    int p = indexI[2] + bounds_inter[2] * (indexI[1] + bounds_inter[1] * indexI[0]);
     
-    int indexL[3], indexR[3];
-    for (int i = 0; i < ndims; i++) {
-      indexL[i] = indexI[i];
-      indexR[i] = indexI[i];
-    }
+    /* Compute cell indices - unrolled */
+    int indexL[3] = {indexI[0], indexI[1], indexI[2]};
     indexL[dir]--;
+
+    /* Use shared memory for thread-local workspace */
+    double uavg[5], fcL[5], fcR[5], ucL[5], ucR[5], fc[5];
+    double eigL[5], eigC[5], eigR[5];
+    double L[25], R[25];  /* 5x5 matrices */
     
-    int pL = 0, pR = 0;
-    for (int i = 0; i < ndims; i++) {
-      pL += (indexL[i] + ghosts) * stride_with_ghosts[i];
-      pR += (indexR[i] + ghosts) * stride_with_ghosts[i];
+    /* Roe average */
+    gpu_ns3d_roe_average(uavg, uL + p*nvars, uR + p*nvars, nvars, gamma);
+    
+    /* Eigenvectors */
+    gpu_ns3d_left_eigenvectors(uavg, L, gamma, nvars, dir);
+    gpu_ns3d_right_eigenvectors(uavg, R, gamma, nvars, dir);
+    
+    /* Matrix-vector multiplies - use optimized version */
+    gpu_matvecmult_5(ucL, L, uL + p*nvars);
+    gpu_matvecmult_5(ucR, L, uR + p*nvars);
+    gpu_matvecmult_5(fcL, L, fL + p*nvars);
+    gpu_matvecmult_5(fcR, L, fR + p*nvars);
+    
+    /* Eigenvalues - extract diagonal only */
+    gpu_ns3d_eigenvalues_diag(uL + p*nvars, eigL, gamma, nvars, dir);
+    gpu_ns3d_eigenvalues_diag(uR + p*nvars, eigR, gamma, nvars, dir);
+    gpu_ns3d_eigenvalues_diag(uavg, eigC, gamma, nvars, dir);
+    
+    /* Compute characteristic fluxes - fully unrolled */
+    #pragma unroll
+    for (int k = 0; k < 5; k++) {
+      if ((eigL[k] > 0) && (eigC[k] > 0) && (eigR[k] > 0)) {
+        fc[k] = fcL[k];
+      } else if ((eigL[k] < 0) && (eigC[k] < 0) && (eigR[k] < 0)) {
+        fc[k] = fcR[k];
+      } else {
+        double alpha = gpu_max3(gpu_absolute(eigL[k]), gpu_absolute(eigC[k]), gpu_absolute(eigR[k]));
+        fc[k] = 0.5 * (fcL[k] + fcR[k] + alpha * (ucL[k] - ucR[k]));
+      }
     }
     
-    /* RF scheme - use dynamic workspace */
-    /* Workspace layout: [uavg, fcL, fcR, ucL, ucR, fc, eigL, eigC, eigR, D, L, R] */
-    /* Total: 9*nvars + 3*nvars*nvars per thread */
+    /* Transform back - use optimized version */
+    gpu_matvecmult_5(fI + p*nvars, R, fc);
+  }
+}
+
+/* Kernel: RF upwinding optimized for nvars=12 */
+GPU_KERNEL void gpu_ns3d_upwind_rf_kernel_nvars12(
+  double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
+  const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, double gamma, double *workspace
+)
+{
+  /* Compile-time constants for optimization */
+  const int nvars = 12;
+  
+  /* Unrolled for 3D */
+  int total_interfaces = bounds_inter[0] * bounds_inter[1] * bounds_inter[2];
+  
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < total_interfaces) {
+    /* Decompose idx - unrolled for 3D */
+    int indexI[3];
+    int temp = idx;
+    indexI[2] = temp % bounds_inter[2]; temp /= bounds_inter[2];
+    indexI[1] = temp % bounds_inter[1]; temp /= bounds_inter[1];
+    indexI[0] = temp;
+    
+    /* Compute 1D interface index - unrolled */
+    int p = indexI[2] + bounds_inter[2] * (indexI[1] + bounds_inter[1] * indexI[0]);
+    
+    /* Compute cell indices - unrolled */
+    int indexL[3] = {indexI[0], indexI[1], indexI[2]};
+    indexL[dir]--;
+
+    /* Workspace from global memory for nvars=12 (too large for registers) */
     int threadId = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
+    size_t workspace_per_thread = 9 * nvars + 2 * nvars * nvars;
     double *thread_workspace = workspace + threadId * workspace_per_thread;
     
     double *uavg = thread_workspace;
@@ -250,8 +366,88 @@ GPU_KERNEL void gpu_ns3d_upwind_rf_kernel(
     double *eigL = fc + nvars;
     double *eigC = eigL + nvars;
     double *eigR = eigC + nvars;
-    double *D = eigR + nvars;
-    double *L = D + nvars * nvars;
+    double *L = eigR + nvars;
+    double *R = L + nvars * nvars;
+    
+    /* Roe average */
+    gpu_ns3d_roe_average(uavg, uL + p*nvars, uR + p*nvars, nvars, gamma);
+    
+    /* Eigenvectors */
+    gpu_ns3d_left_eigenvectors(uavg, L, gamma, nvars, dir);
+    gpu_ns3d_right_eigenvectors(uavg, R, gamma, nvars, dir);
+    
+    /* Matrix-vector multiplies - use optimized version */
+    gpu_matvecmult_12(ucL, L, uL + p*nvars);
+    gpu_matvecmult_12(ucR, L, uR + p*nvars);
+    gpu_matvecmult_12(fcL, L, fL + p*nvars);
+    gpu_matvecmult_12(fcR, L, fR + p*nvars);
+    
+    /* Eigenvalues - extract diagonal only */
+    gpu_ns3d_eigenvalues_diag(uL + p*nvars, eigL, gamma, nvars, dir);
+    gpu_ns3d_eigenvalues_diag(uR + p*nvars, eigR, gamma, nvars, dir);
+    gpu_ns3d_eigenvalues_diag(uavg, eigC, gamma, nvars, dir);
+    
+    /* Compute characteristic fluxes - fully unrolled */
+    #pragma unroll
+    for (int k = 0; k < 12; k++) {
+      if ((eigL[k] > 0) && (eigC[k] > 0) && (eigR[k] > 0)) {
+        fc[k] = fcL[k];
+      } else if ((eigL[k] < 0) && (eigC[k] < 0) && (eigR[k] < 0)) {
+        fc[k] = fcR[k];
+      } else {
+        double alpha = gpu_max3(gpu_absolute(eigL[k]), gpu_absolute(eigC[k]), gpu_absolute(eigR[k]));
+        fc[k] = 0.5 * (fcL[k] + fcR[k] + alpha * (ucL[k] - ucR[k]));
+      }
+    }
+    
+    /* Transform back - use optimized version */
+    gpu_matvecmult_12(fI + p*nvars, R, fc);
+  }
+}
+
+/* Kernel: RF (Roe-Fixed) upwinding for NavierStokes3D - general fallback */
+GPU_KERNEL void gpu_ns3d_upwind_rf_kernel(
+  double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
+  int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, double gamma, double *workspace
+)
+{
+  /* Unrolled for 3D */
+  int total_interfaces = bounds_inter[0] * bounds_inter[1] * bounds_inter[2];
+  
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < total_interfaces) {
+    /* Decompose idx - unrolled for 3D */
+    int indexI[NS3D_NDIMS];
+    int temp = idx;
+    indexI[2] = temp % bounds_inter[2]; temp /= bounds_inter[2];
+    indexI[1] = temp % bounds_inter[1]; temp /= bounds_inter[1];
+    indexI[0] = temp;
+    
+    /* Compute 1D interface index - unrolled */
+    int p = indexI[2] + bounds_inter[2] * (indexI[1] + bounds_inter[1] * indexI[0]);
+    
+    /* Compute cell indices - unrolled */
+    int indexL[NS3D_NDIMS] = {indexI[0], indexI[1], indexI[2]};
+    indexL[dir]--;
+
+    /* RF scheme - use dynamic workspace */
+    /* Workspace layout: [uavg, fcL, fcR, ucL, ucR, fc, eigL, eigC, eigR, L, R] */
+    /* Total: 9*nvars + 2*nvars*nvars per thread */
+    int threadId = blockIdx.x * blockDim.x + threadIdx.x;
+    size_t workspace_per_thread = 9 * nvars + 2 * nvars * nvars;
+    double *thread_workspace = workspace + threadId * workspace_per_thread;
+    
+    double *uavg = thread_workspace;
+    double *fcL = uavg + nvars;
+    double *fcR = fcL + nvars;
+    double *ucL = fcR + nvars;
+    double *ucR = ucL + nvars;
+    double *fc = ucR + nvars;
+    double *eigL = fc + nvars;
+    double *eigC = eigL + nvars;
+    double *eigR = eigC + nvars;
+    double *L = eigR + nvars;
     double *R = L + nvars * nvars;
     
     gpu_ns3d_roe_average(uavg, uL + p*nvars, uR + p*nvars, nvars, gamma);
@@ -263,12 +459,10 @@ GPU_KERNEL void gpu_ns3d_upwind_rf_kernel(
     gpu_matvecmult(nvars, fcL, L, fL + p*nvars);
     gpu_matvecmult(nvars, fcR, L, fR + p*nvars);
     
-    gpu_ns3d_eigenvalues(uL + p*nvars, D, gamma, nvars, dir);
-    for (int k = 0; k < nvars; k++) eigL[k] = D[k*nvars+k];
-    gpu_ns3d_eigenvalues(uR + p*nvars, D, gamma, nvars, dir);
-    for (int k = 0; k < nvars; k++) eigR[k] = D[k*nvars+k];
-    gpu_ns3d_eigenvalues(uavg, D, gamma, nvars, dir);
-    for (int k = 0; k < nvars; k++) eigC[k] = D[k*nvars+k];
+    /* Use optimized eigenvalue extraction */
+    gpu_ns3d_eigenvalues_diag(uL + p*nvars, eigL, gamma, nvars, dir);
+    gpu_ns3d_eigenvalues_diag(uR + p*nvars, eigR, gamma, nvars, dir);
+    gpu_ns3d_eigenvalues_diag(uavg, eigC, gamma, nvars, dir);
     
     for (int k = 0; k < nvars; k++) {
       if ((eigL[k] > 0) && (eigC[k] > 0) && (eigR[k] > 0)) {

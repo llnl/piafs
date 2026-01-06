@@ -7,6 +7,7 @@
 #define _HYPAR_H_
 
 #include <basic.h>
+#include <stddef.h>  /* for size_t */
 
 /*! \def HyPar
     \brief Structure containing all solver-specific variables and functions
@@ -331,6 +332,35 @@ typedef struct main_parameters {
   int count_hyp, /*!< number of times the hyperbolic function is called */
       count_par, /*!< number of times the parabolic function is called */
       count_sou; /*!< number of times the source function is called */
+
+  /*! GPU optimization: cached metadata arrays to avoid repeated transfers */
+  int *gpu_dim_local;           /*!< device copy of dim_local */
+  int *gpu_stride_with_ghosts;  /*!< device copy of stride_with_ghosts */
+  int *gpu_stride_without_ghosts; /*!< device copy of stride_without_ghosts */
+  
+  /*! GPU optimization: persistent temporary buffers for reduction operations */
+  double *gpu_reduce_buffer;    /*!< device buffer for intermediate reduction results */
+  size_t gpu_reduce_buffer_size; /*!< size of reduction buffer in bytes */
+  double *gpu_reduce_result;    /*!< device buffer for final reduction result */
+  
+  /*! GPU optimization: persistent workspace buffers for parabolic terms */
+  double *gpu_parabolic_workspace_Q;        /*!< workspace for primitive variables */
+  double *gpu_parabolic_workspace_QDerivX;  /*!< workspace for X derivatives */
+  double *gpu_parabolic_workspace_QDerivY;  /*!< workspace for Y derivatives */
+  double *gpu_parabolic_workspace_QDerivZ;  /*!< workspace for Z derivatives */
+  double *gpu_parabolic_workspace_FViscous; /*!< workspace for viscous flux */
+  double *gpu_parabolic_workspace_FDeriv;   /*!< workspace for flux derivative */
+  size_t gpu_parabolic_workspace_size;      /*!< size of each workspace array in elements */
+
+#if defined(GPU_CUDA)
+  void *gpu_stream_hyp;         /*!< CUDA stream for hyperbolic term computation */
+  void *gpu_stream_par;         /*!< CUDA stream for parabolic term computation */
+  void *gpu_stream_sou;         /*!< CUDA stream for source term computation */
+#elif defined(GPU_HIP)
+  void *gpu_stream_hyp;         /*!< HIP stream for hyperbolic term computation */
+  void *gpu_stream_par;         /*!< HIP stream for parabolic term computation */
+  void *gpu_stream_sou;         /*!< HIP stream for source term computation */
+#endif
 
 } HyPar;
 

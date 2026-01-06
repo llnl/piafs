@@ -4,6 +4,7 @@
 
 #include <gpu.h>
 #include <gpu_launch.h>
+#include <gpu_config.h>
 #ifndef GPU_NONE
 #include <gpu_kernels.h>
 #endif
@@ -21,7 +22,7 @@ void gpu_launch_array_copy(double *dst, const double *src, int n, int blockSize)
   /* Clear any previous errors */
   GPU_GET_LAST_ERROR();
   
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("memory_bound", n);
   int gridSize = (n + blockSize - 1) / blockSize;
   
   /* Safety checks */
@@ -96,7 +97,7 @@ void gpu_launch_array_axpy(const double *x, double a, double *y, int n, int bloc
 #ifdef GPU_NONE
   for (int i = 0; i < n; i++) y[i] += a * x[i];
 #else
-  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("memory_bound", n);
   int gridSize = (n + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_array_axpy, gridSize, blockSize)(x, a, y, n);
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
@@ -224,6 +225,57 @@ double gpu_launch_array_max(const double *x, int n, int blockSize)
   /* Free temporary arrays */
   GPU_FREE(d_partial);
   GPU_FREE(d_result);
+
+  return result;
+#endif
+}
+
+/* Optimized GPU max reduction using persistent buffers - avoids repeated allocations */
+double gpu_launch_array_max_opt(const double *x, int n,
+                                 double *reduce_buffer, size_t buffer_size,
+                                 double *reduce_result, int blockSize)
+{
+#ifdef GPU_NONE
+  /* CPU fallback */
+  double max_val = -1e308;
+  for (int i = 0; i < n; i++) {
+    if (x[i] > max_val) max_val = x[i];
+  }
+  return max_val;
+#else
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("reduction", n);
+  if (n <= 0) return 0.0;
+
+  int gridSize = (n + blockSize - 1) / blockSize;
+  
+  /* Check if buffer is large enough */
+  size_t required_size = gridSize * sizeof(double);
+  if (required_size > buffer_size) {
+    fprintf(stderr, "Warning: Reduction buffer too small (%zu < %zu), falling back to allocation\n",
+            buffer_size, required_size);
+    return gpu_launch_array_max(x, n, blockSize);
+  }
+
+  /* First pass: each block computes its partial max using persistent buffer */
+  size_t sharedMemSize = blockSize * sizeof(double);
+  gpu_array_max_block<<<gridSize, blockSize, sharedMemSize>>>(x, reduce_buffer, n);
+  GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
+
+  /* Second pass: reduce partial results */
+  int finalBlockSize = (gridSize < blockSize) ? gridSize : blockSize;
+  /* Round up to next power of 2 for efficient reduction */
+  int powerOf2 = 1;
+  while (powerOf2 < finalBlockSize) powerOf2 <<= 1;
+  finalBlockSize = powerOf2;
+  if (finalBlockSize > 1024) finalBlockSize = 1024;
+
+  sharedMemSize = finalBlockSize * sizeof(double);
+  gpu_array_max_final<<<1, finalBlockSize, sharedMemSize>>>(reduce_buffer, reduce_result, gridSize);
+  GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
+
+  /* Copy result back to host */
+  double result;
+  GPU_MEMCPY(&result, reduce_result, sizeof(double), GPU_MEMCPY_D2H);
 
   return result;
 #endif

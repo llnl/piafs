@@ -184,3 +184,167 @@ int GPUIsAvailable(void)
 #endif
 }
 
+int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou)
+{
+#ifdef GPU_CUDA
+  cudaStream_t *s_hyp = (cudaStream_t*)malloc(sizeof(cudaStream_t));
+  cudaStream_t *s_par = (cudaStream_t*)malloc(sizeof(cudaStream_t));
+  cudaStream_t *s_sou = (cudaStream_t*)malloc(sizeof(cudaStream_t));
+  
+  if (!s_hyp || !s_par || !s_sou) {
+    fprintf(stderr, "Error: Failed to allocate memory for CUDA streams\n");
+    if (s_hyp) free(s_hyp);
+    if (s_par) free(s_par);
+    if (s_sou) free(s_sou);
+    return 1;
+  }
+  
+  cudaError_t err;
+  err = cudaStreamCreate(s_hyp);
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Error: Failed to create CUDA stream (hyp): %s\n", cudaGetErrorString(err));
+    free(s_hyp); free(s_par); free(s_sou);
+    return 1;
+  }
+  
+  err = cudaStreamCreate(s_par);
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Error: Failed to create CUDA stream (par): %s\n", cudaGetErrorString(err));
+    cudaStreamDestroy(*s_hyp);
+    free(s_hyp); free(s_par); free(s_sou);
+    return 1;
+  }
+  
+  err = cudaStreamCreate(s_sou);
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Error: Failed to create CUDA stream (sou): %s\n", cudaGetErrorString(err));
+    cudaStreamDestroy(*s_hyp);
+    cudaStreamDestroy(*s_par);
+    free(s_hyp); free(s_par); free(s_sou);
+    return 1;
+  }
+  
+  *stream_hyp = (void*)s_hyp;
+  *stream_par = (void*)s_par;
+  *stream_sou = (void*)s_sou;
+  return 0;
+  
+#elif defined(GPU_HIP)
+  hipStream_t *s_hyp = (hipStream_t*)malloc(sizeof(hipStream_t));
+  hipStream_t *s_par = (hipStream_t*)malloc(sizeof(hipStream_t));
+  hipStream_t *s_sou = (hipStream_t*)malloc(sizeof(hipStream_t));
+  
+  if (!s_hyp || !s_par || !s_sou) {
+    fprintf(stderr, "Error: Failed to allocate memory for HIP streams\n");
+    if (s_hyp) free(s_hyp);
+    if (s_par) free(s_par);
+    if (s_sou) free(s_sou);
+    return 1;
+  }
+  
+  hipError_t err;
+  err = hipStreamCreate(s_hyp);
+  if (err != hipSuccess) {
+    fprintf(stderr, "Error: Failed to create HIP stream (hyp): %s\n", hipGetErrorString(err));
+    free(s_hyp); free(s_par); free(s_sou);
+    return 1;
+  }
+  
+  err = hipStreamCreate(s_par);
+  if (err != hipSuccess) {
+    fprintf(stderr, "Error: Failed to create HIP stream (par): %s\n", hipGetErrorString(err));
+    hipStreamDestroy(*s_hyp);
+    free(s_hyp); free(s_par); free(s_sou);
+    return 1;
+  }
+  
+  err = hipStreamCreate(s_sou);
+  if (err != hipSuccess) {
+    fprintf(stderr, "Error: Failed to create HIP stream (sou): %s\n", hipGetErrorString(err));
+    hipStreamDestroy(*s_hyp);
+    hipStreamDestroy(*s_par);
+    free(s_hyp); free(s_par); free(s_sou);
+    return 1;
+  }
+  
+  *stream_hyp = (void*)s_hyp;
+  *stream_par = (void*)s_par;
+  *stream_sou = (void*)s_sou;
+  return 0;
+  
+#else
+  *stream_hyp = NULL;
+  *stream_par = NULL;
+  *stream_sou = NULL;
+  return 0;
+#endif
+}
+
+int GPUDestroyStreams(void *stream_hyp, void *stream_par, void *stream_sou)
+{
+#ifdef GPU_CUDA
+  if (stream_hyp) {
+    cudaStreamDestroy(*(cudaStream_t*)stream_hyp);
+    free(stream_hyp);
+  }
+  if (stream_par) {
+    cudaStreamDestroy(*(cudaStream_t*)stream_par);
+    free(stream_par);
+  }
+  if (stream_sou) {
+    cudaStreamDestroy(*(cudaStream_t*)stream_sou);
+    free(stream_sou);
+  }
+  return 0;
+  
+#elif defined(GPU_HIP)
+  if (stream_hyp) {
+    hipStreamDestroy(*(hipStream_t*)stream_hyp);
+    free(stream_hyp);
+  }
+  if (stream_par) {
+    hipStreamDestroy(*(hipStream_t*)stream_par);
+    free(stream_par);
+  }
+  if (stream_sou) {
+    hipStreamDestroy(*(hipStream_t*)stream_sou);
+    free(stream_sou);
+  }
+  return 0;
+  
+#else
+  (void)stream_hyp;
+  (void)stream_par;
+  (void)stream_sou;
+  return 0;
+#endif
+}
+
+int GPUStreamSynchronize(void *stream)
+{
+#ifdef GPU_CUDA
+  if (stream) {
+    cudaError_t err = cudaStreamSynchronize(*(cudaStream_t*)stream);
+    if (err != cudaSuccess) {
+      fprintf(stderr, "Error: CUDA stream synchronization failed: %s\n", cudaGetErrorString(err));
+      return 1;
+    }
+  }
+  return 0;
+  
+#elif defined(GPU_HIP)
+  if (stream) {
+    hipError_t err = hipStreamSynchronize(*(hipStream_t*)stream);
+    if (err != hipSuccess) {
+      fprintf(stderr, "Error: HIP stream synchronization failed: %s\n", hipGetErrorString(err));
+      return 1;
+    }
+  }
+  return 0;
+  
+#else
+  (void)stream;
+  return 0;
+#endif
+}
+

@@ -14,10 +14,12 @@
 #include <gpu.h>
 #include <gpu_runtime.h>
 #include <gpu_arrayfunctions.h>
+#include <gpu_kernels.h>
 #elif defined(GPU_HIP)
 #include <gpu.h>
 #include <gpu_runtime.h>
 #include <gpu_arrayfunctions.h>
+#include <gpu_kernels.h>
 #endif
 
 /*!
@@ -69,12 +71,44 @@ int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
                      TS->u_sizes[ns]);
       }
 
-      /* Compute stage values on GPU */
-      for (i = 0; i < stage; i++) {
-        GPUArrayAXPY(TS->Udot[i],
-                     TS->dt * params->A[stage*params->nstages+i],
+      /* Compute stage values on GPU - use fused kernels for performance */
+      if (stage == 0) {
+        /* Stage 0: No computation needed, U[0] already copied */
+      } else if (stage == 1) {
+        /* Stage 1: Single AXPY */
+        GPUArrayAXPY(TS->Udot[0],
+                     TS->dt * params->A[stage*params->nstages+0],
                      TS->U[stage],
                      TS->u_size_total);
+      } else if (stage == 2) {
+        /* Stage 2: Fused 2-way AXPY */
+        gpu_launch_array_axpy_chain2(
+          TS->Udot[0], TS->dt * params->A[stage*params->nstages+0],
+          TS->Udot[1], TS->dt * params->A[stage*params->nstages+1],
+          TS->U[stage], TS->u_size_total, 512);
+      } else if (stage == 3) {
+        /* Stage 3: Fused 3-way AXPY */
+        gpu_launch_array_axpy_chain3(
+          TS->Udot[0], TS->dt * params->A[stage*params->nstages+0],
+          TS->Udot[1], TS->dt * params->A[stage*params->nstages+1],
+          TS->Udot[2], TS->dt * params->A[stage*params->nstages+2],
+          TS->U[stage], TS->u_size_total, 512);
+      } else if (stage == 4) {
+        /* Stage 4: Fused 4-way AXPY */
+        gpu_launch_array_axpy_chain4(
+          TS->Udot[0], TS->dt * params->A[stage*params->nstages+0],
+          TS->Udot[1], TS->dt * params->A[stage*params->nstages+1],
+          TS->Udot[2], TS->dt * params->A[stage*params->nstages+2],
+          TS->Udot[3], TS->dt * params->A[stage*params->nstages+3],
+          TS->U[stage], TS->u_size_total, 512);
+      } else {
+        /* General case: Fallback to loop for higher-order methods */
+        for (i = 0; i < stage; i++) {
+          GPUArrayAXPY(TS->Udot[i],
+                       TS->dt * params->A[stage*params->nstages+i],
+                       TS->U[stage],
+                       TS->u_size_total);
+        }
       }
     } else {
       for (ns = 0; ns < nsims; ns++) {
@@ -99,12 +133,44 @@ int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
                      TS->u_sizes[ns]);
       }
 
-      /* Compute stage values on GPU */
-      for (i = 0; i < stage; i++) {
-        GPUArrayAXPY(TS->Udot[i],
-                     TS->dt * params->A[stage*params->nstages+i],
+      /* Compute stage values on GPU - use fused kernels for performance */
+      if (stage == 0) {
+        /* Stage 0: No computation needed, U[0] already copied */
+      } else if (stage == 1) {
+        /* Stage 1: Single AXPY */
+        GPUArrayAXPY(TS->Udot[0],
+                     TS->dt * params->A[stage*params->nstages+0],
                      TS->U[stage],
                      TS->u_size_total);
+      } else if (stage == 2) {
+        /* Stage 2: Fused 2-way AXPY */
+        gpu_launch_array_axpy_chain2(
+          TS->Udot[0], TS->dt * params->A[stage*params->nstages+0],
+          TS->Udot[1], TS->dt * params->A[stage*params->nstages+1],
+          TS->U[stage], TS->u_size_total, 512);
+      } else if (stage == 3) {
+        /* Stage 3: Fused 3-way AXPY */
+        gpu_launch_array_axpy_chain3(
+          TS->Udot[0], TS->dt * params->A[stage*params->nstages+0],
+          TS->Udot[1], TS->dt * params->A[stage*params->nstages+1],
+          TS->Udot[2], TS->dt * params->A[stage*params->nstages+2],
+          TS->U[stage], TS->u_size_total, 512);
+      } else if (stage == 4) {
+        /* Stage 4: Fused 4-way AXPY */
+        gpu_launch_array_axpy_chain4(
+          TS->Udot[0], TS->dt * params->A[stage*params->nstages+0],
+          TS->Udot[1], TS->dt * params->A[stage*params->nstages+1],
+          TS->Udot[2], TS->dt * params->A[stage*params->nstages+2],
+          TS->Udot[3], TS->dt * params->A[stage*params->nstages+3],
+          TS->U[stage], TS->u_size_total, 512);
+      } else {
+        /* General case: Fallback to loop for higher-order methods */
+        for (i = 0; i < stage; i++) {
+          GPUArrayAXPY(TS->Udot[i],
+                       TS->dt * params->A[stage*params->nstages+i],
+                       TS->U[stage],
+                       TS->u_size_total);
+        }
       }
     } else {
       for (ns = 0; ns < nsims; ns++) {

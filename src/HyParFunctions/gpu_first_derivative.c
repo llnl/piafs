@@ -31,7 +31,21 @@ int GPUFirstDerivativeSecondOrderCentral(
   }
 
   if (GPUShouldUse()) {
-    /* Use GPU kernel for each 1D line along dimension dir */
+    /* Use optimized 3D kernel for 3D problems - single kernel launch */
+    if (ndims == 3) {
+      int ni = dim[0] + 2 * ghosts;
+      int nj = dim[1] + 2 * ghosts;
+      int nk = dim[2] + 2 * ghosts;
+
+      gpu_launch_first_derivative_second_order_3d(
+        Df, f, nvars, ni, nj, nk, ghosts, dir, 256
+      );
+
+      if (GPUShouldSyncEveryOp()) GPUSync();
+      return 0;
+    }
+
+    /* Fallback to per-line approach for 1D/2D */
     int bounds_outer[ndims];
     _ArrayCopy1D_(dim, bounds_outer, ndims);
     bounds_outer[dir] = 1;
@@ -41,12 +55,10 @@ int GPUFirstDerivativeSecondOrderCentral(
     int stride = solver->stride_with_ghosts[dir];
     int npoints_line = dim[dir] + 2 * ghosts;
 
-    /* Process each line */
     for (int line = 0; line < N_outer; line++) {
       int index_outer[ndims];
       _ArrayIndexnD_(ndims, line, bounds_outer, index_outer, 0);
 
-      /* Compute base offset for this line */
       int base_offset = 0;
       for (int d = 0; d < ndims; d++) {
         if (d != dir) {
@@ -54,13 +66,9 @@ int GPUFirstDerivativeSecondOrderCentral(
         }
       }
 
-      /* Extract line from multi-dimensional array */
-      /* For GPU, we need to copy the line to a temporary buffer or use a 2D kernel */
-      /* For now, use CPU fallback for line extraction, GPU for computation */
       double *f_line = f + base_offset * nvars;
       double *Df_line = Df + base_offset * nvars;
 
-      /* Use GPU kernel */
       gpu_launch_first_derivative_second_order(
         Df_line, f_line, nvars, npoints_line, ghosts, stride, 256
       );
@@ -69,9 +77,6 @@ int GPUFirstDerivativeSecondOrderCentral(
     if (GPUShouldSyncEveryOp()) GPUSync();
     return 0;
   } else {
-    /* Fall back to CPU implementation */
-    /* This would call the original FirstDerivativeSecondOrderCentral */
-    /* For now, return error to indicate GPU path not available */
     return 1;
   }
 }
@@ -98,6 +103,21 @@ int GPUFirstDerivativeFourthOrderCentral(
   }
 
   if (GPUShouldUse()) {
+    /* Use optimized 3D kernel for 3D problems - single kernel launch */
+    if (ndims == 3) {
+      int ni = dim[0] + 2 * ghosts;
+      int nj = dim[1] + 2 * ghosts;
+      int nk = dim[2] + 2 * ghosts;
+
+      gpu_launch_first_derivative_fourth_order_3d(
+        Df, f, nvars, ni, nj, nk, ghosts, dir, 256
+      );
+
+      if (GPUShouldSyncEveryOp()) GPUSync();
+      return 0;
+    }
+
+    /* Fallback to per-line approach for 1D/2D */
     int bounds_outer[ndims];
     _ArrayCopy1D_(dim, bounds_outer, ndims);
     bounds_outer[dir] = 1;
@@ -155,6 +175,23 @@ int GPUFirstDerivativeFirstOrder(
   }
 
   if (GPUShouldUse()) {
+    double bias_double = (bias > 0) ? 1.0 : ((bias < 0) ? -1.0 : 0.0);
+
+    /* Use optimized 3D kernel for 3D problems - single kernel launch */
+    if (ndims == 3) {
+      int ni = dim[0] + 2 * ghosts;
+      int nj = dim[1] + 2 * ghosts;
+      int nk = dim[2] + 2 * ghosts;
+
+      gpu_launch_first_derivative_first_order_3d(
+        Df, f, nvars, ni, nj, nk, ghosts, dir, bias_double, 256
+      );
+
+      if (GPUShouldSyncEveryOp()) GPUSync();
+      return 0;
+    }
+
+    /* Fallback to per-line approach for 1D/2D */
     int bounds_outer[ndims];
     _ArrayCopy1D_(dim, bounds_outer, ndims);
     bounds_outer[dir] = 1;
@@ -163,7 +200,6 @@ int GPUFirstDerivativeFirstOrder(
 
     int stride = solver->stride_with_ghosts[dir];
     int npoints_line = dim[dir] + 2 * ghosts;
-    double bias_double = (bias > 0) ? 1.0 : ((bias < 0) ? -1.0 : 0.0);
 
     for (int line = 0; line < N_outer; line++) {
       int index_outer[ndims];

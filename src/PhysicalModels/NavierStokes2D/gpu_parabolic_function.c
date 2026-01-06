@@ -34,14 +34,21 @@ int GPUNavierStokes2DParabolicFunction(double *par, double *u, void *s, void *m,
     double inv_Re = 1.0 / physics->Re;
     double inv_Pr = 1.0 / physics->Pr;
 
-    double *Q, *QDerivX, *QDerivY, *FViscous, *FDeriv;
-    if (GPUAllocate((void**)&Q, size * nvars * sizeof(double))) return 1;
-    if (GPUAllocate((void**)&QDerivX, size * nvars * sizeof(double))) { GPUFree(Q); return 1; }
-    if (GPUAllocate((void**)&QDerivY, size * nvars * sizeof(double))) { GPUFree(Q); GPUFree(QDerivX); return 1; }
-    if (GPUAllocate((void**)&FViscous, size * nvars * sizeof(double))) { GPUFree(Q); GPUFree(QDerivX); GPUFree(QDerivY); return 1; }
-    if (GPUAllocate((void**)&FDeriv, size * nvars * sizeof(double))) { GPUFree(Q); GPUFree(QDerivX); GPUFree(QDerivY); GPUFree(FViscous); return 1; }
+    /* Use persistent workspace buffers - zero allocation overhead */
+    double *Q = solver->gpu_parabolic_workspace_Q;
+    double *QDerivX = solver->gpu_parabolic_workspace_QDerivX;
+    double *QDerivY = solver->gpu_parabolic_workspace_QDerivY;
+    double *FViscous = solver->gpu_parabolic_workspace_FViscous;
+    double *FDeriv = solver->gpu_parabolic_workspace_FDeriv;
     
-    /* Initialize derivative arrays to zero - GPUAllocate does not zero-initialize memory */
+    /* Verify workspace is large enough */
+    if (solver->gpu_parabolic_workspace_size < (size_t)(size * nvars)) {
+      fprintf(stderr, "Error: Parabolic workspace too small (%zu < %d)\n",
+              solver->gpu_parabolic_workspace_size, size * nvars);
+      return 1;
+    }
+    
+    /* Initialize arrays to zero */
     GPUMemset(QDerivX, 0, size * nvars * sizeof(double));
     GPUMemset(QDerivY, 0, size * nvars * sizeof(double));
     GPUMemset(FViscous, 0, size * nvars * sizeof(double));
@@ -57,16 +64,9 @@ int GPUNavierStokes2DParabolicFunction(double *par, double *u, void *s, void *m,
     GPUMPIExchangeBoundariesnD(solver->ndims, solver->nvars, dim, solver->ghosts, mpi, QDerivY);
     GPUSync(); // Ensure MPI exchange is complete before proceeding
 
-    int *dim_gpu = NULL, *stride_gpu = NULL;
-    if (GPUAllocate((void**)&dim_gpu, solver->ndims * sizeof(int))) {
-      GPUFree(Q); GPUFree(QDerivX); GPUFree(QDerivY); GPUFree(FViscous); GPUFree(FDeriv); return 1;
-    }
-    if (GPUAllocate((void**)&stride_gpu, solver->ndims * sizeof(int))) {
-      GPUFree(Q); GPUFree(QDerivX); GPUFree(QDerivY); GPUFree(FViscous); GPUFree(FDeriv); GPUFree(dim_gpu); return 1;
-    }
-    GPUCopyToDevice(dim_gpu, dim, solver->ndims * sizeof(int));
-    GPUCopyToDevice(stride_gpu, solver->stride_with_ghosts, solver->ndims * sizeof(int));
-    if (GPUShouldSyncEveryOp()) GPUSync();
+    /* Use cached metadata arrays - no allocation/copy overhead */
+    int *dim_gpu = solver->gpu_dim_local;
+    int *stride_gpu = solver->gpu_stride_with_ghosts;
 
     /* Compute dxinv offsets for each direction */
     int offset_x = 0;
@@ -90,8 +90,7 @@ int GPUNavierStokes2DParabolicFunction(double *par, double *u, void *s, void *m,
     gpu_launch_add_scaled_derivative(par, FDeriv, solver->d_dxinv, nvars, npoints_interior, solver->ndims, dim_gpu, stride_gpu, ghosts, _YDIR_, offset_y, 256);
     if (GPUShouldSyncEveryOp()) GPUSync();
 
-    GPUFree(Q); GPUFree(QDerivX); GPUFree(QDerivY); GPUFree(FViscous); GPUFree(FDeriv); GPUFree(dim_gpu); GPUFree(stride_gpu);
-    if (GPUShouldSyncEveryOp()) GPUSync();
+    /* No need to free - using persistent workspace buffers and cached metadata */
     return 0;
   } else {
     return 1; /* Fall back to CPU */

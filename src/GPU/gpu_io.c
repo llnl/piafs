@@ -49,7 +49,7 @@ int GPUWriteBinary(
   if (GPUShouldUse()) {
     GPUCopyToHost(x_host, x, grid_size * sizeof(double));
     GPUCopyToHost(u_host, u, sol_size * sizeof(double));
-    /* GPUCopyToHost uses a synchronous copy; avoid forced device sync here. */
+    /* GPUCopyToHost is synchronous - no explicit sync needed */
   } else {
     /* Already on host, just copy */
     for (int i = 0; i < grid_size; i++) x_host[i] = x[i];
@@ -151,7 +151,7 @@ int GPUWriteText(
   if (GPUShouldUse()) {
     GPUCopyToHost(x_host, x, grid_size * sizeof(double));
     GPUCopyToHost(u_host, u, sol_size * sizeof(double));
-    /* GPUCopyToHost uses a synchronous copy; avoid forced device sync here. */
+    /* GPUCopyToHost is synchronous - no explicit sync needed */
   } else {
     /* Already on host */
     for (int i = 0; i < grid_size; i++) x_host[i] = x[i];
@@ -277,6 +277,7 @@ int GPUReadBinary(
   if (GPUShouldUse()) {
     GPUCopyToDevice(x, x_host, grid_size * sizeof(double));
     GPUCopyToDevice(u, u_host, sol_size * sizeof(double));
+    /* GPUCopyToDevice is synchronous - no explicit sync needed unless debugging */
     if (GPUShouldSyncEveryOp()) GPUSync();
   } else {
     /* Copy to host arrays */

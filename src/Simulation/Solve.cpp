@@ -65,31 +65,11 @@ int Solve(  void  *s,     /*!< Array of simulation objects of type #SimulationOb
         }
       }
       OutputSolution(sim, nsims, TS.waqt);
-#if defined(GPU_CUDA) || defined(GPU_HIP)
-      if (!rank && GPUShouldUse()) { 
-        fflush(stderr); 
-        GPUSync();
-        int gpu_err = GPU_GET_LAST_ERROR();
-        if (gpu_err != GPU_SUCCESS) {
-        } else {
-        }
-        fflush(stderr);
-      }
-#endif
+      /* GPU sync only needed for I/O operations - OutputSolution handles this */
     }
 
     /* Call pre-step function */
     TimePreStep (&TS);
-#if defined(GPU_CUDA) || defined(GPU_HIP)
-    if (!rank && GPUShouldUse()) {
-      GPUSync();
-      int gpu_err = GPU_GET_LAST_ERROR();
-      if (gpu_err != GPU_SUCCESS) {
-      } else {
-      }
-      fflush(stderr);
-    }
-#endif
 
     /* Step in time */
     TimeStep (&TS);

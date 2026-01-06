@@ -13,6 +13,19 @@ extern GPU_KERNEL void gpu_ns3d_upwind_roe_kernel(
   int ghosts, int dir, double gamma, double *workspace
 );
 
+/* Specialized RF kernels */
+extern GPU_KERNEL void gpu_ns3d_upwind_rf_kernel_nvars5(
+  double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
+  const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, double gamma, double *workspace
+);
+
+extern GPU_KERNEL void gpu_ns3d_upwind_rf_kernel_nvars12(
+  double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
+  const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, double gamma, double *workspace
+);
+
 extern GPU_KERNEL void gpu_ns3d_upwind_rf_kernel(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
@@ -118,21 +131,43 @@ void gpu_launch_ns3d_upwind_rf(
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
   int total_threads = numBlocks * blockSize;
   
-  /* Allocate workspace for RF scheme: 9*nvars + 3*nvars*nvars per thread */
-  size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
-  size_t total_workspace = total_threads * workspace_per_thread;
-  double *workspace = NULL;
-  if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
-    fprintf(stderr, "Error: Failed to allocate workspace for NS3D RF upwinding\n");
-    return;
+  /* Dispatch to specialized kernels for common nvars values */
+  if (nvars == 5) {
+    /* nvars=5 uses register-based workspace - no allocation needed */
+    double *workspace = NULL;  /* Not used for nvars=5 */
+    GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_rf_kernel_nvars5, numBlocks, blockSize)(
+      fI, fL, fR, uL, uR, u, d_dim, d_stride_with_ghosts, d_bounds_inter,
+      ghosts, dir, gamma, workspace
+    );
+  } else if (nvars == 12) {
+    /* Allocate workspace for nvars=12: 9*nvars + 2*nvars*nvars per thread */
+    size_t workspace_per_thread = 9 * nvars + 2 * nvars * nvars;
+    size_t total_workspace = total_threads * workspace_per_thread;
+    double *workspace = NULL;
+    if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
+      fprintf(stderr, "Error: Failed to allocate workspace for NS3D RF upwinding (nvars=12)\n");
+      return;
+    }
+    GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_rf_kernel_nvars12, numBlocks, blockSize)(
+      fI, fL, fR, uL, uR, u, d_dim, d_stride_with_ghosts, d_bounds_inter,
+      ghosts, dir, gamma, workspace
+    );
+    GPUFree(workspace);
+  } else {
+    /* General fallback for other nvars: 9*nvars + 2*nvars*nvars per thread */
+    size_t workspace_per_thread = 9 * nvars + 2 * nvars * nvars;
+    size_t total_workspace = total_threads * workspace_per_thread;
+    double *workspace = NULL;
+    if (GPUAllocate((void**)&workspace, total_workspace * sizeof(double))) {
+      fprintf(stderr, "Error: Failed to allocate workspace for NS3D RF upwinding (nvars=%d)\n", nvars);
+      return;
+    }
+    GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_rf_kernel, numBlocks, blockSize)(
+      fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
+      ghosts, dir, gamma, workspace
+    );
+    GPUFree(workspace);
   }
-
-  GPU_KERNEL_LAUNCH(gpu_ns3d_upwind_rf_kernel, numBlocks, blockSize)(
-    fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
-    ghosts, dir, gamma, workspace
-  );
-  
-  GPUFree(workspace);
 }
 
 void gpu_launch_ns3d_upwind_llf(

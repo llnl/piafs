@@ -147,6 +147,11 @@ GPULaunchConfig GPUConfigureLaunch(size_t n, int blockSize);
 /* Check if GPU is available */
 int GPUIsAvailable(void);
 
+/* GPU stream management */
+int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou);
+int GPUDestroyStreams(void *stream_hyp, void *stream_par, void *stream_sou);
+int GPUStreamSynchronize(void *stream);
+
 #ifdef __cplusplus
 }
 #endif
