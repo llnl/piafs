@@ -51,6 +51,7 @@ typedef struct mpi_variables {
   double *sendbuf, /*!< Buffer to send data */
          *recvbuf; /*!< Buffer to receive data */
   int    maxbuf;   /*!< Maximum buffer size */
+  int    use_gpu_pinned; /*!< Flag: buffers allocated with GPU pinned memory */
 
 } MPIVariables;
 

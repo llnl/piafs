@@ -73,7 +73,7 @@ void gpu_launch_hyperbolic_flux_derivative_nd(
   GPUCopyToHost(dim_host, dim, ndims * sizeof(int));
   GPUCopyToHost(stride_host, stride_with_ghosts, ndims * sizeof(int));
   /* GPUCopyToHost uses a synchronous copy; avoid forced device sync here. */
-  
+
   int npoints_dir = dim_host[dir];
   int nlines = 1;
   for (int i = 0; i < ndims; i++) {
@@ -81,15 +81,33 @@ void gpu_launch_hyperbolic_flux_derivative_nd(
   }
   int total_points = nlines * npoints_dir;
   int gridSize = (total_points + blockSize - 1) / blockSize;
-  
+
+  /* Use specialized 3D kernels for nvars=5 or nvars=12 */
+  if (ndims == 3 && nvars == 5) {
+    GPU_KERNEL_LAUNCH(gpu_hyperbolic_flux_derivative_3d_nvars5_kernel, gridSize, blockSize)(
+      hyp, fluxI, dxinv, StageBoundaryIntegral,
+      dim_host[0], dim_host[1], dim_host[2],
+      stride_host[0], stride_host[1], stride_host[2],
+      ghosts, dir, dir_offset
+    );
+  } else if (ndims == 3 && nvars == 12) {
+    GPU_KERNEL_LAUNCH(gpu_hyperbolic_flux_derivative_3d_nvars12_kernel, gridSize, blockSize)(
+      hyp, fluxI, dxinv, StageBoundaryIntegral,
+      dim_host[0], dim_host[1], dim_host[2],
+      stride_host[0], stride_host[1], stride_host[2],
+      ghosts, dir, dir_offset
+    );
+  } else {
+    /* Fall back to generic N-D kernel */
+    GPU_KERNEL_LAUNCH(gpu_hyperbolic_flux_derivative_nd_kernel, gridSize, blockSize)(
+      hyp, fluxI, dxinv, StageBoundaryIntegral,
+      nvars, ndims, dim, stride_with_ghosts, ghosts, dir, dir_offset
+    );
+  }
+  GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
+
   free(dim_host);
   free(stride_host);
-  
-  GPU_KERNEL_LAUNCH(gpu_hyperbolic_flux_derivative_nd_kernel, gridSize, blockSize)(
-    hyp, fluxI, dxinv, StageBoundaryIntegral,
-    nvars, ndims, dim, stride_with_ghosts, ghosts, dir, dir_offset
-  );
-  GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
 #endif
 }
 

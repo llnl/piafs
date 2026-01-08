@@ -249,34 +249,44 @@ int GPUMPIExchangeBoundariesnD(
 
   /* Copy data from GPU to host send buffers */
   if (GPUShouldUse()) {
-    static double *d_buf = NULL;
-    static size_t d_buf_capacity = 0; /* in doubles */
-    if ((size_t)stride > d_buf_capacity) {
-      if (d_buf) GPUFree(d_buf);
-      if (GPUAllocate((void**)&d_buf, (size_t)stride * sizeof(double))) {
+    /* Static device buffer for packing - sized to hold all faces */
+    static double *d_packbuf = NULL;
+    static size_t d_packbuf_capacity = 0;
+    size_t total_buf_size = (size_t)(2 * ndims) * (size_t)stride;
+    if (total_buf_size > d_packbuf_capacity) {
+      if (d_packbuf) GPUFree(d_packbuf);
+      if (GPUAllocate((void**)&d_packbuf, total_buf_size * sizeof(double))) {
         fprintf(stderr, "Error: GPUMPIExchangeBoundariesnD: failed to allocate device pack buffer (%zu bytes)\n",
-                (size_t)stride * sizeof(double));
-        d_buf = NULL;
-        d_buf_capacity = 0;
+                total_buf_size * sizeof(double));
+        d_packbuf = NULL;
+        d_packbuf_capacity = 0;
         return 1;
       }
-      d_buf_capacity = (size_t)stride;
+      d_packbuf_capacity = total_buf_size;
     }
 
+    /* Pack ALL boundaries to device buffer first (overlaps kernel launches) */
     for (d = 0; d < ndims; d++) {
-      _ArrayCopy1D_(dim, bounds, ndims);
-      bounds[d] = ghosts;
+      if (neighbor_rank[2*d] != -1) {
+        gpu_launch_mpi_pack_boundary(var, &d_packbuf[2*d*stride], ndims, nvars, dim, ghosts, d, -1, 256);
+      }
+      if (neighbor_rank[2*d+1] != -1) {
+        gpu_launch_mpi_pack_boundary(var, &d_packbuf[(2*d+1)*stride], ndims, nvars, dim, ghosts, d, +1, 256);
+      }
+    }
 
+    /* Sync to ensure all packing is complete */
+    GPUSync();
+
+    /* Now copy all packed data to host (with pinned memory this is fast) */
+    for (d = 0; d < ndims; d++) {
       if (neighbor_rank[2*d] != -1) {
         const int bufsize = bufdim[d] * nvars;
-        gpu_launch_mpi_pack_boundary(var, d_buf, ndims, nvars, dim, ghosts, d, -1, 256);
-        GPUCopyToHost(&sendbuf[2*d*stride], d_buf, (size_t)bufsize * sizeof(double));
+        GPUCopyToHost(&sendbuf[2*d*stride], &d_packbuf[2*d*stride], (size_t)bufsize * sizeof(double));
       }
-
       if (neighbor_rank[2*d+1] != -1) {
         const int bufsize = bufdim[d] * nvars;
-        gpu_launch_mpi_pack_boundary(var, d_buf, ndims, nvars, dim, ghosts, d, +1, 256);
-        GPUCopyToHost(&sendbuf[(2*d+1)*stride], d_buf, (size_t)bufsize * sizeof(double));
+        GPUCopyToHost(&sendbuf[(2*d+1)*stride], &d_packbuf[(2*d+1)*stride], (size_t)bufsize * sizeof(double));
       }
     }
   } else {
@@ -332,32 +342,41 @@ int GPUMPIExchangeBoundariesnD(
 
   /* Copy received data from host to GPU ghost points */
   if (GPUShouldUse()) {
-    static double *d_buf = NULL;
-    static size_t d_buf_capacity = 0; /* in doubles */
-    if ((size_t)stride > d_buf_capacity) {
-      if (d_buf) GPUFree(d_buf);
-      if (GPUAllocate((void**)&d_buf, (size_t)stride * sizeof(double))) {
+    /* Static device buffer for unpacking - sized to hold all faces */
+    static double *d_unpackbuf = NULL;
+    static size_t d_unpackbuf_capacity = 0;
+    size_t total_buf_size = (size_t)(2 * ndims) * (size_t)stride;
+    if (total_buf_size > d_unpackbuf_capacity) {
+      if (d_unpackbuf) GPUFree(d_unpackbuf);
+      if (GPUAllocate((void**)&d_unpackbuf, total_buf_size * sizeof(double))) {
         fprintf(stderr, "Error: GPUMPIExchangeBoundariesnD: failed to allocate device unpack buffer (%zu bytes)\n",
-                (size_t)stride * sizeof(double));
-        d_buf = NULL;
-        d_buf_capacity = 0;
+                total_buf_size * sizeof(double));
+        d_unpackbuf = NULL;
+        d_unpackbuf_capacity = 0;
         return 1;
       }
-      d_buf_capacity = (size_t)stride;
+      d_unpackbuf_capacity = total_buf_size;
     }
 
+    /* Copy all received data to device (with pinned memory this is fast) */
     for (d = 0; d < ndims; d++) {
-      _ArrayCopy1D_(dim, bounds, ndims);
-      bounds[d] = ghosts;
       if (neighbor_rank[2*d] != -1) {
         const int bufsize = bufdim[d] * nvars;
-        GPUCopyToDevice(d_buf, &recvbuf[2*d*stride], (size_t)bufsize * sizeof(double));
-        gpu_launch_mpi_unpack_boundary(var, d_buf, ndims, nvars, dim, ghosts, d, -1, 256);
+        GPUCopyToDevice(&d_unpackbuf[2*d*stride], &recvbuf[2*d*stride], (size_t)bufsize * sizeof(double));
       }
       if (neighbor_rank[2*d+1] != -1) {
         const int bufsize = bufdim[d] * nvars;
-        GPUCopyToDevice(d_buf, &recvbuf[(2*d+1)*stride], (size_t)bufsize * sizeof(double));
-        gpu_launch_mpi_unpack_boundary(var, d_buf, ndims, nvars, dim, ghosts, d, +1, 256);
+        GPUCopyToDevice(&d_unpackbuf[(2*d+1)*stride], &recvbuf[(2*d+1)*stride], (size_t)bufsize * sizeof(double));
+      }
+    }
+
+    /* Launch all unpack kernels (they can overlap on the GPU) */
+    for (d = 0; d < ndims; d++) {
+      if (neighbor_rank[2*d] != -1) {
+        gpu_launch_mpi_unpack_boundary(var, &d_unpackbuf[2*d*stride], ndims, nvars, dim, ghosts, d, -1, 256);
+      }
+      if (neighbor_rank[2*d+1] != -1) {
+        gpu_launch_mpi_unpack_boundary(var, &d_unpackbuf[(2*d+1)*stride], ndims, nvars, dim, ghosts, d, +1, 256);
       }
     }
   } else {

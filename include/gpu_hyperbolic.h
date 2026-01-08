@@ -29,6 +29,23 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative_nd_kernel(
   int ghosts, int dir, int dir_offset
 );
 
+/* Specialized 3D flux derivative kernels for common nvars values */
+GPU_KERNEL void gpu_hyperbolic_flux_derivative_3d_nvars5_kernel(
+  double *hyp, const double *fluxI, const double *dxinv,
+  double *StageBoundaryIntegral,
+  int ni, int nj, int nk,
+  int stride_i, int stride_j, int stride_k,
+  int ghosts, int dir, int dir_offset
+);
+
+GPU_KERNEL void gpu_hyperbolic_flux_derivative_3d_nvars12_kernel(
+  double *hyp, const double *fluxI, const double *dxinv,
+  double *StageBoundaryIntegral,
+  int ni, int nj, int nk,
+  int stride_i, int stride_j, int stride_k,
+  int ghosts, int dir, int dir_offset
+);
+
 GPU_KERNEL void gpu_default_upwinding_kernel(
   double *fI, const double *fL, const double *fR,
   int nvars, int ninterfaces

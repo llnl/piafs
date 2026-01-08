@@ -136,6 +136,14 @@ int GPUCopyDeviceToDevice(void *dst, const void *src, size_t size);
 int GPUMemset(void *ptr, int value, size_t size);
 void GPUSync(void);
 
+/* Pinned (page-locked) host memory for faster CPU-GPU transfers */
+int GPUAllocatePinned(void **ptr, size_t size);
+int GPUFreePinned(void *ptr);
+
+/* Async memory copy operations (requires pinned host memory for best performance) */
+int GPUCopyToDeviceAsync(void *dst, const void *src, size_t size, void *stream);
+int GPUCopyToHostAsync(void *dst, const void *src, size_t size, void *stream);
+
 /* GPU kernel launch configuration */
 typedef struct {
   int blockSize;

@@ -198,8 +198,16 @@ int Cleanup(  void  *s,   /*!< Array of simulation objects of type #SimulationOb
     free(mpi->is);
     free(mpi->ie);
     free(mpi->bcperiodic);
-    free(mpi->sendbuf);
-    free(mpi->recvbuf);
+#if defined(GPU_CUDA) || defined(GPU_HIP)
+    if (mpi->use_gpu_pinned) {
+      GPUFreePinned(mpi->sendbuf);
+      GPUFreePinned(mpi->recvbuf);
+    } else
+#endif
+    {
+      free(mpi->sendbuf);
+      free(mpi->recvbuf);
+    }
     free(solver->VolumeIntegral);
     free(solver->VolumeIntegralInitial);
     free(solver->TotalBoundaryIntegral);

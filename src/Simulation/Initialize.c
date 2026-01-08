@@ -313,8 +313,29 @@ int Initialize( void *s,    /*!< Array of simulation objects of type #Simulation
     }
     maxbuf *= (simobj[n].solver.nvars*simobj[n].solver.ndims);
     simobj[n].mpi.maxbuf  = maxbuf;
-    simobj[n].mpi.sendbuf = (double*) calloc (2*simobj[n].solver.ndims*maxbuf,sizeof(double));
-    simobj[n].mpi.recvbuf = (double*) calloc (2*simobj[n].solver.ndims*maxbuf,sizeof(double));
+    size_t mpi_buf_size = (size_t)(2*simobj[n].solver.ndims*maxbuf) * sizeof(double);
+#if defined(GPU_CUDA) || defined(GPU_HIP)
+    /* Use pinned memory for faster GPU-CPU transfers */
+    if (GPUShouldUse()) {
+      simobj[n].mpi.use_gpu_pinned = 1;
+      if (GPUAllocatePinned((void**)&simobj[n].mpi.sendbuf, mpi_buf_size)) {
+        fprintf(stderr, "Error: Failed to allocate pinned memory for MPI sendbuf\n");
+        return 1;
+      }
+      if (GPUAllocatePinned((void**)&simobj[n].mpi.recvbuf, mpi_buf_size)) {
+        fprintf(stderr, "Error: Failed to allocate pinned memory for MPI recvbuf\n");
+        GPUFreePinned(simobj[n].mpi.sendbuf);
+        return 1;
+      }
+      memset(simobj[n].mpi.sendbuf, 0, mpi_buf_size);
+      memset(simobj[n].mpi.recvbuf, 0, mpi_buf_size);
+    } else
+#endif
+    {
+      simobj[n].mpi.use_gpu_pinned = 0;
+      simobj[n].mpi.sendbuf = (double*) calloc (2*simobj[n].solver.ndims*maxbuf,sizeof(double));
+      simobj[n].mpi.recvbuf = (double*) calloc (2*simobj[n].solver.ndims*maxbuf,sizeof(double));
+    }
 
     /* allocate the volume and boundary integral arrays */
     simobj[n].solver.VolumeIntegral        = (double*) calloc (simobj[n].solver.nvars  ,sizeof(double));

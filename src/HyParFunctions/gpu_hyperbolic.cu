@@ -186,3 +186,165 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative_nd_kernel(
   }
 }
 
+/* Specialized 3D flux derivative kernel for nvars=5 (e.g., Euler/NS with 5 conserved variables) */
+GPU_KERNEL void gpu_hyperbolic_flux_derivative_3d_nvars5_kernel(
+  double *hyp,
+  const double *fluxI,
+  const double *dxinv,
+  double *StageBoundaryIntegral,
+  int ni, int nj, int nk,
+  int stride_i, int stride_j, int stride_k,
+  int ghosts,
+  int dir,
+  int dir_offset
+)
+{
+  const int nvars = 5;
+  int npoints_dir, dim_other1, dim_other2;
+
+  if (dir == 0) {
+    npoints_dir = ni; dim_other1 = nj; dim_other2 = nk;
+  } else if (dir == 1) {
+    npoints_dir = nj; dim_other1 = ni; dim_other2 = nk;
+  } else {
+    npoints_dir = nk; dim_other1 = ni; dim_other2 = nj;
+  }
+
+  int total_points = npoints_dir * dim_other1 * dim_other2;
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= total_points) return;
+
+  /* Decompose idx into 3D indices */
+  int point_idx = idx % npoints_dir;
+  int tmp = idx / npoints_dir;
+  int idx1 = tmp % dim_other1;
+  int idx2 = tmp / dim_other1;
+
+  int i, j, k;
+  if (dir == 0) {
+    i = point_idx; j = idx1; k = idx2;
+  } else if (dir == 1) {
+    j = point_idx; i = idx1; k = idx2;
+  } else {
+    k = point_idx; i = idx1; j = idx2;
+  }
+
+  /* Compute array index with ghosts */
+  int p = (i + ghosts) * stride_i + (j + ghosts) * stride_j + (k + ghosts) * stride_k;
+
+  /* Interface array dimensions (k stride not needed - it's the slowest varying) */
+  int ni_I = (dir == 0) ? (ni + 1) : ni;
+  int nj_I = (dir == 1) ? (nj + 1) : nj;
+
+  /* Interface indices (using same ordering as _ArrayIndex1D_) */
+  int i1 = i, j1 = j, k1 = k;
+  int i2 = i, j2 = j, k2 = k;
+  if (dir == 0) i2++; else if (dir == 1) j2++; else k2++;
+
+  int p1 = k1 * (nj_I * ni_I) + j1 * ni_I + i1;
+  int p2 = k2 * (nj_I * ni_I) + j2 * ni_I + i2;
+
+  double dx = dxinv[dir_offset + ghosts + point_idx];
+
+  /* Unrolled derivative computation */
+  #pragma unroll
+  for (int v = 0; v < 5; v++) {
+    hyp[p * nvars + v] += dx * (fluxI[p2 * nvars + v] - fluxI[p1 * nvars + v]);
+  }
+
+  /* Boundary flux integrals */
+  if (point_idx == 0) {
+    #pragma unroll
+    for (int v = 0; v < 5; v++) {
+      atomicAdd(&StageBoundaryIntegral[(2*dir+0)*nvars+v], -fluxI[p1*nvars+v]);
+    }
+  }
+  if (point_idx == npoints_dir - 1) {
+    #pragma unroll
+    for (int v = 0; v < 5; v++) {
+      atomicAdd(&StageBoundaryIntegral[(2*dir+1)*nvars+v], fluxI[p2*nvars+v]);
+    }
+  }
+}
+
+/* Specialized 3D flux derivative kernel for nvars=12 (e.g., NS3D with chemistry) */
+GPU_KERNEL void gpu_hyperbolic_flux_derivative_3d_nvars12_kernel(
+  double *hyp,
+  const double *fluxI,
+  const double *dxinv,
+  double *StageBoundaryIntegral,
+  int ni, int nj, int nk,
+  int stride_i, int stride_j, int stride_k,
+  int ghosts,
+  int dir,
+  int dir_offset
+)
+{
+  const int nvars = 12;
+  int npoints_dir, dim_other1, dim_other2;
+
+  if (dir == 0) {
+    npoints_dir = ni; dim_other1 = nj; dim_other2 = nk;
+  } else if (dir == 1) {
+    npoints_dir = nj; dim_other1 = ni; dim_other2 = nk;
+  } else {
+    npoints_dir = nk; dim_other1 = ni; dim_other2 = nj;
+  }
+
+  int total_points = npoints_dir * dim_other1 * dim_other2;
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= total_points) return;
+
+  /* Decompose idx into 3D indices */
+  int point_idx = idx % npoints_dir;
+  int tmp = idx / npoints_dir;
+  int idx1 = tmp % dim_other1;
+  int idx2 = tmp / dim_other1;
+
+  int i, j, k;
+  if (dir == 0) {
+    i = point_idx; j = idx1; k = idx2;
+  } else if (dir == 1) {
+    j = point_idx; i = idx1; k = idx2;
+  } else {
+    k = point_idx; i = idx1; j = idx2;
+  }
+
+  /* Compute array index with ghosts */
+  int p = (i + ghosts) * stride_i + (j + ghosts) * stride_j + (k + ghosts) * stride_k;
+
+  /* Interface array dimensions (k stride not needed - it's the slowest varying) */
+  int ni_I = (dir == 0) ? (ni + 1) : ni;
+  int nj_I = (dir == 1) ? (nj + 1) : nj;
+
+  /* Interface indices */
+  int i1 = i, j1 = j, k1 = k;
+  int i2 = i, j2 = j, k2 = k;
+  if (dir == 0) i2++; else if (dir == 1) j2++; else k2++;
+
+  int p1 = k1 * (nj_I * ni_I) + j1 * ni_I + i1;
+  int p2 = k2 * (nj_I * ni_I) + j2 * ni_I + i2;
+
+  double dx = dxinv[dir_offset + ghosts + point_idx];
+
+  /* Unrolled derivative computation for 12 variables */
+  #pragma unroll
+  for (int v = 0; v < 12; v++) {
+    hyp[p * nvars + v] += dx * (fluxI[p2 * nvars + v] - fluxI[p1 * nvars + v]);
+  }
+
+  /* Boundary flux integrals */
+  if (point_idx == 0) {
+    #pragma unroll
+    for (int v = 0; v < 12; v++) {
+      atomicAdd(&StageBoundaryIntegral[(2*dir+0)*nvars+v], -fluxI[p1*nvars+v]);
+    }
+  }
+  if (point_idx == npoints_dir - 1) {
+    #pragma unroll
+    for (int v = 0; v < 12; v++) {
+      atomicAdd(&StageBoundaryIntegral[(2*dir+1)*nvars+v], fluxI[p2*nvars+v]);
+    }
+  }
+}
+

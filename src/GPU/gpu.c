@@ -175,6 +175,114 @@ GPULaunchConfig GPUConfigureLaunch(size_t n, int blockSize)
   return config;
 }
 
+/* Pinned (page-locked) host memory allocation for faster CPU-GPU transfers */
+int GPUAllocatePinned(void **ptr, size_t size)
+{
+#ifdef GPU_CUDA
+  cudaError_t err = cudaHostAlloc(ptr, size, cudaHostAllocDefault);
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Error: cudaHostAlloc failed (size: %zu bytes): %s\n",
+            size, cudaGetErrorString(err));
+    return 1;
+  }
+  return 0;
+#elif defined(GPU_HIP)
+  hipError_t err = hipHostMalloc(ptr, size, hipHostMallocDefault);
+  if (err != hipSuccess) {
+    fprintf(stderr, "Error: hipHostMalloc failed (size: %zu bytes): %s\n",
+            size, hipGetErrorString(err));
+    return 1;
+  }
+  return 0;
+#else
+  /* CPU fallback - use regular malloc */
+  *ptr = malloc(size);
+  if (*ptr == NULL) {
+    fprintf(stderr, "Error: malloc failed for pinned memory fallback (size: %zu bytes)\n", size);
+    return 1;
+  }
+  return 0;
+#endif
+}
+
+int GPUFreePinned(void *ptr)
+{
+  if (!ptr) return 0;
+#ifdef GPU_CUDA
+  cudaError_t err = cudaFreeHost(ptr);
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Warning: cudaFreeHost failed: %s\n", cudaGetErrorString(err));
+    return 1;
+  }
+  return 0;
+#elif defined(GPU_HIP)
+  hipError_t err = hipHostFree(ptr);
+  if (err != hipSuccess) {
+    fprintf(stderr, "Warning: hipHostFree failed: %s\n", hipGetErrorString(err));
+    return 1;
+  }
+  return 0;
+#else
+  free(ptr);
+  return 0;
+#endif
+}
+
+/* Async memory copy operations */
+int GPUCopyToDeviceAsync(void *dst, const void *src, size_t size, void *stream)
+{
+#ifdef GPU_CUDA
+  cudaStream_t s = stream ? *(cudaStream_t*)stream : 0;
+  cudaError_t err = cudaMemcpyAsync(dst, src, size, cudaMemcpyHostToDevice, s);
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Error: cudaMemcpyAsync H2D failed (size: %zu bytes): %s\n",
+            size, cudaGetErrorString(err));
+    return 1;
+  }
+  return 0;
+#elif defined(GPU_HIP)
+  hipStream_t s = stream ? *(hipStream_t*)stream : 0;
+  hipError_t err = hipMemcpyAsync(dst, src, size, hipMemcpyHostToDevice, s);
+  if (err != hipSuccess) {
+    fprintf(stderr, "Error: hipMemcpyAsync H2D failed (size: %zu bytes): %s\n",
+            size, hipGetErrorString(err));
+    return 1;
+  }
+  return 0;
+#else
+  (void)stream;
+  memcpy(dst, src, size);
+  return 0;
+#endif
+}
+
+int GPUCopyToHostAsync(void *dst, const void *src, size_t size, void *stream)
+{
+#ifdef GPU_CUDA
+  cudaStream_t s = stream ? *(cudaStream_t*)stream : 0;
+  cudaError_t err = cudaMemcpyAsync(dst, src, size, cudaMemcpyDeviceToHost, s);
+  if (err != cudaSuccess) {
+    fprintf(stderr, "Error: cudaMemcpyAsync D2H failed (size: %zu bytes): %s\n",
+            size, cudaGetErrorString(err));
+    return 1;
+  }
+  return 0;
+#elif defined(GPU_HIP)
+  hipStream_t s = stream ? *(hipStream_t*)stream : 0;
+  hipError_t err = hipMemcpyAsync(dst, src, size, hipMemcpyDeviceToHost, s);
+  if (err != hipSuccess) {
+    fprintf(stderr, "Error: hipMemcpyAsync D2H failed (size: %zu bytes): %s\n",
+            size, hipGetErrorString(err));
+    return 1;
+  }
+  return 0;
+#else
+  (void)stream;
+  memcpy(dst, src, size);
+  return 0;
+#endif
+}
+
 int GPUIsAvailable(void)
 {
 #ifdef GPU_NONE
