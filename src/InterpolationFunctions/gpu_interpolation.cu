@@ -677,6 +677,930 @@ GPU_KERNEL void gpu_muscl3_interpolation_nd_char_ns3d_kernel(
   }
 }
 
+/* ==========================================================================
+   SPECIALIZED MUSCL3 CHARACTERISTIC KERNELS FOR nvars=5 AND nvars=12
+   These kernels use compile-time constants and fully unrolled operations
+   for optimal register usage and instruction-level parallelism.
+   ========================================================================== */
+
+/* Specialized MUSCL3 kernel for nvars=5 (3D NavierStokes, no passive scalars) */
+GPU_KERNEL void gpu_muscl3_interpolation_nd_char_ns3d_nvars5_kernel(
+  double *fI, const double *fC, const double *u,
+  int dim0, int dim1, int dim2,
+  int stride0, int stride1, int stride2,
+  int bounds0, int bounds1, int bounds2,
+  int ghosts, int dir, int upw,
+  double eps, double gamma
+)
+{
+  const int total_interfaces = bounds0 * bounds1 * bounds2;
+  const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
+  if (tid >= total_interfaces) return;
+
+  /* Decode tid to 3D interface index */
+  const int i0 = tid % bounds0;
+  const int i1 = (tid / bounds0) % bounds1;
+  const int i2 = tid / (bounds0 * bounds1);
+
+  /* Compute stride in current direction */
+  const int stride_dir = (dir == 0) ? stride0 : ((dir == 1) ? stride1 : stride2);
+
+  /* Constants */
+  const double one_third = 1.0/3.0;
+  const double one_sixth = 1.0/6.0;
+  const int nvars = 5;
+
+  /* Compute cell indices */
+  int c0, c1, c2;
+  int qm1, qm2, qp1, qp2;
+
+  if (upw > 0) {
+    c0 = i0; c1 = i1; c2 = i2;
+    if (dir == 0) c0 = i0 - 1;
+    else if (dir == 1) c1 = i1 - 1;
+    else c2 = i2 - 1;
+
+    qm1 = (c2 + ghosts) * stride2 + (c1 + ghosts) * stride1 + (c0 + ghosts) * stride0;
+    qm2 = qm1 - stride_dir;
+    qp1 = qm1 + stride_dir;
+  } else {
+    c0 = i0; c1 = i1; c2 = i2;
+    if (dir == 0) c0 = i0;
+    else if (dir == 1) c1 = i1;
+    else c2 = i2;
+
+    qp1 = (c2 + ghosts) * stride2 + (c1 + ghosts) * stride1 + (c0 + ghosts) * stride0;
+    qm1 = qp1 - stride_dir;
+    qp2 = qp1 + stride_dir;
+  }
+
+  /* Load solution states for Roe average */
+  double uL[5], uR[5];
+  #pragma unroll
+  for (int v = 0; v < 5; v++) {
+    uL[v] = u[qm1*nvars + v];
+    uR[v] = u[qp1*nvars + v];
+  }
+
+  /* Compute Roe average inline */
+  double rhoL = uL[0], rhoR = uR[0];
+  double tL = sqrt(rhoL), tR = sqrt(rhoR);
+  double tLpR = tL + tR;
+
+  double vxL = uL[1]/rhoL, vyL = uL[2]/rhoL, vzL = uL[3]/rhoL;
+  double vxR = uR[1]/rhoR, vyR = uR[2]/rhoR, vzR = uR[3]/rhoR;
+
+  double vsqL = vxL*vxL + vyL*vyL + vzL*vzL;
+  double vsqR = vxR*vxR + vyR*vyR + vzR*vzR;
+  double PL = (gamma-1.0) * (uL[4] - 0.5*rhoL*vsqL);
+  double PR = (gamma-1.0) * (uR[4] - 0.5*rhoR*vsqR);
+  double HL = 0.5*vsqL + gamma*PL/((gamma-1.0)*rhoL);
+  double HR = 0.5*vsqR + gamma*PR/((gamma-1.0)*rhoR);
+
+  /* rho = tL * tR is the Roe-averaged density, not needed for eigenvector formulation */
+  double vx = (tL*vxL + tR*vxR) / tLpR;
+  double vy = (tL*vyL + tR*vyR) / tLpR;
+  double vz = (tL*vzL + tR*vzR) / tLpR;
+  double H = (tL*HL + tR*HR) / tLpR;
+  double vsq = vx*vx + vy*vy + vz*vz;
+  double a2 = (gamma-1.0) * (H - 0.5*vsq);
+  double a = sqrt(a2);
+
+  /* Compute eigenvector coefficients */
+  double gm1 = gamma - 1.0;
+  double ek = 0.5 * vsq;
+  double a2inv = 1.0 / a2;
+  double twoA2inv = 0.5 * a2inv;
+  double h0 = a2/gm1 + ek;
+
+  /* Build left eigenvector matrix L (5x5) inline based on direction */
+  double L[25];
+  #pragma unroll
+  for (int i = 0; i < 25; i++) L[i] = 0.0;
+
+  if (dir == 0) { /* X-direction */
+    L[5*1+0] = (gm1*ek + a*vx) * twoA2inv;
+    L[5*1+1] = (-gm1*vx - a) * twoA2inv;
+    L[5*1+2] = (-gm1*vy) * twoA2inv;
+    L[5*1+3] = (-gm1*vz) * twoA2inv;
+    L[5*1+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vx) * twoA2inv;
+    L[5*4+1] = (-gm1*vx + a) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv;
+    L[5*4+3] = (-gm1*vz) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*2+0] = vy; L[5*2+2] = -1.0;
+    L[5*3+0] = -vz; L[5*3+3] = 1.0;
+  } else if (dir == 1) { /* Y-direction */
+    L[5*2+0] = (gm1*ek + a*vy) * twoA2inv;
+    L[5*2+1] = (-gm1*vx) * twoA2inv;
+    L[5*2+2] = (-gm1*vy - a) * twoA2inv;
+    L[5*2+3] = (-gm1*vz) * twoA2inv;
+    L[5*2+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vy) * twoA2inv;
+    L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy + a) * twoA2inv;
+    L[5*4+3] = (-gm1*vz) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = -vx; L[5*1+1] = 1.0;
+    L[5*3+0] = vz; L[5*3+3] = -1.0;
+  } else { /* Z-direction */
+    L[5*3+0] = (gm1*ek + a*vz) * twoA2inv;
+    L[5*3+1] = (-gm1*vx) * twoA2inv;
+    L[5*3+2] = (-gm1*vy) * twoA2inv;
+    L[5*3+3] = (-gm1*vz - a) * twoA2inv;
+    L[5*3+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vz) * twoA2inv;
+    L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv;
+    L[5*4+3] = (-gm1*vz + a) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = vx; L[5*1+1] = -1.0;
+    L[5*2+0] = -vy; L[5*2+2] = 1.0;
+  }
+
+  /* Build right eigenvector matrix R (5x5) inline */
+  double R[25];
+  #pragma unroll
+  for (int i = 0; i < 25; i++) R[i] = 0.0;
+
+  if (dir == 0) { /* X-direction */
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[0*5+1] = 1.0; R[1*5+1] = vx-a; R[2*5+1] = vy; R[3*5+1] = vz; R[4*5+1] = h0-a*vx;
+    R[2*5+2] = -1.0; R[4*5+2] = -vy;
+    R[3*5+3] = 1.0; R[4*5+3] = vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx+a; R[2*5+4] = vy; R[3*5+4] = vz; R[4*5+4] = h0+a*vx;
+  } else if (dir == 1) { /* Y-direction */
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = 1.0; R[4*5+1] = vx;
+    R[0*5+2] = 1.0; R[1*5+2] = vx; R[2*5+2] = vy-a; R[3*5+2] = vz; R[4*5+2] = h0-a*vy;
+    R[3*5+3] = -1.0; R[4*5+3] = -vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy+a; R[3*5+4] = vz; R[4*5+4] = h0+a*vy;
+  } else { /* Z-direction */
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = -1.0; R[4*5+1] = -vx;
+    R[2*5+2] = 1.0; R[4*5+2] = vy;
+    R[0*5+3] = 1.0; R[1*5+3] = vx; R[2*5+3] = vy; R[3*5+3] = vz-a; R[4*5+3] = h0-a*vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy; R[3*5+4] = vz+a; R[4*5+4] = h0+a*vz;
+  }
+
+  /* Transform to characteristic space, apply limiter, transform back */
+  double fchar[5];
+
+  #pragma unroll
+  for (int v = 0; v < 5; v++) {
+    double a_m2 = 0.0, a_m1 = 0.0, a_p1 = 0.0, a_p2 = 0.0;
+
+    if (upw > 0) {
+      #pragma unroll
+      for (int k = 0; k < 5; k++) {
+        double Lvk = L[v*5 + k];
+        a_m2 += Lvk * fC[qm2*nvars + k];
+        a_m1 += Lvk * fC[qm1*nvars + k];
+        a_p1 += Lvk * fC[qp1*nvars + k];
+      }
+      double fdiff = a_p1 - a_m1;
+      double bdiff = a_m1 - a_m2;
+      double num = 3.0*fdiff*bdiff + eps;
+      double den = 2.0*(fdiff-bdiff)*(fdiff-bdiff) + 3.0*fdiff*bdiff + eps;
+      double limit = (den != 0.0) ? (num/den) : 1.0;
+      fchar[v] = a_m1 + limit * (one_third*fdiff + one_sixth*bdiff);
+    } else {
+      #pragma unroll
+      for (int k = 0; k < 5; k++) {
+        double Lvk = L[v*5 + k];
+        a_m1 += Lvk * fC[qm1*nvars + k];
+        a_p1 += Lvk * fC[qp1*nvars + k];
+        a_p2 += Lvk * fC[qp2*nvars + k];
+      }
+      double fdiff = a_p2 - a_p1;
+      double bdiff = a_p1 - a_m1;
+      double num = 3.0*fdiff*bdiff + eps;
+      double den = 2.0*(fdiff-bdiff)*(fdiff-bdiff) + 3.0*fdiff*bdiff + eps;
+      double limit = (den != 0.0) ? (num/den) : 1.0;
+      fchar[v] = a_p1 - limit * (one_third*fdiff + one_sixth*bdiff);
+    }
+  }
+
+  /* Transform back to physical space */
+  #pragma unroll
+  for (int k = 0; k < 5; k++) {
+    double s = 0.0;
+    #pragma unroll
+    for (int v = 0; v < 5; v++) {
+      s += R[k*5 + v] * fchar[v];
+    }
+    fI[tid*nvars + k] = s;
+  }
+}
+
+/* Specialized MUSCL3 kernel for nvars=12 (3D NavierStokes + 7 passive scalars) */
+GPU_KERNEL void gpu_muscl3_interpolation_nd_char_ns3d_nvars12_kernel(
+  double *fI, const double *fC, const double *u,
+  int dim0, int dim1, int dim2,
+  int stride0, int stride1, int stride2,
+  int bounds0, int bounds1, int bounds2,
+  int ghosts, int dir, int upw,
+  double eps, double gamma
+)
+{
+  const int total_interfaces = bounds0 * bounds1 * bounds2;
+  const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
+  if (tid >= total_interfaces) return;
+
+  /* Decode tid to 3D interface index */
+  const int i0 = tid % bounds0;
+  const int i1 = (tid / bounds0) % bounds1;
+  const int i2 = tid / (bounds0 * bounds1);
+
+  /* Compute stride in current direction */
+  const int stride_dir = (dir == 0) ? stride0 : ((dir == 1) ? stride1 : stride2);
+
+  /* Constants */
+  const double one_third = 1.0/3.0;
+  const double one_sixth = 1.0/6.0;
+  const int nvars = 12;
+  const int base_nvars = 5;
+
+  /* Compute cell indices */
+  int c0, c1, c2;
+  int qm1, qm2, qp1, qp2;
+
+  if (upw > 0) {
+    c0 = i0; c1 = i1; c2 = i2;
+    if (dir == 0) c0 = i0 - 1;
+    else if (dir == 1) c1 = i1 - 1;
+    else c2 = i2 - 1;
+
+    qm1 = (c2 + ghosts) * stride2 + (c1 + ghosts) * stride1 + (c0 + ghosts) * stride0;
+    qm2 = qm1 - stride_dir;
+    qp1 = qm1 + stride_dir;
+  } else {
+    c0 = i0; c1 = i1; c2 = i2;
+    if (dir == 0) c0 = i0;
+    else if (dir == 1) c1 = i1;
+    else c2 = i2;
+
+    qp1 = (c2 + ghosts) * stride2 + (c1 + ghosts) * stride1 + (c0 + ghosts) * stride0;
+    qm1 = qp1 - stride_dir;
+    qp2 = qp1 + stride_dir;
+  }
+
+  /* Load solution states for Roe average (only base 5 vars needed) */
+  double uL[5], uR[5];
+  #pragma unroll
+  for (int v = 0; v < 5; v++) {
+    uL[v] = u[qm1*nvars + v];
+    uR[v] = u[qp1*nvars + v];
+  }
+
+  /* Compute Roe average inline */
+  double rhoL = uL[0], rhoR = uR[0];
+  double tL = sqrt(rhoL), tR = sqrt(rhoR);
+  double tLpR = tL + tR;
+
+  double vxL = uL[1]/rhoL, vyL = uL[2]/rhoL, vzL = uL[3]/rhoL;
+  double vxR = uR[1]/rhoR, vyR = uR[2]/rhoR, vzR = uR[3]/rhoR;
+
+  double vsqL = vxL*vxL + vyL*vyL + vzL*vzL;
+  double vsqR = vxR*vxR + vyR*vyR + vzR*vzR;
+  double PL = (gamma-1.0) * (uL[4] - 0.5*rhoL*vsqL);
+  double PR = (gamma-1.0) * (uR[4] - 0.5*rhoR*vsqR);
+  double HL = 0.5*vsqL + gamma*PL/((gamma-1.0)*rhoL);
+  double HR = 0.5*vsqR + gamma*PR/((gamma-1.0)*rhoR);
+
+  double vx = (tL*vxL + tR*vxR) / tLpR;
+  double vy = (tL*vyL + tR*vyR) / tLpR;
+  double vz = (tL*vzL + tR*vzR) / tLpR;
+  double H = (tL*HL + tR*HR) / tLpR;
+  double vsq = vx*vx + vy*vy + vz*vz;
+  double a2 = (gamma-1.0) * (H - 0.5*vsq);
+  double a = sqrt(a2);
+
+  /* Compute eigenvector coefficients */
+  double gm1 = gamma - 1.0;
+  double ek = 0.5 * vsq;
+  double a2inv = 1.0 / a2;
+  double twoA2inv = 0.5 * a2inv;
+  double h0 = a2/gm1 + ek;
+
+  /* Build left eigenvector matrix L (5x5) for base NS3D system */
+  double L[25];
+  #pragma unroll
+  for (int i = 0; i < 25; i++) L[i] = 0.0;
+
+  if (dir == 0) {
+    L[5*1+0] = (gm1*ek + a*vx) * twoA2inv;
+    L[5*1+1] = (-gm1*vx - a) * twoA2inv;
+    L[5*1+2] = (-gm1*vy) * twoA2inv;
+    L[5*1+3] = (-gm1*vz) * twoA2inv;
+    L[5*1+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vx) * twoA2inv;
+    L[5*4+1] = (-gm1*vx + a) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv;
+    L[5*4+3] = (-gm1*vz) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*2+0] = vy; L[5*2+2] = -1.0;
+    L[5*3+0] = -vz; L[5*3+3] = 1.0;
+  } else if (dir == 1) {
+    L[5*2+0] = (gm1*ek + a*vy) * twoA2inv;
+    L[5*2+1] = (-gm1*vx) * twoA2inv;
+    L[5*2+2] = (-gm1*vy - a) * twoA2inv;
+    L[5*2+3] = (-gm1*vz) * twoA2inv;
+    L[5*2+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vy) * twoA2inv;
+    L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy + a) * twoA2inv;
+    L[5*4+3] = (-gm1*vz) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = -vx; L[5*1+1] = 1.0;
+    L[5*3+0] = vz; L[5*3+3] = -1.0;
+  } else {
+    L[5*3+0] = (gm1*ek + a*vz) * twoA2inv;
+    L[5*3+1] = (-gm1*vx) * twoA2inv;
+    L[5*3+2] = (-gm1*vy) * twoA2inv;
+    L[5*3+3] = (-gm1*vz - a) * twoA2inv;
+    L[5*3+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vz) * twoA2inv;
+    L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv;
+    L[5*4+3] = (-gm1*vz + a) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = vx; L[5*1+1] = -1.0;
+    L[5*2+0] = -vy; L[5*2+2] = 1.0;
+  }
+
+  /* Build right eigenvector matrix R (5x5) */
+  double R[25];
+  #pragma unroll
+  for (int i = 0; i < 25; i++) R[i] = 0.0;
+
+  if (dir == 0) {
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[0*5+1] = 1.0; R[1*5+1] = vx-a; R[2*5+1] = vy; R[3*5+1] = vz; R[4*5+1] = h0-a*vx;
+    R[2*5+2] = -1.0; R[4*5+2] = -vy;
+    R[3*5+3] = 1.0; R[4*5+3] = vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx+a; R[2*5+4] = vy; R[3*5+4] = vz; R[4*5+4] = h0+a*vx;
+  } else if (dir == 1) {
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = 1.0; R[4*5+1] = vx;
+    R[0*5+2] = 1.0; R[1*5+2] = vx; R[2*5+2] = vy-a; R[3*5+2] = vz; R[4*5+2] = h0-a*vy;
+    R[3*5+3] = -1.0; R[4*5+3] = -vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy+a; R[3*5+4] = vz; R[4*5+4] = h0+a*vy;
+  } else {
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = -1.0; R[4*5+1] = -vx;
+    R[2*5+2] = 1.0; R[4*5+2] = vy;
+    R[0*5+3] = 1.0; R[1*5+3] = vx; R[2*5+3] = vy; R[3*5+3] = vz-a; R[4*5+3] = h0-a*vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy; R[3*5+4] = vz+a; R[4*5+4] = h0+a*vz;
+  }
+
+  /* Process base 5 NS3D variables with characteristic transform */
+  double fchar[5];
+
+  #pragma unroll
+  for (int v = 0; v < base_nvars; v++) {
+    double a_m2 = 0.0, a_m1 = 0.0, a_p1 = 0.0, a_p2 = 0.0;
+
+    if (upw > 0) {
+      #pragma unroll
+      for (int k = 0; k < base_nvars; k++) {
+        double Lvk = L[v*5 + k];
+        a_m2 += Lvk * fC[qm2*nvars + k];
+        a_m1 += Lvk * fC[qm1*nvars + k];
+        a_p1 += Lvk * fC[qp1*nvars + k];
+      }
+      double fdiff = a_p1 - a_m1;
+      double bdiff = a_m1 - a_m2;
+      double num = 3.0*fdiff*bdiff + eps;
+      double den = 2.0*(fdiff-bdiff)*(fdiff-bdiff) + 3.0*fdiff*bdiff + eps;
+      double limit = (den != 0.0) ? (num/den) : 1.0;
+      fchar[v] = a_m1 + limit * (one_third*fdiff + one_sixth*bdiff);
+    } else {
+      #pragma unroll
+      for (int k = 0; k < base_nvars; k++) {
+        double Lvk = L[v*5 + k];
+        a_m1 += Lvk * fC[qm1*nvars + k];
+        a_p1 += Lvk * fC[qp1*nvars + k];
+        a_p2 += Lvk * fC[qp2*nvars + k];
+      }
+      double fdiff = a_p2 - a_p1;
+      double bdiff = a_p1 - a_m1;
+      double num = 3.0*fdiff*bdiff + eps;
+      double den = 2.0*(fdiff-bdiff)*(fdiff-bdiff) + 3.0*fdiff*bdiff + eps;
+      double limit = (den != 0.0) ? (num/den) : 1.0;
+      fchar[v] = a_p1 - limit * (one_third*fdiff + one_sixth*bdiff);
+    }
+  }
+
+  /* Transform base variables back to physical space */
+  #pragma unroll
+  for (int k = 0; k < base_nvars; k++) {
+    double s = 0.0;
+    #pragma unroll
+    for (int v = 0; v < base_nvars; v++) {
+      s += R[k*5 + v] * fchar[v];
+    }
+    fI[tid*nvars + k] = s;
+  }
+
+  /* Process passive scalars (vars 5-11) with component-wise MUSCL3 */
+  #pragma unroll
+  for (int k = base_nvars; k < nvars; k++) {
+    if (upw > 0) {
+      double m2 = fC[qm2*nvars + k];
+      double m1 = fC[qm1*nvars + k];
+      double p1 = fC[qp1*nvars + k];
+      double fdiff = p1 - m1;
+      double bdiff = m1 - m2;
+      double num = 3.0*fdiff*bdiff + eps;
+      double den = 2.0*(fdiff-bdiff)*(fdiff-bdiff) + 3.0*fdiff*bdiff + eps;
+      double limit = (den != 0.0) ? (num/den) : 1.0;
+      fI[tid*nvars + k] = m1 + limit * (one_third*fdiff + one_sixth*bdiff);
+    } else {
+      double m1 = fC[qm1*nvars + k];
+      double p1 = fC[qp1*nvars + k];
+      double p2 = fC[qp2*nvars + k];
+      double fdiff = p2 - p1;
+      double bdiff = p1 - m1;
+      double num = 3.0*fdiff*bdiff + eps;
+      double den = 2.0*(fdiff-bdiff)*(fdiff-bdiff) + 3.0*fdiff*bdiff + eps;
+      double limit = (den != 0.0) ? (num/den) : 1.0;
+      fI[tid*nvars + k] = p1 - limit * (one_third*fdiff + one_sixth*bdiff);
+    }
+  }
+}
+
+/* ==========================================================================
+   FUSED WENO5 CHARACTERISTIC KERNELS FOR nvars=5 AND nvars=12
+   These kernels compute WENO weights AND interpolation in a SINGLE pass,
+   eliminating intermediate weight storage and duplicate Roe average computation.
+   ========================================================================== */
+
+/* Helper: Compute WENO5 smoothness indicators inline */
+static __device__ __forceinline__ void weno5_smoothness_inline(
+  double m3, double m2, double m1, double p1, double p2,
+  double *b1, double *b2, double *b3
+)
+{
+  const double c13_12 = 13.0/12.0;
+  const double c1_4 = 0.25;
+
+  *b1 = c13_12*(m3 - 2*m2 + m1)*(m3 - 2*m2 + m1)
+      + c1_4*(m3 - 4*m2 + 3*m1)*(m3 - 4*m2 + 3*m1);
+  *b2 = c13_12*(m2 - 2*m1 + p1)*(m2 - 2*m1 + p1)
+      + c1_4*(m2 - p1)*(m2 - p1);
+  *b3 = c13_12*(m1 - 2*p1 + p2)*(m1 - 2*p1 + p2)
+      + c1_4*(3*m1 - 4*p1 + p2)*(3*m1 - 4*p1 + p2);
+}
+
+/* Helper: Compute WENO5 weights and interpolated value inline (Jiang-Shu) */
+static __device__ __forceinline__ double weno5_interp_inline(
+  double m3, double m2, double m1, double p1, double p2, double eps
+)
+{
+  /* Smoothness indicators */
+  double b1, b2, b3;
+  weno5_smoothness_inline(m3, m2, m1, p1, p2, &b1, &b2, &b3);
+
+  /* Optimal weights */
+  const double c1 = 0.1, c2 = 0.6, c3 = 0.3;
+
+  /* Nonlinear weights (Jiang-Shu) */
+  double a1 = c1 / ((b1 + eps) * (b1 + eps));
+  double a2 = c2 / ((b2 + eps) * (b2 + eps));
+  double a3 = c3 / ((b3 + eps) * (b3 + eps));
+  double asum_inv = 1.0 / (a1 + a2 + a3);
+  double w1 = a1 * asum_inv;
+  double w2 = a2 * asum_inv;
+  double w3 = a3 * asum_inv;
+
+  /* Candidate stencils */
+  const double c1_6 = 1.0/6.0;
+  double f1 = (2*c1_6)*m3 + (-7*c1_6)*m2 + (11*c1_6)*m1;
+  double f2 = (-c1_6)*m2 + (5*c1_6)*m1 + (2*c1_6)*p1;
+  double f3 = (2*c1_6)*m1 + (5*c1_6)*p1 + (-c1_6)*p2;
+
+  return w1*f1 + w2*f2 + w3*f3;
+}
+
+/* Fused WENO5 kernel for nvars=5 (3D NavierStokes, no passive scalars)
+   Computes weights and interpolation in a single pass */
+GPU_KERNEL void gpu_weno5_fused_char_ns3d_nvars5_kernel(
+  double *fI, const double *fC, const double *u,
+  int dim0, int dim1, int dim2,
+  int stride0, int stride1, int stride2,
+  int bounds0, int bounds1, int bounds2,
+  int ghosts, int dir, int upw,
+  double eps, double gamma
+)
+{
+  const int total_interfaces = bounds0 * bounds1 * bounds2;
+  const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
+  if (tid >= total_interfaces) return;
+
+  /* Decode tid to 3D interface index */
+  const int i0 = tid % bounds0;
+  const int i1 = (tid / bounds0) % bounds1;
+  const int i2 = tid / (bounds0 * bounds1);
+
+  const int stride_dir = (dir == 0) ? stride0 : ((dir == 1) ? stride1 : stride2);
+  const int nvars = 5;
+
+  /* Compute cell indices */
+  int c0, c1, c2;
+  int qm1, qm2, qm3, qp1, qp2, qL, qR;
+
+  if (upw > 0) {
+    c0 = i0; c1 = i1; c2 = i2;
+    if (dir == 0) c0 = i0 - 1;
+    else if (dir == 1) c1 = i1 - 1;
+    else c2 = i2 - 1;
+
+    qm1 = (c2 + ghosts) * stride2 + (c1 + ghosts) * stride1 + (c0 + ghosts) * stride0;
+    qm3 = qm1 - 2*stride_dir;
+    qm2 = qm1 - stride_dir;
+    qp1 = qm1 + stride_dir;
+    qp2 = qm1 + 2*stride_dir;
+    qL = qm1;
+    qR = qp1;
+  } else {
+    c0 = i0; c1 = i1; c2 = i2;
+    if (dir == 0) c0 = i0;
+    else if (dir == 1) c1 = i1;
+    else c2 = i2;
+
+    qm1 = (c2 + ghosts) * stride2 + (c1 + ghosts) * stride1 + (c0 + ghosts) * stride0;
+    qm3 = qm1 + 2*stride_dir;
+    qm2 = qm1 + stride_dir;
+    qp1 = qm1 - stride_dir;
+    qp2 = qm1 - 2*stride_dir;
+    qL = qm1;
+    qR = qp1;
+  }
+
+  /* Load solution states for Roe average */
+  double uL[5], uR[5];
+  #pragma unroll
+  for (int v = 0; v < 5; v++) {
+    uL[v] = u[qL*nvars + v];
+    uR[v] = u[qR*nvars + v];
+  }
+
+  /* Compute Roe average */
+  double rhoL = uL[0], rhoR = uR[0];
+  double tL = sqrt(rhoL), tR = sqrt(rhoR);
+  double tLpR = tL + tR;
+
+  double vxL = uL[1]/rhoL, vyL = uL[2]/rhoL, vzL = uL[3]/rhoL;
+  double vxR = uR[1]/rhoR, vyR = uR[2]/rhoR, vzR = uR[3]/rhoR;
+
+  double vsqL = vxL*vxL + vyL*vyL + vzL*vzL;
+  double vsqR = vxR*vxR + vyR*vyR + vzR*vzR;
+  double PL = (gamma-1.0) * (uL[4] - 0.5*rhoL*vsqL);
+  double PR = (gamma-1.0) * (uR[4] - 0.5*rhoR*vsqR);
+  double HL = 0.5*vsqL + gamma*PL/((gamma-1.0)*rhoL);
+  double HR = 0.5*vsqR + gamma*PR/((gamma-1.0)*rhoR);
+
+  double vx = (tL*vxL + tR*vxR) / tLpR;
+  double vy = (tL*vyL + tR*vyR) / tLpR;
+  double vz = (tL*vzL + tR*vzR) / tLpR;
+  double H = (tL*HL + tR*HR) / tLpR;
+  double vsq = vx*vx + vy*vy + vz*vz;
+  double a2 = (gamma-1.0) * (H - 0.5*vsq);
+  double a = sqrt(a2);
+
+  /* Eigenvector coefficients */
+  double gm1 = gamma - 1.0;
+  double ek = 0.5 * vsq;
+  double a2inv = 1.0 / a2;
+  double twoA2inv = 0.5 * a2inv;
+  double h0 = a2/gm1 + ek;
+
+  /* Build left eigenvector matrix L (5x5) */
+  double L[25];
+  #pragma unroll
+  for (int i = 0; i < 25; i++) L[i] = 0.0;
+
+  if (dir == 0) {
+    L[5*1+0] = (gm1*ek + a*vx) * twoA2inv;
+    L[5*1+1] = (-gm1*vx - a) * twoA2inv;
+    L[5*1+2] = (-gm1*vy) * twoA2inv;
+    L[5*1+3] = (-gm1*vz) * twoA2inv;
+    L[5*1+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vx) * twoA2inv;
+    L[5*4+1] = (-gm1*vx + a) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv;
+    L[5*4+3] = (-gm1*vz) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*2+0] = vy; L[5*2+2] = -1.0;
+    L[5*3+0] = -vz; L[5*3+3] = 1.0;
+  } else if (dir == 1) {
+    L[5*2+0] = (gm1*ek + a*vy) * twoA2inv;
+    L[5*2+1] = (-gm1*vx) * twoA2inv;
+    L[5*2+2] = (-gm1*vy - a) * twoA2inv;
+    L[5*2+3] = (-gm1*vz) * twoA2inv;
+    L[5*2+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vy) * twoA2inv;
+    L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy + a) * twoA2inv;
+    L[5*4+3] = (-gm1*vz) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = -vx; L[5*1+1] = 1.0;
+    L[5*3+0] = vz; L[5*3+3] = -1.0;
+  } else {
+    L[5*3+0] = (gm1*ek + a*vz) * twoA2inv;
+    L[5*3+1] = (-gm1*vx) * twoA2inv;
+    L[5*3+2] = (-gm1*vy) * twoA2inv;
+    L[5*3+3] = (-gm1*vz - a) * twoA2inv;
+    L[5*3+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vz) * twoA2inv;
+    L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv;
+    L[5*4+3] = (-gm1*vz + a) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = vx; L[5*1+1] = -1.0;
+    L[5*2+0] = -vy; L[5*2+2] = 1.0;
+  }
+
+  /* Build right eigenvector matrix R (5x5) */
+  double R[25];
+  #pragma unroll
+  for (int i = 0; i < 25; i++) R[i] = 0.0;
+
+  if (dir == 0) {
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[0*5+1] = 1.0; R[1*5+1] = vx-a; R[2*5+1] = vy; R[3*5+1] = vz; R[4*5+1] = h0-a*vx;
+    R[2*5+2] = -1.0; R[4*5+2] = -vy;
+    R[3*5+3] = 1.0; R[4*5+3] = vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx+a; R[2*5+4] = vy; R[3*5+4] = vz; R[4*5+4] = h0+a*vx;
+  } else if (dir == 1) {
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = 1.0; R[4*5+1] = vx;
+    R[0*5+2] = 1.0; R[1*5+2] = vx; R[2*5+2] = vy-a; R[3*5+2] = vz; R[4*5+2] = h0-a*vy;
+    R[3*5+3] = -1.0; R[4*5+3] = -vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy+a; R[3*5+4] = vz; R[4*5+4] = h0+a*vy;
+  } else {
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = -1.0; R[4*5+1] = -vx;
+    R[2*5+2] = 1.0; R[4*5+2] = vy;
+    R[0*5+3] = 1.0; R[1*5+3] = vx; R[2*5+3] = vy; R[3*5+3] = vz-a; R[4*5+3] = h0-a*vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy; R[3*5+4] = vz+a; R[4*5+4] = h0+a*vz;
+  }
+
+  /* Transform to characteristic, apply WENO5, transform back */
+  double fchar[5];
+
+  #pragma unroll
+  for (int v = 0; v < 5; v++) {
+    /* Transform stencil to characteristic space */
+    double fm3 = 0.0, fm2 = 0.0, fm1 = 0.0, fp1 = 0.0, fp2 = 0.0;
+    #pragma unroll
+    for (int k = 0; k < 5; k++) {
+      double Lvk = L[v*5 + k];
+      fm3 += Lvk * fC[qm3*nvars + k];
+      fm2 += Lvk * fC[qm2*nvars + k];
+      fm1 += Lvk * fC[qm1*nvars + k];
+      fp1 += Lvk * fC[qp1*nvars + k];
+      fp2 += Lvk * fC[qp2*nvars + k];
+    }
+
+    /* Apply WENO5 inline */
+    fchar[v] = weno5_interp_inline(fm3, fm2, fm1, fp1, fp2, eps);
+  }
+
+  /* Transform back to physical space */
+  #pragma unroll
+  for (int k = 0; k < 5; k++) {
+    double s = 0.0;
+    #pragma unroll
+    for (int v = 0; v < 5; v++) {
+      s += R[k*5 + v] * fchar[v];
+    }
+    fI[tid*nvars + k] = s;
+  }
+}
+
+/* Fused WENO5 kernel for nvars=12 (3D NavierStokes + 7 passive scalars) */
+GPU_KERNEL void gpu_weno5_fused_char_ns3d_nvars12_kernel(
+  double *fI, const double *fC, const double *u,
+  int dim0, int dim1, int dim2,
+  int stride0, int stride1, int stride2,
+  int bounds0, int bounds1, int bounds2,
+  int ghosts, int dir, int upw,
+  double eps, double gamma
+)
+{
+  const int total_interfaces = bounds0 * bounds1 * bounds2;
+  const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
+  if (tid >= total_interfaces) return;
+
+  const int i0 = tid % bounds0;
+  const int i1 = (tid / bounds0) % bounds1;
+  const int i2 = tid / (bounds0 * bounds1);
+
+  const int stride_dir = (dir == 0) ? stride0 : ((dir == 1) ? stride1 : stride2);
+  const int nvars = 12;
+  const int base_nvars = 5;
+
+  int c0, c1, c2;
+  int qm1, qm2, qm3, qp1, qp2, qL, qR;
+
+  if (upw > 0) {
+    c0 = i0; c1 = i1; c2 = i2;
+    if (dir == 0) c0 = i0 - 1;
+    else if (dir == 1) c1 = i1 - 1;
+    else c2 = i2 - 1;
+
+    qm1 = (c2 + ghosts) * stride2 + (c1 + ghosts) * stride1 + (c0 + ghosts) * stride0;
+    qm3 = qm1 - 2*stride_dir;
+    qm2 = qm1 - stride_dir;
+    qp1 = qm1 + stride_dir;
+    qp2 = qm1 + 2*stride_dir;
+    qL = qm1;
+    qR = qp1;
+  } else {
+    c0 = i0; c1 = i1; c2 = i2;
+    if (dir == 0) c0 = i0;
+    else if (dir == 1) c1 = i1;
+    else c2 = i2;
+
+    qm1 = (c2 + ghosts) * stride2 + (c1 + ghosts) * stride1 + (c0 + ghosts) * stride0;
+    qm3 = qm1 + 2*stride_dir;
+    qm2 = qm1 + stride_dir;
+    qp1 = qm1 - stride_dir;
+    qp2 = qm1 - 2*stride_dir;
+    qL = qm1;
+    qR = qp1;
+  }
+
+  /* Load solution states for Roe average */
+  double uL[5], uR[5];
+  #pragma unroll
+  for (int v = 0; v < 5; v++) {
+    uL[v] = u[qL*nvars + v];
+    uR[v] = u[qR*nvars + v];
+  }
+
+  /* Compute Roe average */
+  double rhoL = uL[0], rhoR = uR[0];
+  double tL = sqrt(rhoL), tR = sqrt(rhoR);
+  double tLpR = tL + tR;
+
+  double vxL = uL[1]/rhoL, vyL = uL[2]/rhoL, vzL = uL[3]/rhoL;
+  double vxR = uR[1]/rhoR, vyR = uR[2]/rhoR, vzR = uR[3]/rhoR;
+
+  double vsqL = vxL*vxL + vyL*vyL + vzL*vzL;
+  double vsqR = vxR*vxR + vyR*vyR + vzR*vzR;
+  double PL = (gamma-1.0) * (uL[4] - 0.5*rhoL*vsqL);
+  double PR = (gamma-1.0) * (uR[4] - 0.5*rhoR*vsqR);
+  double HL = 0.5*vsqL + gamma*PL/((gamma-1.0)*rhoL);
+  double HR = 0.5*vsqR + gamma*PR/((gamma-1.0)*rhoR);
+
+  double vx = (tL*vxL + tR*vxR) / tLpR;
+  double vy = (tL*vyL + tR*vyR) / tLpR;
+  double vz = (tL*vzL + tR*vzR) / tLpR;
+  double H = (tL*HL + tR*HR) / tLpR;
+  double vsq = vx*vx + vy*vy + vz*vz;
+  double a2 = (gamma-1.0) * (H - 0.5*vsq);
+  double a = sqrt(a2);
+
+  double gm1 = gamma - 1.0;
+  double ek = 0.5 * vsq;
+  double a2inv = 1.0 / a2;
+  double twoA2inv = 0.5 * a2inv;
+  double h0 = a2/gm1 + ek;
+
+  /* Build L and R matrices (5x5) */
+  double L[25], R[25];
+  #pragma unroll
+  for (int i = 0; i < 25; i++) { L[i] = 0.0; R[i] = 0.0; }
+
+  if (dir == 0) {
+    L[5*1+0] = (gm1*ek + a*vx) * twoA2inv; L[5*1+1] = (-gm1*vx - a) * twoA2inv;
+    L[5*1+2] = (-gm1*vy) * twoA2inv; L[5*1+3] = (-gm1*vz) * twoA2inv; L[5*1+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv; L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv; L[5*0+3] = gm1*vz * a2inv; L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vx) * twoA2inv; L[5*4+1] = (-gm1*vx + a) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv; L[5*4+3] = (-gm1*vz) * twoA2inv; L[5*4+4] = gm1 * twoA2inv;
+    L[5*2+0] = vy; L[5*2+2] = -1.0; L[5*3+0] = -vz; L[5*3+3] = 1.0;
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[0*5+1] = 1.0; R[1*5+1] = vx-a; R[2*5+1] = vy; R[3*5+1] = vz; R[4*5+1] = h0-a*vx;
+    R[2*5+2] = -1.0; R[4*5+2] = -vy; R[3*5+3] = 1.0; R[4*5+3] = vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx+a; R[2*5+4] = vy; R[3*5+4] = vz; R[4*5+4] = h0+a*vx;
+  } else if (dir == 1) {
+    L[5*2+0] = (gm1*ek + a*vy) * twoA2inv; L[5*2+1] = (-gm1*vx) * twoA2inv;
+    L[5*2+2] = (-gm1*vy - a) * twoA2inv; L[5*2+3] = (-gm1*vz) * twoA2inv; L[5*2+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv; L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv; L[5*0+3] = gm1*vz * a2inv; L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vy) * twoA2inv; L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy + a) * twoA2inv; L[5*4+3] = (-gm1*vz) * twoA2inv; L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = -vx; L[5*1+1] = 1.0; L[5*3+0] = vz; L[5*3+3] = -1.0;
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = 1.0; R[4*5+1] = vx;
+    R[0*5+2] = 1.0; R[1*5+2] = vx; R[2*5+2] = vy-a; R[3*5+2] = vz; R[4*5+2] = h0-a*vy;
+    R[3*5+3] = -1.0; R[4*5+3] = -vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy+a; R[3*5+4] = vz; R[4*5+4] = h0+a*vy;
+  } else {
+    L[5*3+0] = (gm1*ek + a*vz) * twoA2inv; L[5*3+1] = (-gm1*vx) * twoA2inv;
+    L[5*3+2] = (-gm1*vy) * twoA2inv; L[5*3+3] = (-gm1*vz - a) * twoA2inv; L[5*3+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv; L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv; L[5*0+3] = gm1*vz * a2inv; L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vz) * twoA2inv; L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv; L[5*4+3] = (-gm1*vz + a) * twoA2inv; L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = vx; L[5*1+1] = -1.0; L[5*2+0] = -vy; L[5*2+2] = 1.0;
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = -1.0; R[4*5+1] = -vx; R[2*5+2] = 1.0; R[4*5+2] = vy;
+    R[0*5+3] = 1.0; R[1*5+3] = vx; R[2*5+3] = vy; R[3*5+3] = vz-a; R[4*5+3] = h0-a*vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy; R[3*5+4] = vz+a; R[4*5+4] = h0+a*vz;
+  }
+
+  /* Process base 5 NS3D variables with characteristic WENO5 */
+  double fchar[5];
+
+  #pragma unroll
+  for (int v = 0; v < base_nvars; v++) {
+    double fm3 = 0.0, fm2 = 0.0, fm1 = 0.0, fp1 = 0.0, fp2 = 0.0;
+    #pragma unroll
+    for (int k = 0; k < base_nvars; k++) {
+      double Lvk = L[v*5 + k];
+      fm3 += Lvk * fC[qm3*nvars + k];
+      fm2 += Lvk * fC[qm2*nvars + k];
+      fm1 += Lvk * fC[qm1*nvars + k];
+      fp1 += Lvk * fC[qp1*nvars + k];
+      fp2 += Lvk * fC[qp2*nvars + k];
+    }
+    fchar[v] = weno5_interp_inline(fm3, fm2, fm1, fp1, fp2, eps);
+  }
+
+  /* Transform back to physical space */
+  #pragma unroll
+  for (int k = 0; k < base_nvars; k++) {
+    double s = 0.0;
+    #pragma unroll
+    for (int v = 0; v < base_nvars; v++) {
+      s += R[k*5 + v] * fchar[v];
+    }
+    fI[tid*nvars + k] = s;
+  }
+
+  /* Passive scalars: component-wise WENO5 */
+  #pragma unroll
+  for (int k = base_nvars; k < nvars; k++) {
+    double m3 = fC[qm3*nvars + k];
+    double m2 = fC[qm2*nvars + k];
+    double m1 = fC[qm1*nvars + k];
+    double p1 = fC[qp1*nvars + k];
+    double p2 = fC[qp2*nvars + k];
+    fI[tid*nvars + k] = weno5_interp_inline(m3, m2, m1, p1, p2, eps);
+  }
+}
+
 /* Kernel: Multi-dimensional 5th order WENO interpolation
    Handles full multi-dimensional array layout using stride_with_ghosts
 */
@@ -1144,23 +2068,43 @@ extern "C" void gpu_launch_muscl3_interpolation_nd_char_ns3d(
   (void)bounds_inter; (void)ghosts; (void)dir; (void)upw; (void)eps; (void)gamma; (void)blockSize;
 #else
   if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
-  if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
-    fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
-
-    return;
-  }
-  int *dim_gpu = cached_metadata.dim_gpu;
-  int *stride_gpu = cached_metadata.stride_gpu;
-  int *bounds_gpu = cached_metadata.bounds_gpu;
 
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
-  GPU_KERNEL_LAUNCH(gpu_muscl3_interpolation_nd_char_ns3d_kernel, gridSize, blockSize)(
-    fI, fC, u, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, upw, eps, gamma
-  );
+
+  /* Use specialized kernels for 3D with nvars=5 or nvars=12 */
+  if (ndims == 3 && nvars == 5) {
+    GPU_KERNEL_LAUNCH(gpu_muscl3_interpolation_nd_char_ns3d_nvars5_kernel, gridSize, blockSize)(
+      fI, fC, u,
+      dim[0], dim[1], dim[2],
+      stride_with_ghosts[0], stride_with_ghosts[1], stride_with_ghosts[2],
+      bounds_inter[0], bounds_inter[1], bounds_inter[2],
+      ghosts, dir, upw, eps, gamma
+    );
+  } else if (ndims == 3 && nvars == 12) {
+    GPU_KERNEL_LAUNCH(gpu_muscl3_interpolation_nd_char_ns3d_nvars12_kernel, gridSize, blockSize)(
+      fI, fC, u,
+      dim[0], dim[1], dim[2],
+      stride_with_ghosts[0], stride_with_ghosts[1], stride_with_ghosts[2],
+      bounds_inter[0], bounds_inter[1], bounds_inter[2],
+      ghosts, dir, upw, eps, gamma
+    );
+  } else {
+    /* Fall back to generic kernel */
+    if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
+      fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
+      return;
+    }
+    int *dim_gpu = cached_metadata.dim_gpu;
+    int *stride_gpu = cached_metadata.stride_gpu;
+    int *bounds_gpu = cached_metadata.bounds_gpu;
+
+    GPU_KERNEL_LAUNCH(gpu_muscl3_interpolation_nd_char_ns3d_kernel, gridSize, blockSize)(
+      fI, fC, u, nvars, ndims, dim_gpu, stride_gpu, bounds_gpu, ghosts, dir, upw, eps, gamma
+    );
+  }
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  /* No need to free - metadata cached for reuse */
 #endif
 }
 
@@ -1889,6 +2833,54 @@ extern "C" void gpu_launch_fifth_order_upwind_nd_char_ns3d(
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
   /* No need to free - metadata cached for reuse */
+#endif
+}
+
+/* Launch wrapper for FUSED WENO5 characteristic interpolation (NS3D) */
+/* This function computes weights and interpolation in a single pass */
+/* Only works for 3D with nvars=5 or nvars=12; returns 0 on success, -1 if not applicable */
+extern "C" int gpu_launch_weno5_fused_char_ns3d(
+  double *fI, const double *fC, const double *u,
+  int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, int upw,
+  double eps, double gamma,
+  int blockSize
+)
+{
+#ifdef GPU_NONE
+  (void)fI; (void)fC; (void)u; (void)nvars; (void)ndims; (void)dim; (void)stride_with_ghosts;
+  (void)bounds_inter; (void)ghosts; (void)dir; (void)upw; (void)eps; (void)gamma; (void)blockSize;
+  return -1;
+#else
+  /* Only support 3D with nvars=5 or nvars=12 */
+  if (ndims != 3 || (nvars != 5 && nvars != 12)) {
+    return -1;
+  }
+
+  if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
+
+  int total_interfaces = bounds_inter[0] * bounds_inter[1] * bounds_inter[2];
+  int gridSize = (total_interfaces + blockSize - 1) / blockSize;
+
+  if (nvars == 5) {
+    GPU_KERNEL_LAUNCH(gpu_weno5_fused_char_ns3d_nvars5_kernel, gridSize, blockSize)(
+      fI, fC, u,
+      dim[0], dim[1], dim[2],
+      stride_with_ghosts[0], stride_with_ghosts[1], stride_with_ghosts[2],
+      bounds_inter[0], bounds_inter[1], bounds_inter[2],
+      ghosts, dir, upw, eps, gamma
+    );
+  } else {
+    GPU_KERNEL_LAUNCH(gpu_weno5_fused_char_ns3d_nvars12_kernel, gridSize, blockSize)(
+      fI, fC, u,
+      dim[0], dim[1], dim[2],
+      stride_with_ghosts[0], stride_with_ghosts[1], stride_with_ghosts[2],
+      bounds_inter[0], bounds_inter[1], bounds_inter[2],
+      ghosts, dir, upw, eps, gamma
+    );
+  }
+  GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
+  return 0;
 #endif
 }
 

@@ -80,7 +80,7 @@ void gpu_launch_chemistry_photon_density_3d_first_layer(
   int blockSize
 );
 
-/* GPU kernel launch wrapper for photon density next layer (3D) */
+/* GPU kernel launch wrapper for photon density next layer (3D) - LEGACY */
 void gpu_launch_chemistry_photon_density_3d_next_layer(
   double* nv_hnu,
   const double* u,
@@ -96,6 +96,37 @@ void gpu_launch_chemistry_photon_density_3d_next_layer(
   double sO3,
   double n_O2_chem,
   double dz,
+  int blockSize
+);
+
+/* GPU kernel launch wrapper for photon density ALL layers in ONE launch (3D)
+ * This is the OPTIMIZED version that eliminates ~(kmax-1) kernel launches.
+ */
+void gpu_launch_chemistry_photon_density_3d_batched(
+  double* nv_hnu,
+  const double* u,
+  const double* imap,
+  int imax,
+  int jmax,
+  int kmax,
+  int dim0,
+  int dim1,
+  int dim2,
+  int ghosts,
+  int grid_stride,
+  int n_flow_vars,
+  double I0,
+  double c,
+  double h,
+  double nu,
+  double n_O2_chem,
+  double t_pulse_norm,
+  double t_start_norm,
+  double sO3,
+  double dz,
+  double t,
+  int first_rank_z,
+  int kstart,
   int blockSize
 );
 

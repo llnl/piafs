@@ -203,6 +203,16 @@ void gpu_launch_fifth_order_upwind_nd_char_ns3d(
   int ghosts, int dir, int upw, double gamma, int blockSize
 );
 
+/* Fused WENO5 characteristic interpolation (computes weights and interpolation in single pass) */
+/* Returns 0 on success, -1 if not applicable (only works for 3D with nvars=5 or nvars=12) */
+int gpu_launch_weno5_fused_char_ns3d(
+  double *fI, const double *fC, const double *u,
+  int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, int upw,
+  double eps, double gamma,
+  int blockSize
+);
+
 #ifdef __cplusplus
 }
 #endif

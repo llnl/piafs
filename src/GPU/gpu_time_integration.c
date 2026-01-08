@@ -112,7 +112,9 @@ int GPUTimeRHSFunctionExplicit(
       if (ex_ierr) return ex_ierr;
     }
 
-    /* Validate u before computing RHS (INTERIOR ONLY; ghosts may be unset at corners) */
+    /* Validate u before computing RHS (INTERIOR ONLY; ghosts may be unset at corners)
+       Note: This is expensive on GPU (requires cudaMemcpy). Disabled by default. */
+#ifdef PIAFS_NAN_CHECK
     if (GPUShouldValidate()) {
       const int ndims = solver->ndims;
       const int ghosts = solver->ghosts;
@@ -169,6 +171,7 @@ int GPUTimeRHSFunctionExplicit(
         free(u_host_check);
       }
     }
+#endif /* PIAFS_NAN_CHECK */
 
     /* Initialize RHS to zero on GPU */
     GPUArraySetValue(rhs, 0.0, size);
@@ -183,7 +186,8 @@ int GPUTimeRHSFunctionExplicit(
       );
       if (hyp_ierr) return hyp_ierr;
       
-      /* Validate hyp after computation */
+      /* Validate hyp after computation (Debug builds only) */
+#ifdef PIAFS_NAN_CHECK
       if (GPUShouldValidate()) {
         double *hyp_host_check = (double*) malloc(size * sizeof(double));
         if (hyp_host_check) {
@@ -200,6 +204,7 @@ int GPUTimeRHSFunctionExplicit(
           free(hyp_host_check);
         }
       }
+#endif
       
       /* Add to RHS (negate for hyperbolic term) */
       GPUArrayAXPY(solver->hyp, -1.0, rhs, size);

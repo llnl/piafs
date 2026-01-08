@@ -8,12 +8,80 @@
 #include <mpivars.h>
 #include <arrayfunctions.h>
 #include <basic.h>
+#include <stdlib.h>
+#include <stdio.h>
+#ifndef serial
+#include <mpi.h>
+/* Check for OpenMPI CUDA-aware extensions */
+#ifdef OPEN_MPI
+#include <mpi-ext.h>
+#endif
+#endif
 
 /* Static GPU buffers for GPU-aware MPI */
 #ifdef GPU_AWARE_MPI
 static double *d_sendbuf = NULL;
 static double *d_recvbuf = NULL;
 static size_t d_mpi_buf_capacity = 0;
+
+/* Runtime check for GPU-aware MPI support
+   -1 = not checked yet, 0 = not supported, 1 = supported */
+static int gpu_aware_mpi_available = -1;
+
+/* Check if MPI library actually supports GPU-aware operations at runtime */
+static int check_gpu_aware_mpi_support(void)
+{
+  if (gpu_aware_mpi_available >= 0) {
+    return gpu_aware_mpi_available;
+  }
+
+  /* Check environment variable override first */
+  const char *env = getenv("PIAFS_FORCE_GPU_AWARE_MPI");
+  if (env) {
+    if (env[0] == '1' || env[0] == 'y' || env[0] == 'Y') {
+      gpu_aware_mpi_available = 1;
+      return 1;
+    } else if (env[0] == '0' || env[0] == 'n' || env[0] == 'N') {
+      gpu_aware_mpi_available = 0;
+      return 0;
+    }
+  }
+
+  /* Try to detect GPU-aware MPI support from the MPI library */
+  int supported = 0;
+
+#if defined(MPIX_CUDA_AWARE_SUPPORT) && MPIX_CUDA_AWARE_SUPPORT
+  /* OpenMPI compile-time check passed, now check runtime */
+  supported = MPIX_Query_cuda_support();
+#elif defined(MVAPICH2_VERSION)
+  /* MVAPICH2: check environment variable */
+  const char *mv2_cuda = getenv("MV2_USE_CUDA");
+  if (mv2_cuda && mv2_cuda[0] == '1') {
+    supported = 1;
+  }
+#else
+  /* Unknown MPI implementation - default to disabled for safety */
+  supported = 0;
+#endif
+
+  gpu_aware_mpi_available = supported;
+
+  /* Print diagnostic message (only rank 0) */
+  int rank = 0;
+#ifndef serial
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+#endif
+  if (rank == 0) {
+    if (supported) {
+      printf("GPU-aware MPI: enabled (runtime check passed)\n");
+    } else {
+      printf("GPU-aware MPI: disabled (runtime check failed, using host staging)\n");
+      printf("  Set PIAFS_FORCE_GPU_AWARE_MPI=1 to override if your MPI is CUDA-aware.\n");
+    }
+  }
+
+  return supported;
+}
 
 static int ensure_gpu_mpi_buffers(size_t required_size)
 {
@@ -98,7 +166,7 @@ int GPUMPIExchangeBoundariesnD(
 
 #ifdef GPU_AWARE_MPI
   /* GPU-aware MPI path: use device buffers directly */
-  if (GPUShouldUse()) {
+  if (GPUShouldUse() && check_gpu_aware_mpi_support()) {
     /* Ensure GPU buffers are large enough */
     size_t total_buf_size = (size_t)(2 * ndims) * (size_t)stride * sizeof(double);
     if (ensure_gpu_mpi_buffers(total_buf_size)) {

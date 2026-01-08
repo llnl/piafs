@@ -70,13 +70,15 @@ int TimeRHSFunctionExplicit(
     _ArrayAXPY_(solver->source, 1.0,rhs,size*solver->nvars);
   }
 
-  /* Check for NaN/Inf in RHS */
+  /* Check for NaN/Inf in RHS (Debug builds only) */
+#ifdef PIAFS_NAN_CHECK
   for (int i = 0; i < size*solver->nvars; i++) {
     if (isnan(rhs[i]) || isinf(rhs[i])) {
       fprintf(stderr,"ERROR in TimeRHSFunctionExplicit: NaN/Inf detected in RHS at index %d, time=%e.\n",i,t);
       exit(1);
     }
   }
+#endif
 
   return(0);
 }

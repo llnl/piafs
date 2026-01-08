@@ -32,6 +32,10 @@ int GPUAllocateSolutionArrays(SimulationObject *simobj, int nsims)
     solver->gpu_parabolic_workspace_FViscous = NULL;
     solver->gpu_parabolic_workspace_FDeriv = NULL;
     solver->gpu_parabolic_workspace_size = 0;
+
+    /* Initialize CFL workspace buffer */
+    solver->gpu_cfl_workspace = NULL;
+    solver->gpu_cfl_workspace_size = 0;
     
 #if defined(GPU_CUDA) || defined(GPU_HIP)
     solver->gpu_stream_hyp = NULL;
@@ -289,7 +293,19 @@ int GPUCopyGridArraysToDevice(SimulationObject *simobj, int nsims)
       fprintf(stderr, "Error: Failed to allocate gpu_parabolic_workspace_FDeriv\n");
       return 1;
     }
-    
+
+    /* GPU Optimization: Allocate persistent CFL workspace buffer */
+    /* Size: npoints without ghosts (dim[0] * dim[1] * ... * dim[ndims-1]) */
+    int npoints_interior = 1;
+    for (int d = 0; d < solver->ndims; d++) {
+      npoints_interior *= solver->dim_local[d];
+    }
+    solver->gpu_cfl_workspace_size = npoints_interior;
+    if (GPUAllocate((void**)&solver->gpu_cfl_workspace, npoints_interior * sizeof(double))) {
+      fprintf(stderr, "Error: Failed to allocate gpu_cfl_workspace\n");
+      return 1;
+    }
+
     /* GPU Optimization: Create CUDA/HIP streams for overlap */
 #if defined(GPU_CUDA) || defined(GPU_HIP)
     if (GPUCreateStreams(&solver->gpu_stream_hyp, &solver->gpu_stream_par, &solver->gpu_stream_sou)) {
@@ -343,7 +359,10 @@ void GPUFreeSolutionArrays(SimulationObject *simobj, int nsims)
     GPUFree(solver->gpu_parabolic_workspace_QDerivZ);
     GPUFree(solver->gpu_parabolic_workspace_FViscous);
     GPUFree(solver->gpu_parabolic_workspace_FDeriv);
-    
+
+    /* GPU Optimization: Free CFL workspace buffer */
+    GPUFree(solver->gpu_cfl_workspace);
+
     /* GPU Optimization: Destroy streams */
 #if defined(GPU_CUDA) || defined(GPU_HIP)
     GPUDestroyStreams(solver->gpu_stream_hyp, solver->gpu_stream_par, solver->gpu_stream_sou);
@@ -376,6 +395,7 @@ void GPUFreeSolutionArrays(SimulationObject *simobj, int nsims)
     solver->gpu_parabolic_workspace_QDerivZ = NULL;
     solver->gpu_parabolic_workspace_FViscous = NULL;
     solver->gpu_parabolic_workspace_FDeriv = NULL;
+    solver->gpu_cfl_workspace = NULL;
 #if defined(GPU_CUDA) || defined(GPU_HIP)
     solver->gpu_stream_hyp = NULL;
     solver->gpu_stream_par = NULL;

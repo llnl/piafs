@@ -115,14 +115,14 @@ int GPUInterpolateInterfacesHypWENO5Char(
 {
   HyPar *solver = (HyPar*) s;
   WENOParameters *weno = (WENOParameters*) solver->interp;
-  
+
   if (!weno) {
     fprintf(stderr, "Error: GPUInterpolateInterfacesHypWENO5Char: weno is NULL\n");
     return 1;
   }
-  
+
   int nvars = solver->nvars;
-  
+
   /* Get physics parameters - need gamma */
   double gamma = 1.4; /* Default value */
   if (solver->physics) {
@@ -132,25 +132,30 @@ int GPUInterpolateInterfacesHypWENO5Char(
       gamma = param->gamma;
     }
   }
-  
+
   int ndims = solver->ndims;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   /* Compute bounds for interface array */
   int bounds_inter[3]; /* Support up to 3D */
   for (int i = 0; i < ndims; i++) {
     bounds_inter[i] = dim[i];
   }
   bounds_inter[dir] = dim[dir] + 1; /* One more interface than cells */
-  
-  /* Compute total interface size */
-  int size_interface = 1;
-  for (int i = 0; i < ndims; i++) {
-    size_interface *= bounds_inter[i];
+
+  /* Try fused WENO5 kernel for 3D with nvars=5 or nvars=12
+   * This computes weights and interpolation in a single pass, avoiding
+   * the need for pre-computed weights and reducing memory bandwidth */
+  if (gpu_launch_weno5_fused_char_ns3d(
+        fI, fC, u, nvars, ndims, dim, stride_with_ghosts, bounds_inter,
+        ghosts, dir, upw, weno->eps, gamma, 256) == 0) {
+    if (GPUShouldSyncEveryOp()) GPUSync();
+    return 0;
   }
-  
+
+  /* Fall back to two-pass approach: use pre-computed weights */
   if (!weno->w1_gpu || !weno->w2_gpu || !weno->w3_gpu) {
     if (ensure_device_weno_weights_initialized(weno)) {
       fprintf(stderr,
@@ -161,7 +166,7 @@ int GPUInterpolateInterfacesHypWENO5Char(
   double *w1_gpu = weno->w1_gpu + (upw < 0 ? 2*weno->size : 0) + (uflag ? weno->size : 0) + weno->offset[dir];
   double *w2_gpu = weno->w2_gpu + (upw < 0 ? 2*weno->size : 0) + (uflag ? weno->size : 0) + weno->offset[dir];
   double *w3_gpu = weno->w3_gpu + (upw < 0 ? 2*weno->size : 0) + (uflag ? weno->size : 0) + weno->offset[dir];
-  
+
   /* Launch GPU kernel for characteristic-based interpolation */
   gpu_launch_weno5_interpolation_nd_char(
     fI, fC, u, w1_gpu, w2_gpu, w3_gpu,
@@ -169,9 +174,9 @@ int GPUInterpolateInterfacesHypWENO5Char(
     ghosts, dir, upw, gamma, 256
   );
   if (GPUShouldSyncEveryOp()) GPUSync();
-  
+
   /* weights persist on device */
-  
+
   return 0;
 }
 

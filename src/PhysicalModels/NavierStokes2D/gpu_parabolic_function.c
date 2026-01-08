@@ -59,10 +59,10 @@ int GPUNavierStokes2DParabolicFunction(double *par, double *u, void *s, void *m,
 
     solver->FirstDerivativePar(QDerivX, Q, _XDIR_, 1, solver, mpi);
     solver->FirstDerivativePar(QDerivY, Q, _YDIR_, 1, solver, mpi);
-    
+
     GPUMPIExchangeBoundariesnD(solver->ndims, solver->nvars, dim, solver->ghosts, mpi, QDerivX);
     GPUMPIExchangeBoundariesnD(solver->ndims, solver->nvars, dim, solver->ghosts, mpi, QDerivY);
-    GPUSync(); // Ensure MPI exchange is complete before proceeding
+    /* Note: GPUMPIExchangeBoundariesnD uses synchronous cudaMemcpy, so no explicit sync needed */
 
     /* Use cached metadata arrays - no allocation/copy overhead */
     int *dim_gpu = solver->gpu_dim_local;

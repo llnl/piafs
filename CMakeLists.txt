@@ -48,6 +48,7 @@ option(ENABLE_GPU "Enable GPU support (CUDA/HIP)" OFF)
 option(ENABLE_CUDA "Enable CUDA support" OFF)
 option(ENABLE_HIP "Enable HIP support" OFF)
 option(ENABLE_GPU_AWARE_MPI "Enable GPU-aware MPI (requires CUDA-aware or ROCm-aware MPI)" OFF)
+# ENABLE_NAN_CHECK is set below after CMAKE_BUILD_TYPE is determined
 
 # Enable CUDA language early if needed (before any subdirectories process CUDA files)
 # Note: CUDA language is already enabled in project() if ENABLE_GPU and ENABLE_CUDA are set
@@ -132,6 +133,24 @@ endif()
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the type of build." FORCE)
   set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+# NaN checking option: defaults to ON for Debug, OFF for Release
+# User can always override with -DENABLE_NAN_CHECK=ON/OFF
+if(NOT DEFINED ENABLE_NAN_CHECK)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(ENABLE_NAN_CHECK ON CACHE BOOL "Enable NaN/Inf checking in time integration (expensive on GPU)")
+  else()
+    set(ENABLE_NAN_CHECK OFF CACHE BOOL "Enable NaN/Inf checking in time integration (expensive on GPU)")
+  endif()
+endif()
+
+# Add compile definition for NaN checking
+if(ENABLE_NAN_CHECK)
+  add_compile_definitions(PIAFS_NAN_CHECK)
+  message(STATUS "NaN/Inf checking: enabled")
+else()
+  message(STATUS "NaN/Inf checking: disabled (enable with -DENABLE_NAN_CHECK=ON)")
 endif()
 
 # Configure MPI or serial mode

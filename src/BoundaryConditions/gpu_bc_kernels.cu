@@ -745,6 +745,46 @@ GPU_KERNEL void gpu_bc_subsonic_ambivalent_kernel(
 
 #define DEFAULT_BLOCK_SIZE 256
 
+/* ============================================================================
+   Static device buffers for BC arrays - eliminates per-call allocation
+   ============================================================================ */
+static int *d_bc_size = NULL;
+static int *d_bc_is = NULL;
+static int *d_bc_ie = NULL;
+static double *d_bc_dval = NULL;
+static int d_bc_ndims_capacity = 0;
+static int d_bc_nvars_capacity = 0;
+
+static int ensure_bc_device_arrays(int ndims, int nvars_for_dval) {
+  /* Check if we need to reallocate the int arrays */
+  if (ndims > d_bc_ndims_capacity) {
+    if (d_bc_size) { GPUFree(d_bc_size); d_bc_size = NULL; }
+    if (d_bc_is) { GPUFree(d_bc_is); d_bc_is = NULL; }
+    if (d_bc_ie) { GPUFree(d_bc_ie); d_bc_ie = NULL; }
+
+    if (GPUAllocate((void**)&d_bc_size, ndims * sizeof(int))) return 1;
+    if (GPUAllocate((void**)&d_bc_is, ndims * sizeof(int))) {
+      GPUFree(d_bc_size); d_bc_size = NULL;
+      return 1;
+    }
+    if (GPUAllocate((void**)&d_bc_ie, ndims * sizeof(int))) {
+      GPUFree(d_bc_size); d_bc_size = NULL;
+      GPUFree(d_bc_is); d_bc_is = NULL;
+      return 1;
+    }
+    d_bc_ndims_capacity = ndims;
+  }
+
+  /* Check if we need to reallocate dval array (only if nvars_for_dval > 0) */
+  if (nvars_for_dval > 0 && nvars_for_dval > d_bc_nvars_capacity) {
+    if (d_bc_dval) { GPUFree(d_bc_dval); d_bc_dval = NULL; }
+    if (GPUAllocate((void**)&d_bc_dval, nvars_for_dval * sizeof(double))) return 1;
+    d_bc_nvars_capacity = nvars_for_dval;
+  }
+
+  return 0;
+}
+
 /* ========== Launch wrappers ========== */
 
 extern "C" void gpu_launch_bc_extrapolate(
@@ -754,27 +794,22 @@ extern "C" void gpu_launch_bc_extrapolate(
 {
 #ifndef GPU_NONE
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  
+
   int npoints = 1;
   for (int i = 0; i < ndims; i++) npoints *= (bc_ie[i] - bc_is[i]);
   if (npoints <= 0) return;
-  
-  int *size_gpu = NULL, *bc_is_gpu = NULL, *bc_ie_gpu = NULL;
-  if (GPUAllocate((void**)&size_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&bc_is_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); return; }
-  if (GPUAllocate((void**)&bc_ie_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); return; }
-  
-  GPUCopyToDevice(size_gpu, size, ndims*sizeof(int));
-  GPUCopyToDevice(bc_is_gpu, bc_is, ndims*sizeof(int));
-  GPUCopyToDevice(bc_ie_gpu, bc_ie, ndims*sizeof(int));
-  
+
+  if (ensure_bc_device_arrays(ndims, 0)) return;
+
+  GPUCopyToDevice(d_bc_size, size, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_is, bc_is, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_ie, bc_ie, ndims*sizeof(int));
+
   int gridSize = (npoints + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_bc_extrapolate_kernel, gridSize, blockSize)(
-    phi, nvars, ndims, size_gpu, ghosts, bc_dim, bc_face, bc_is_gpu, bc_ie_gpu, npoints
+    phi, nvars, ndims, d_bc_size, ghosts, bc_dim, bc_face, d_bc_is, d_bc_ie, npoints
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  
-  GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu);
 #else
   (void)phi; (void)nvars; (void)ndims; (void)size; (void)ghosts;
   (void)bc_dim; (void)bc_face; (void)bc_is; (void)bc_ie; (void)blockSize;
@@ -789,30 +824,23 @@ extern "C" void gpu_launch_bc_dirichlet(
 {
 #ifndef GPU_NONE
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  
+
   int npoints = 1;
   for (int i = 0; i < ndims; i++) npoints *= (bc_ie[i] - bc_is[i]);
   if (npoints <= 0) return;
-  
-  int *size_gpu = NULL, *bc_is_gpu = NULL, *bc_ie_gpu = NULL;
-  double *dval_gpu = NULL;
-  if (GPUAllocate((void**)&size_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&bc_is_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); return; }
-  if (GPUAllocate((void**)&bc_ie_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); return; }
-  if (GPUAllocate((void**)&dval_gpu, nvars*sizeof(double))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu); return; }
-  
-  GPUCopyToDevice(size_gpu, size, ndims*sizeof(int));
-  GPUCopyToDevice(bc_is_gpu, bc_is, ndims*sizeof(int));
-  GPUCopyToDevice(bc_ie_gpu, bc_ie, ndims*sizeof(int));
-  GPUCopyToDevice(dval_gpu, dirichlet_value, nvars*sizeof(double));
-  
+
+  if (ensure_bc_device_arrays(ndims, nvars)) return;
+
+  GPUCopyToDevice(d_bc_size, size, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_is, bc_is, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_ie, bc_ie, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_dval, dirichlet_value, nvars*sizeof(double));
+
   int gridSize = (npoints + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_bc_dirichlet_kernel, gridSize, blockSize)(
-    phi, dval_gpu, nvars, ndims, size_gpu, ghosts, bc_is_gpu, bc_ie_gpu, npoints
+    phi, d_bc_dval, nvars, ndims, d_bc_size, ghosts, d_bc_is, d_bc_ie, npoints
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  
-  GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu); GPUFree(dval_gpu);
 #else
   (void)phi; (void)dirichlet_value; (void)nvars; (void)ndims; (void)size;
   (void)ghosts; (void)bc_is; (void)bc_ie; (void)blockSize;
@@ -826,27 +854,22 @@ extern "C" void gpu_launch_bc_reflect(
 {
 #ifndef GPU_NONE
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  
+
   int npoints = 1;
   for (int i = 0; i < ndims; i++) npoints *= (bc_ie[i] - bc_is[i]);
   if (npoints <= 0) return;
-  
-  int *size_gpu = NULL, *bc_is_gpu = NULL, *bc_ie_gpu = NULL;
-  if (GPUAllocate((void**)&size_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&bc_is_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); return; }
-  if (GPUAllocate((void**)&bc_ie_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); return; }
-  
-  GPUCopyToDevice(size_gpu, size, ndims*sizeof(int));
-  GPUCopyToDevice(bc_is_gpu, bc_is, ndims*sizeof(int));
-  GPUCopyToDevice(bc_ie_gpu, bc_ie, ndims*sizeof(int));
-  
+
+  if (ensure_bc_device_arrays(ndims, 0)) return;
+
+  GPUCopyToDevice(d_bc_size, size, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_is, bc_is, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_ie, bc_ie, ndims*sizeof(int));
+
   int gridSize = (npoints + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_bc_reflect_kernel, gridSize, blockSize)(
-    phi, nvars, ndims, size_gpu, ghosts, bc_dim, bc_face, bc_is_gpu, bc_ie_gpu, npoints
+    phi, nvars, ndims, d_bc_size, ghosts, bc_dim, bc_face, d_bc_is, d_bc_ie, npoints
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  
-  GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu);
 #else
   (void)phi; (void)nvars; (void)ndims; (void)size; (void)ghosts;
   (void)bc_dim; (void)bc_face; (void)bc_is; (void)bc_ie; (void)blockSize;
@@ -860,27 +883,22 @@ extern "C" void gpu_launch_bc_periodic(
 {
 #ifndef GPU_NONE
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  
+
   int npoints = 1;
   for (int i = 0; i < ndims; i++) npoints *= (bc_ie[i] - bc_is[i]);
   if (npoints <= 0) return;
-  
-  int *size_gpu = NULL, *bc_is_gpu = NULL, *bc_ie_gpu = NULL;
-  if (GPUAllocate((void**)&size_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&bc_is_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); return; }
-  if (GPUAllocate((void**)&bc_ie_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); return; }
-  
-  GPUCopyToDevice(size_gpu, size, ndims*sizeof(int));
-  GPUCopyToDevice(bc_is_gpu, bc_is, ndims*sizeof(int));
-  GPUCopyToDevice(bc_ie_gpu, bc_ie, ndims*sizeof(int));
-  
+
+  if (ensure_bc_device_arrays(ndims, 0)) return;
+
+  GPUCopyToDevice(d_bc_size, size, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_is, bc_is, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_ie, bc_ie, ndims*sizeof(int));
+
   int gridSize = (npoints + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_bc_periodic_kernel, gridSize, blockSize)(
-    phi, nvars, ndims, size_gpu, ghosts, bc_dim, bc_face, bc_is_gpu, bc_ie_gpu, npoints
+    phi, nvars, ndims, d_bc_size, ghosts, bc_dim, bc_face, d_bc_is, d_bc_ie, npoints
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  
-  GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu);
 #else
   (void)phi; (void)nvars; (void)ndims; (void)size; (void)ghosts;
   (void)bc_dim; (void)bc_face; (void)bc_is; (void)bc_ie; (void)blockSize;
@@ -894,27 +912,22 @@ extern "C" void gpu_launch_bc_slipwall(
 {
 #ifndef GPU_NONE
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  
+
   int npoints = 1;
   for (int i = 0; i < ndims; i++) npoints *= (bc_ie[i] - bc_is[i]);
   if (npoints <= 0) return;
-  
-  int *size_gpu = NULL, *bc_is_gpu = NULL, *bc_ie_gpu = NULL;
-  if (GPUAllocate((void**)&size_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&bc_is_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); return; }
-  if (GPUAllocate((void**)&bc_ie_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); return; }
-  
-  GPUCopyToDevice(size_gpu, size, ndims*sizeof(int));
-  GPUCopyToDevice(bc_is_gpu, bc_is, ndims*sizeof(int));
-  GPUCopyToDevice(bc_ie_gpu, bc_ie, ndims*sizeof(int));
-  
+
+  if (ensure_bc_device_arrays(ndims, 0)) return;
+
+  GPUCopyToDevice(d_bc_size, size, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_is, bc_is, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_ie, bc_ie, ndims*sizeof(int));
+
   int gridSize = (npoints + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_bc_slipwall_kernel, gridSize, blockSize)(
-    phi, nvars, ndims, size_gpu, ghosts, bc_dim, bc_face, bc_is_gpu, bc_ie_gpu, npoints
+    phi, nvars, ndims, d_bc_size, ghosts, bc_dim, bc_face, d_bc_is, d_bc_ie, npoints
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  
-  GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu);
 #else
   (void)phi; (void)nvars; (void)ndims; (void)size; (void)ghosts;
   (void)bc_dim; (void)bc_face; (void)bc_is; (void)bc_ie; (void)blockSize;
@@ -929,28 +942,23 @@ extern "C" void gpu_launch_bc_noslipwall(
 {
 #ifndef GPU_NONE
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  
+
   int npoints = 1;
   for (int i = 0; i < ndims; i++) npoints *= (bc_ie[i] - bc_is[i]);
   if (npoints <= 0) return;
-  
-  int *size_gpu = NULL, *bc_is_gpu = NULL, *bc_ie_gpu = NULL;
-  if (GPUAllocate((void**)&size_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&bc_is_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); return; }
-  if (GPUAllocate((void**)&bc_ie_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); return; }
-  
-  GPUCopyToDevice(size_gpu, size, ndims*sizeof(int));
-  GPUCopyToDevice(bc_is_gpu, bc_is, ndims*sizeof(int));
-  GPUCopyToDevice(bc_ie_gpu, bc_ie, ndims*sizeof(int));
-  
+
+  if (ensure_bc_device_arrays(ndims, 0)) return;
+
+  GPUCopyToDevice(d_bc_size, size, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_is, bc_is, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_ie, bc_ie, ndims*sizeof(int));
+
   int gridSize = (npoints + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_bc_noslipwall_kernel, gridSize, blockSize)(
-    phi, nvars, ndims, size_gpu, ghosts, bc_dim, bc_face, bc_is_gpu, bc_ie_gpu, gamma,
+    phi, nvars, ndims, d_bc_size, ghosts, bc_dim, bc_face, d_bc_is, d_bc_ie, gamma,
     wall_u, wall_v, wall_w, npoints
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  
-  GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu);
 #else
   (void)phi; (void)nvars; (void)ndims; (void)size; (void)ghosts;
   (void)bc_dim; (void)bc_face; (void)bc_is; (void)bc_ie; (void)gamma;
@@ -981,22 +989,17 @@ extern "C" void gpu_launch_bc_supersonic_inflow(
   for (int i = 0; i < ndims; i++) npoints *= (bc_ie[i] - bc_is[i]);
   if (npoints <= 0) return;
 
-  int *size_gpu = NULL, *bc_is_gpu = NULL, *bc_ie_gpu = NULL;
-  if (GPUAllocate((void**)&size_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&bc_is_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); return; }
-  if (GPUAllocate((void**)&bc_ie_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); return; }
+  if (ensure_bc_device_arrays(ndims, 0)) return;
 
-  GPUCopyToDevice(size_gpu, size, ndims*sizeof(int));
-  GPUCopyToDevice(bc_is_gpu, bc_is, ndims*sizeof(int));
-  GPUCopyToDevice(bc_ie_gpu, bc_ie, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_size, size, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_is, bc_is, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_ie, bc_ie, ndims*sizeof(int));
 
   int gridSize = (npoints + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_bc_supersonic_inflow_kernel, gridSize, blockSize)(
-    phi, rho, u, v, w, p, NULL, 0, gamma, nvars, ndims, size_gpu, ghosts, bc_is_gpu, bc_ie_gpu, npoints
+    phi, rho, u, v, w, p, NULL, 0, gamma, nvars, ndims, d_bc_size, ghosts, d_bc_is, d_bc_ie, npoints
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-
-  GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu);
 #else
   (void)phi; (void)nvars; (void)ndims; (void)size; (void)ghosts;
   (void)bc_is; (void)bc_ie; (void)gamma; (void)rho; (void)u; (void)v; (void)w; (void)p;
@@ -1018,23 +1021,18 @@ extern "C" void gpu_launch_bc_subsonic_inflow(
   for (int i = 0; i < ndims; i++) npoints *= (bc_ie[i] - bc_is[i]);
   if (npoints <= 0) return;
 
-  int *size_gpu = NULL, *bc_is_gpu = NULL, *bc_ie_gpu = NULL;
-  if (GPUAllocate((void**)&size_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&bc_is_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); return; }
-  if (GPUAllocate((void**)&bc_ie_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); return; }
+  if (ensure_bc_device_arrays(ndims, 0)) return;
 
-  GPUCopyToDevice(size_gpu, size, ndims*sizeof(int));
-  GPUCopyToDevice(bc_is_gpu, bc_is, ndims*sizeof(int));
-  GPUCopyToDevice(bc_ie_gpu, bc_ie, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_size, size, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_is, bc_is, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_ie, bc_ie, ndims*sizeof(int));
 
   int gridSize = (npoints + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_bc_subsonic_inflow_kernel, gridSize, blockSize)(
-    phi, rho, u, v, w, gamma, nvars, ndims, size_gpu, ghosts, bc_dim, bc_face,
-    bc_is_gpu, bc_ie_gpu, npoints
+    phi, rho, u, v, w, gamma, nvars, ndims, d_bc_size, ghosts, bc_dim, bc_face,
+    d_bc_is, d_bc_ie, npoints
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-
-  GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu);
 #else
   (void)phi; (void)nvars; (void)ndims; (void)size; (void)ghosts;
   (void)bc_dim; (void)bc_face; (void)bc_is; (void)bc_ie;
@@ -1056,23 +1054,18 @@ extern "C" void gpu_launch_bc_subsonic_outflow(
   for (int i = 0; i < ndims; i++) npoints *= (bc_ie[i] - bc_is[i]);
   if (npoints <= 0) return;
 
-  int *size_gpu = NULL, *bc_is_gpu = NULL, *bc_ie_gpu = NULL;
-  if (GPUAllocate((void**)&size_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&bc_is_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); return; }
-  if (GPUAllocate((void**)&bc_ie_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); return; }
+  if (ensure_bc_device_arrays(ndims, 0)) return;
 
-  GPUCopyToDevice(size_gpu, size, ndims*sizeof(int));
-  GPUCopyToDevice(bc_is_gpu, bc_is, ndims*sizeof(int));
-  GPUCopyToDevice(bc_ie_gpu, bc_ie, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_size, size, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_is, bc_is, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_ie, bc_ie, ndims*sizeof(int));
 
   int gridSize = (npoints + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_bc_subsonic_outflow_kernel, gridSize, blockSize)(
-    phi, p, gamma, nvars, ndims, size_gpu, ghosts, bc_dim, bc_face,
-    bc_is_gpu, bc_ie_gpu, npoints
+    phi, p, gamma, nvars, ndims, d_bc_size, ghosts, bc_dim, bc_face,
+    d_bc_is, d_bc_ie, npoints
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-
-  GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu);
 #else
   (void)phi; (void)nvars; (void)ndims; (void)size; (void)ghosts;
   (void)bc_dim; (void)bc_face; (void)bc_is; (void)bc_ie;
@@ -1094,23 +1087,18 @@ extern "C" void gpu_launch_bc_subsonic_ambivalent(
   for (int i = 0; i < ndims; i++) npoints *= (bc_ie[i] - bc_is[i]);
   if (npoints <= 0) return;
 
-  int *size_gpu = NULL, *bc_is_gpu = NULL, *bc_ie_gpu = NULL;
-  if (GPUAllocate((void**)&size_gpu, ndims*sizeof(int))) return;
-  if (GPUAllocate((void**)&bc_is_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); return; }
-  if (GPUAllocate((void**)&bc_ie_gpu, ndims*sizeof(int))) { GPUFree(size_gpu); GPUFree(bc_is_gpu); return; }
+  if (ensure_bc_device_arrays(ndims, 0)) return;
 
-  GPUCopyToDevice(size_gpu, size, ndims*sizeof(int));
-  GPUCopyToDevice(bc_is_gpu, bc_is, ndims*sizeof(int));
-  GPUCopyToDevice(bc_ie_gpu, bc_ie, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_size, size, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_is, bc_is, ndims*sizeof(int));
+  GPUCopyToDevice(d_bc_ie, bc_ie, ndims*sizeof(int));
 
   int gridSize = (npoints + blockSize - 1) / blockSize;
   GPU_KERNEL_LAUNCH(gpu_bc_subsonic_ambivalent_kernel, gridSize, blockSize)(
-    phi, rho, u, v, w, p, gamma, nvars, ndims, size_gpu, ghosts, bc_dim, bc_face,
-    bc_is_gpu, bc_ie_gpu, npoints
+    phi, rho, u, v, w, p, gamma, nvars, ndims, d_bc_size, ghosts, bc_dim, bc_face,
+    d_bc_is, d_bc_ie, npoints
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-
-  GPUFree(size_gpu); GPUFree(bc_is_gpu); GPUFree(bc_ie_gpu);
 #else
   (void)phi; (void)nvars; (void)ndims; (void)size; (void)ghosts;
   (void)bc_dim; (void)bc_face; (void)bc_is; (void)bc_ie;

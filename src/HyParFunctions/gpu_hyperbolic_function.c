@@ -106,8 +106,16 @@ int GPUHyperbolicFunction(
         /* Precalculate WENO nonlinear interpolation coefficients if required */
         int is_weno = !strcmp(solver->spatial_scheme_hyp, _FIFTH_ORDER_WENO_);
         if (is_weno && LimFlag && solver->SetInterpLimiterVar) {
-          /* Compute WENO nonlinear weights on GPU (no host staging). */
-          {
+          /* For characteristic WENO with 3D and nvars=5 or nvars=12, the fused kernel
+           * computes weights inline, so skip the separate weight computation */
+          int skip_weights = 0;
+          if (!strcmp(solver->interp_type, _CHARACTERISTIC_) &&
+              ndims == 3 && (nvars == 5 || nvars == 12)) {
+            skip_weights = 1;
+          }
+
+          if (!skip_weights) {
+            /* Compute WENO nonlinear weights on GPU (no host staging). */
             int ierr_w = 0;
             if (!strcmp(solver->interp_type, _CHARACTERISTIC_)) {
               ierr_w = GPUWENOFifthOrderCalculateWeightsChar(FluxC, u, d, solver, mpi);

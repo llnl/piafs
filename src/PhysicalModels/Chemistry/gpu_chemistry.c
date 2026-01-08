@@ -171,67 +171,69 @@ int GPUChemistrySetPhotonDensity(
   // imap_gpu is already on GPU (allocated and copied in GPUChemistryAllocate)
 
   if (solver->ndims == 3) {
-    // 3D case: Sequential processing of k-layers with MPI synchronization
-    
+    // 3D case: Use batched kernel for all z-layers in a single launch
+
     int imax = dim[0], jmax = dim[1], kmax = dim[2];
     int my_rank_z = mpi->ip[_ZDIR_];
     int num_rank_z = mpi->iproc[_ZDIR_];
     int first_rank_z = (mpi->ip[_ZDIR_] == 0 ? 1 : 0);
 
-    int *meow = (int*) calloc(num_rank_z, sizeof(int));
-    if (!meow) {
-      fprintf(stderr, "Error: Failed to allocate meow array\n");
-      return 1;
-    }
+    if (num_rank_z == 1) {
+      // Single rank in z: Use optimized batched kernel (single launch for all layers)
+      int kstart = (first_rank_z ? 1 : 0);
+      gpu_launch_chemistry_photon_density_3d_batched(
+        nv_hnu_gpu, a_U, imap_gpu,
+        imax, jmax, kmax,
+        dim[0], dim[1], dim[2], ghosts,
+        chem->grid_stride, chem->n_flow_vars,
+        chem->I0, chem->c, chem->h, chem->nu, chem->n_O2,
+        chem->t_pulse_norm, chem->t_start_norm,
+        chem->sO3, chem->dz, a_t,
+        first_rank_z, kstart,
+        16  // block size for 2D grid
+      );
+      GPUSync();
+    } else {
+      // Multiple ranks in z: Need MPI synchronization between ranks
+      // Use batched kernel within each rank's local domain
 
-    // Allocate host memory for nv_hnu boundary exchange (only if needed)
-    double *nv_hnu_host_temp = NULL;
-    if (num_rank_z > 1) {
-      nv_hnu_host_temp = (double*) malloc(npoints * sizeof(double));
+      int *meow = (int*) calloc(num_rank_z, sizeof(int));
+      if (!meow) {
+        fprintf(stderr, "Error: Failed to allocate meow array\n");
+        return 1;
+      }
+
+      // Allocate host memory for nv_hnu boundary exchange
+      double *nv_hnu_host_temp = (double*) malloc(npoints * sizeof(double));
       if (!nv_hnu_host_temp) {
         fprintf(stderr, "Error: Failed to allocate host temp memory\n");
         free(meow);
         return 1;
       }
-    }
 
-    while (!meow[num_rank_z-1]) {
+      while (!meow[num_rank_z-1]) {
 
-      int go = (first_rank_z ? 1 : meow[my_rank_z-1]);
+        int go = (first_rank_z ? 1 : meow[my_rank_z-1]);
 
-      if (go && (!meow[my_rank_z])) {
-        
-        // First layer (k=0) for first rank in z
-        if (first_rank_z) {
-          gpu_launch_chemistry_photon_density_3d_first_layer(
-            nv_hnu_gpu, imap_gpu, imax, jmax,
-            dim[0], dim[1], dim[2], ghosts,
-            chem->I0, chem->c, chem->h, chem->nu, chem->n_O2,
-            chem->t_pulse_norm, chem->t_start_norm,
-            a_t,
-            16  // block size for 2D grid
-          );
-          GPUSync();
-        }
-        
-        // Subsequent layers (k > 0)
-        int kstart = (first_rank_z ? 1 : 0);
-        for (int k = kstart; k < kmax; k++) {
-          gpu_launch_chemistry_photon_density_3d_next_layer(
-            nv_hnu_gpu, a_U, imax, jmax, k,
+        if (go && (!meow[my_rank_z])) {
+          // Use batched kernel for this rank's z-layers (single launch)
+          int kstart = (first_rank_z ? 1 : 0);
+          gpu_launch_chemistry_photon_density_3d_batched(
+            nv_hnu_gpu, a_U, imap_gpu,
+            imax, jmax, kmax,
             dim[0], dim[1], dim[2], ghosts,
             chem->grid_stride, chem->n_flow_vars,
-            chem->sO3, chem->n_O2, chem->dz,
+            chem->I0, chem->c, chem->h, chem->nu, chem->n_O2,
+            chem->t_pulse_norm, chem->t_start_norm,
+            chem->sO3, chem->dz, a_t,
+            first_rank_z, kstart,
             16  // block size for 2D grid
           );
           GPUSync();
-        }
-        
-        meow[my_rank_z] = 1;
-      }
 
-      // Only do MPI exchange if there are multiple ranks in z
-      if (num_rank_z > 1) {
+          meow[my_rank_z] = 1;
+        }
+
         // Copy nv_hnu from GPU to host for MPI exchange
         if (GPUCopyToHost(nv_hnu_host_temp, nv_hnu_gpu, npoints * sizeof(double))) {
           fprintf(stderr, "Error: Failed to copy nv_hnu from GPU to host\n");
@@ -243,7 +245,7 @@ int GPUChemistrySetPhotonDensity(
 
         // MPI boundary exchange on host
         MPIExchangeBoundariesnD(solver->ndims, 1, dim, ghosts, mpi, nv_hnu_host_temp);
-        
+
         // Copy back to GPU after exchange
         if (GPUCopyToDevice(nv_hnu_gpu, nv_hnu_host_temp, npoints * sizeof(double))) {
           fprintf(stderr, "Error: Failed to copy nv_hnu from host to GPU\n");
@@ -251,14 +253,14 @@ int GPUChemistrySetPhotonDensity(
           free(meow);
           return 1;
         }
-      }
-      
-      // Synchronize meow array across all ranks
-      MPIMax_integer(meow, meow, num_rank_z, &mpi->world);
-    }
 
-    if (nv_hnu_host_temp) free(nv_hnu_host_temp);
-    free(meow);
+        // Synchronize meow array across all ranks
+        MPIMax_integer(meow, meow, num_rank_z, &mpi->world);
+      }
+
+      free(nv_hnu_host_temp);
+      free(meow);
+    }
 
   } else {
     // 1D/2D case: Each grid point processes its z-stack independently

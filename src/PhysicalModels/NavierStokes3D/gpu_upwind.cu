@@ -323,85 +323,233 @@ GPU_KERNEL void gpu_ns3d_upwind_rf_kernel_nvars5(
   }
 }
 
-/* Kernel: RF upwinding optimized for nvars=12 */
+/* Kernel: RF upwinding optimized for nvars=12
+ * Key optimization: Only compute 5x5 eigenvector block for base flow variables.
+ * Passive scalars (vars 5-11) use identity eigenvectors (simple upwinding).
+ * This reduces register usage and avoids global memory workspace.
+ */
 GPU_KERNEL void gpu_ns3d_upwind_rf_kernel_nvars12(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
   int ghosts, int dir, double gamma, double *workspace
 )
 {
-  /* Compile-time constants for optimization */
   const int nvars = 12;
-  
-  /* Unrolled for 3D */
-  int total_interfaces = bounds_inter[0] * bounds_inter[1] * bounds_inter[2];
-  
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < total_interfaces) {
-    /* Decompose idx - unrolled for 3D */
-    int indexI[3];
-    int temp = idx;
-    indexI[2] = temp % bounds_inter[2]; temp /= bounds_inter[2];
-    indexI[1] = temp % bounds_inter[1]; temp /= bounds_inter[1];
-    indexI[0] = temp;
-    
-    /* Compute 1D interface index - unrolled */
-    int p = indexI[2] + bounds_inter[2] * (indexI[1] + bounds_inter[1] * indexI[0]);
-    
-    /* Compute cell indices - unrolled */
-    int indexL[3] = {indexI[0], indexI[1], indexI[2]};
-    indexL[dir]--;
+  /* Note: Only 5 base flow variables need characteristic decomposition;
+     passive scalars (vars 5-11) use simple upwinding with identity eigenvectors */
 
-    /* Workspace from global memory for nvars=12 (too large for registers) */
-    int threadId = blockIdx.x * blockDim.x + threadIdx.x;
-    size_t workspace_per_thread = 9 * nvars + 2 * nvars * nvars;
-    double *thread_workspace = workspace + threadId * workspace_per_thread;
-    
-    double *uavg = thread_workspace;
-    double *fcL = uavg + nvars;
-    double *fcR = fcL + nvars;
-    double *ucL = fcR + nvars;
-    double *ucR = ucL + nvars;
-    double *fc = ucR + nvars;
-    double *eigL = fc + nvars;
-    double *eigC = eigL + nvars;
-    double *eigR = eigC + nvars;
-    double *L = eigR + nvars;
-    double *R = L + nvars * nvars;
-    
-    /* Roe average */
-    gpu_ns3d_roe_average(uavg, uL + p*nvars, uR + p*nvars, nvars, gamma);
-    
-    /* Eigenvectors */
-    gpu_ns3d_left_eigenvectors(uavg, L, gamma, nvars, dir);
-    gpu_ns3d_right_eigenvectors(uavg, R, gamma, nvars, dir);
-    
-    /* Matrix-vector multiplies - use optimized version */
-    gpu_matvecmult_12(ucL, L, uL + p*nvars);
-    gpu_matvecmult_12(ucR, L, uR + p*nvars);
-    gpu_matvecmult_12(fcL, L, fL + p*nvars);
-    gpu_matvecmult_12(fcR, L, fR + p*nvars);
-    
-    /* Eigenvalues - extract diagonal only */
-    gpu_ns3d_eigenvalues_diag(uL + p*nvars, eigL, gamma, nvars, dir);
-    gpu_ns3d_eigenvalues_diag(uR + p*nvars, eigR, gamma, nvars, dir);
-    gpu_ns3d_eigenvalues_diag(uavg, eigC, gamma, nvars, dir);
-    
-    /* Compute characteristic fluxes - fully unrolled */
-    #pragma unroll
-    for (int k = 0; k < 12; k++) {
-      if ((eigL[k] > 0) && (eigC[k] > 0) && (eigR[k] > 0)) {
-        fc[k] = fcL[k];
-      } else if ((eigL[k] < 0) && (eigC[k] < 0) && (eigR[k] < 0)) {
-        fc[k] = fcR[k];
-      } else {
-        double alpha = gpu_max3(gpu_absolute(eigL[k]), gpu_absolute(eigC[k]), gpu_absolute(eigR[k]));
-        fc[k] = 0.5 * (fcL[k] + fcR[k] + alpha * (ucL[k] - ucR[k]));
-      }
+  int total_interfaces = bounds_inter[0] * bounds_inter[1] * bounds_inter[2];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= total_interfaces) return;
+
+  /* Decompose idx - unrolled for 3D */
+  int temp = idx;
+  const int i2 = temp % bounds_inter[2]; temp /= bounds_inter[2];
+  const int i1 = temp % bounds_inter[1]; temp /= bounds_inter[1];
+  const int i0 = temp;
+
+  /* Interface index */
+  const int p = i2 + bounds_inter[2] * (i1 + bounds_inter[1] * i0);
+
+  /* Pointers to interface data */
+  const double *uL_p = uL + p * nvars;
+  const double *uR_p = uR + p * nvars;
+  const double *fL_p = fL + p * nvars;
+  const double *fR_p = fR + p * nvars;
+  double *fI_p = fI + p * nvars;
+
+  /* ===== Compute Roe average for base 5 variables ===== */
+  double rhoL = uL_p[0], rhoR = uR_p[0];
+  double tL = sqrt(rhoL), tR = sqrt(rhoR);
+  double tLpR = tL + tR;
+
+  double vxL = uL_p[1]/rhoL, vyL = uL_p[2]/rhoL, vzL = uL_p[3]/rhoL;
+  double vxR = uR_p[1]/rhoR, vyR = uR_p[2]/rhoR, vzR = uR_p[3]/rhoR;
+
+  double vsqL = vxL*vxL + vyL*vyL + vzL*vzL;
+  double vsqR = vxR*vxR + vyR*vyR + vzR*vzR;
+  double PL = (gamma-1.0) * (uL_p[4] - 0.5*rhoL*vsqL);
+  double PR = (gamma-1.0) * (uR_p[4] - 0.5*rhoR*vsqR);
+  double HL = 0.5*vsqL + gamma*PL/((gamma-1.0)*rhoL);
+  double HR = 0.5*vsqR + gamma*PR/((gamma-1.0)*rhoR);
+
+  /* Roe-averaged quantities */
+  double vx = (tL*vxL + tR*vxR) / tLpR;
+  double vy = (tL*vyL + tR*vyR) / tLpR;
+  double vz = (tL*vzL + tR*vzR) / tLpR;
+  double H = (tL*HL + tR*HR) / tLpR;
+  double vsq = vx*vx + vy*vy + vz*vz;
+  double a2 = (gamma-1.0) * (H - 0.5*vsq);
+  double a = sqrt(a2);
+
+  /* Normal velocity for eigenvalues */
+  double vn = (dir == 0) ? vx : ((dir == 1) ? vy : vz);
+
+  /* ===== Eigenvalues for all 12 variables ===== */
+  double eigL[12], eigC[12], eigR[12];
+
+  /* Left state eigenvalues */
+  double cL = sqrt(gamma * PL / rhoL);
+  double vnL = (dir == 0) ? vxL : ((dir == 1) ? vyL : vzL);
+  eigL[0] = vnL;
+  eigL[1] = (dir == 0) ? vnL - cL : vnL;
+  eigL[2] = (dir == 1) ? vnL - cL : vnL;
+  eigL[3] = (dir == 2) ? vnL - cL : vnL;
+  eigL[4] = vnL + cL;
+  #pragma unroll
+  for (int k = 5; k < 12; k++) eigL[k] = vnL;
+
+  /* Right state eigenvalues */
+  double cR = sqrt(gamma * PR / rhoR);
+  double vnR = (dir == 0) ? vxR : ((dir == 1) ? vyR : vzR);
+  eigR[0] = vnR;
+  eigR[1] = (dir == 0) ? vnR - cR : vnR;
+  eigR[2] = (dir == 1) ? vnR - cR : vnR;
+  eigR[3] = (dir == 2) ? vnR - cR : vnR;
+  eigR[4] = vnR + cR;
+  #pragma unroll
+  for (int k = 5; k < 12; k++) eigR[k] = vnR;
+
+  /* Roe-averaged eigenvalues */
+  eigC[0] = vn;
+  eigC[1] = (dir == 0) ? vn - a : vn;
+  eigC[2] = (dir == 1) ? vn - a : vn;
+  eigC[3] = (dir == 2) ? vn - a : vn;
+  eigC[4] = vn + a;
+  #pragma unroll
+  for (int k = 5; k < 12; k++) eigC[k] = vn;
+
+  /* ===== Build 5x5 eigenvector matrices (registers) ===== */
+  double L[25], R[25];
+
+  double gm1 = gamma - 1.0;
+  double ek = 0.5 * vsq;
+  double a2inv = 1.0 / a2;
+  double twoA2inv = 0.5 * a2inv;
+  double h0 = a2/gm1 + ek;
+
+  /* Initialize to zero */
+  #pragma unroll
+  for (int i = 0; i < 25; i++) { L[i] = 0.0; R[i] = 0.0; }
+
+  /* Build L and R based on direction */
+  if (dir == 0) { /* X-direction */
+    L[5*1+0] = (gm1*ek + a*vx) * twoA2inv;
+    L[5*1+1] = (-gm1*vx - a) * twoA2inv;
+    L[5*1+2] = (-gm1*vy) * twoA2inv;
+    L[5*1+3] = (-gm1*vz) * twoA2inv;
+    L[5*1+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vx) * twoA2inv;
+    L[5*4+1] = (-gm1*vx + a) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv;
+    L[5*4+3] = (-gm1*vz) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*2+0] = vy; L[5*2+2] = -1.0;
+    L[5*3+0] = -vz; L[5*3+3] = 1.0;
+
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[0*5+1] = 1.0; R[1*5+1] = vx-a; R[2*5+1] = vy; R[3*5+1] = vz; R[4*5+1] = h0-a*vx;
+    R[2*5+2] = -1.0; R[4*5+2] = -vy;
+    R[3*5+3] = 1.0; R[4*5+3] = vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx+a; R[2*5+4] = vy; R[3*5+4] = vz; R[4*5+4] = h0+a*vx;
+  } else if (dir == 1) { /* Y-direction */
+    L[5*2+0] = (gm1*ek + a*vy) * twoA2inv;
+    L[5*2+1] = (-gm1*vx) * twoA2inv;
+    L[5*2+2] = (-gm1*vy - a) * twoA2inv;
+    L[5*2+3] = (-gm1*vz) * twoA2inv;
+    L[5*2+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vy) * twoA2inv;
+    L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy + a) * twoA2inv;
+    L[5*4+3] = (-gm1*vz) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = -vx; L[5*1+1] = 1.0;
+    L[5*3+0] = vz; L[5*3+3] = -1.0;
+
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = 1.0; R[4*5+1] = vx;
+    R[0*5+2] = 1.0; R[1*5+2] = vx; R[2*5+2] = vy-a; R[3*5+2] = vz; R[4*5+2] = h0-a*vy;
+    R[3*5+3] = -1.0; R[4*5+3] = -vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy+a; R[3*5+4] = vz; R[4*5+4] = h0+a*vy;
+  } else { /* Z-direction */
+    L[5*3+0] = (gm1*ek + a*vz) * twoA2inv;
+    L[5*3+1] = (-gm1*vx) * twoA2inv;
+    L[5*3+2] = (-gm1*vy) * twoA2inv;
+    L[5*3+3] = (-gm1*vz - a) * twoA2inv;
+    L[5*3+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vz) * twoA2inv;
+    L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv;
+    L[5*4+3] = (-gm1*vz + a) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = vx; L[5*1+1] = -1.0;
+    L[5*2+0] = -vy; L[5*2+2] = 1.0;
+
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = -1.0; R[4*5+1] = -vx;
+    R[2*5+2] = 1.0; R[4*5+2] = vy;
+    R[0*5+3] = 1.0; R[1*5+3] = vx; R[2*5+3] = vy; R[3*5+3] = vz-a; R[4*5+3] = h0-a*vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy; R[3*5+4] = vz+a; R[4*5+4] = h0+a*vz;
+  }
+
+  /* ===== Transform base 5 variables to characteristic space ===== */
+  double ucL[5], ucR[5], fcL[5], fcR[5], fc[5];
+
+  #pragma unroll
+  for (int i = 0; i < 5; i++) {
+    ucL[i] = L[i*5+0]*uL_p[0] + L[i*5+1]*uL_p[1] + L[i*5+2]*uL_p[2] + L[i*5+3]*uL_p[3] + L[i*5+4]*uL_p[4];
+    ucR[i] = L[i*5+0]*uR_p[0] + L[i*5+1]*uR_p[1] + L[i*5+2]*uR_p[2] + L[i*5+3]*uR_p[3] + L[i*5+4]*uR_p[4];
+    fcL[i] = L[i*5+0]*fL_p[0] + L[i*5+1]*fL_p[1] + L[i*5+2]*fL_p[2] + L[i*5+3]*fL_p[3] + L[i*5+4]*fL_p[4];
+    fcR[i] = L[i*5+0]*fR_p[0] + L[i*5+1]*fR_p[1] + L[i*5+2]*fR_p[2] + L[i*5+3]*fR_p[3] + L[i*5+4]*fR_p[4];
+  }
+
+  /* ===== Compute characteristic fluxes for base 5 variables ===== */
+  #pragma unroll
+  for (int k = 0; k < 5; k++) {
+    if ((eigL[k] > 0) && (eigC[k] > 0) && (eigR[k] > 0)) {
+      fc[k] = fcL[k];
+    } else if ((eigL[k] < 0) && (eigC[k] < 0) && (eigR[k] < 0)) {
+      fc[k] = fcR[k];
+    } else {
+      double alpha = gpu_max3(gpu_absolute(eigL[k]), gpu_absolute(eigC[k]), gpu_absolute(eigR[k]));
+      fc[k] = 0.5 * (fcL[k] + fcR[k] + alpha * (ucL[k] - ucR[k]));
     }
-    
-    /* Transform back - use optimized version */
-    gpu_matvecmult_12(fI + p*nvars, R, fc);
+  }
+
+  /* ===== Transform base 5 variables back to physical space ===== */
+  #pragma unroll
+  for (int i = 0; i < 5; i++) {
+    fI_p[i] = R[i*5+0]*fc[0] + R[i*5+1]*fc[1] + R[i*5+2]*fc[2] + R[i*5+3]*fc[3] + R[i*5+4]*fc[4];
+  }
+
+  /* ===== Simple upwinding for passive scalars (vars 5-11) ===== */
+  /* These use identity eigenvectors, so characteristic = physical */
+  #pragma unroll
+  for (int k = 5; k < 12; k++) {
+    if ((eigL[k] > 0) && (eigC[k] > 0) && (eigR[k] > 0)) {
+      fI_p[k] = fL_p[k];
+    } else if ((eigL[k] < 0) && (eigC[k] < 0) && (eigR[k] < 0)) {
+      fI_p[k] = fR_p[k];
+    } else {
+      double alpha = gpu_max3(gpu_absolute(eigL[k]), gpu_absolute(eigC[k]), gpu_absolute(eigR[k]));
+      fI_p[k] = 0.5 * (fL_p[k] + fR_p[k] + alpha * (uL_p[k] - uR_p[k]));
+    }
   }
 }
 
@@ -479,7 +627,285 @@ GPU_KERNEL void gpu_ns3d_upwind_rf_kernel(
   }
 }
 
-/* Kernel: LLF (Local Lax-Friedrich) upwinding for NavierStokes3D */
+/* Kernel: LLF upwinding optimized for nvars=5
+ * All computation in registers, no global memory workspace needed.
+ */
+GPU_KERNEL void gpu_ns3d_upwind_llf_kernel_nvars5(
+  double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
+  const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, double gamma, double *workspace
+)
+{
+  const int nvars = 5;
+
+  int total_interfaces = bounds_inter[0] * bounds_inter[1] * bounds_inter[2];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= total_interfaces) return;
+
+  /* Decompose idx - unrolled for 3D */
+  int temp = idx;
+  const int i2 = temp % bounds_inter[2]; temp /= bounds_inter[2];
+  const int i1 = temp % bounds_inter[1]; temp /= bounds_inter[1];
+  const int i0 = temp;
+
+  /* Compute 1D interface index */
+  int p = i2 + bounds_inter[2] * (i1 + bounds_inter[1] * i0);
+
+  /* Register-based storage */
+  double uavg[5], ucL[5], ucR[5], fcL[5], fcR[5], fc[5];
+  double eigL[5], eigC[5], eigR[5];
+  double L[25], R[25];
+
+  /* Pointers for readability */
+  const double *uL_p = uL + p * nvars;
+  const double *uR_p = uR + p * nvars;
+  const double *fL_p = fL + p * nvars;
+  const double *fR_p = fR + p * nvars;
+  double *fI_p = fI + p * nvars;
+
+  /* Roe average */
+  gpu_ns3d_roe_average(uavg, uL_p, uR_p, nvars, gamma);
+
+  /* Eigenvectors */
+  gpu_ns3d_left_eigenvectors(uavg, L, gamma, nvars, dir);
+  gpu_ns3d_right_eigenvectors(uavg, R, gamma, nvars, dir);
+
+  /* Transform to characteristic space */
+  gpu_matvecmult_5(ucL, L, uL_p);
+  gpu_matvecmult_5(ucR, L, uR_p);
+  gpu_matvecmult_5(fcL, L, fL_p);
+  gpu_matvecmult_5(fcR, L, fR_p);
+
+  /* Eigenvalues */
+  gpu_ns3d_eigenvalues_diag(uL_p, eigL, gamma, nvars, dir);
+  gpu_ns3d_eigenvalues_diag(uR_p, eigR, gamma, nvars, dir);
+  gpu_ns3d_eigenvalues_diag(uavg, eigC, gamma, nvars, dir);
+
+  /* LLF characteristic fluxes */
+  #pragma unroll
+  for (int k = 0; k < 5; k++) {
+    double alpha = gpu_max3(gpu_absolute(eigL[k]), gpu_absolute(eigC[k]), gpu_absolute(eigR[k]));
+    fc[k] = 0.5 * (fcL[k] + fcR[k] + alpha * (ucL[k] - ucR[k]));
+  }
+
+  /* Transform back to physical space */
+  gpu_matvecmult_5(fI_p, R, fc);
+}
+
+/* Kernel: LLF upwinding optimized for nvars=12
+ * Key optimization: Only compute 5x5 eigenvector block for base flow variables.
+ * Passive scalars (vars 5-11) use identity eigenvectors (simple LLF).
+ * All computation in registers, no global memory workspace needed.
+ */
+GPU_KERNEL void gpu_ns3d_upwind_llf_kernel_nvars12(
+  double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
+  const int *dim, const int *stride_with_ghosts, const int *bounds_inter,
+  int ghosts, int dir, double gamma, double *workspace
+)
+{
+  const int nvars = 12;
+  /* Note: Only 5 base flow variables need characteristic decomposition;
+     passive scalars (vars 5-11) use simple LLF with identity eigenvectors */
+
+  int total_interfaces = bounds_inter[0] * bounds_inter[1] * bounds_inter[2];
+
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx >= total_interfaces) return;
+
+  /* Decompose idx - unrolled for 3D */
+  int temp = idx;
+  const int i2 = temp % bounds_inter[2]; temp /= bounds_inter[2];
+  const int i1 = temp % bounds_inter[1]; temp /= bounds_inter[1];
+  const int i0 = temp;
+
+  /* Compute 1D interface index */
+  int p = i2 + bounds_inter[2] * (i1 + bounds_inter[1] * i0);
+
+  /* Pointers for readability */
+  const double *uL_p = uL + p * nvars;
+  const double *uR_p = uR + p * nvars;
+  const double *fL_p = fL + p * nvars;
+  const double *fR_p = fR + p * nvars;
+  double *fI_p = fI + p * nvars;
+
+  /* ===== Compute Roe average for base 5 variables ===== */
+  double rhoL = uL_p[0], rhoR = uR_p[0];
+  if (rhoL <= 0.0 || rhoR <= 0.0) {
+    for (int k = 0; k < nvars; k++) fI_p[k] = 0.5 * (fL_p[k] + fR_p[k]);
+    return;
+  }
+
+  double sqrtRhoL = sqrt(rhoL), sqrtRhoR = sqrt(rhoR);
+  double denom = sqrtRhoL + sqrtRhoR;
+  double vxL = uL_p[1]/rhoL, vyL = uL_p[2]/rhoL, vzL = uL_p[3]/rhoL;
+  double vxR = uR_p[1]/rhoR, vyR = uR_p[2]/rhoR, vzR = uR_p[3]/rhoR;
+
+  double vx = (sqrtRhoL*vxL + sqrtRhoR*vxR) / denom;
+  double vy = (sqrtRhoL*vyL + sqrtRhoR*vyR) / denom;
+  double vz = (sqrtRhoL*vzL + sqrtRhoR*vzR) / denom;
+
+  double vsqL = vxL*vxL + vyL*vyL + vzL*vzL;
+  double vsqR = vxR*vxR + vyR*vyR + vzR*vzR;
+  double PL = (gamma-1.0) * (uL_p[4] - 0.5*rhoL*vsqL);
+  double PR = (gamma-1.0) * (uR_p[4] - 0.5*rhoR*vsqR);
+  if (PL <= 0.0 || PR <= 0.0) {
+    for (int k = 0; k < nvars; k++) fI_p[k] = 0.5 * (fL_p[k] + fR_p[k]);
+    return;
+  }
+
+  double hL = (uL_p[4] + PL) / rhoL;
+  double hR = (uR_p[4] + PR) / rhoR;
+  double h0 = (sqrtRhoL*hL + sqrtRhoR*hR) / denom;
+
+  double vsq = vx*vx + vy*vy + vz*vz;
+  double a2 = (gamma-1.0) * (h0 - 0.5*vsq);
+  if (a2 <= 0.0) {
+    for (int k = 0; k < nvars; k++) fI_p[k] = 0.5 * (fL_p[k] + fR_p[k]);
+    return;
+  }
+  double a = sqrt(a2);
+
+  /* ===== Compute eigenvalues for all 12 variables ===== */
+  double eigL[12], eigC[12], eigR[12];
+  double vn, vnL, vnR;
+
+  if (dir == _XDIR_) {
+    vnL = vxL; vnR = vxR; vn = vx;
+  } else if (dir == _YDIR_) {
+    vnL = vyL; vnR = vyR; vn = vy;
+  } else {
+    vnL = vzL; vnR = vzR; vn = vz;
+  }
+
+  double cL = sqrt(gamma * PL / rhoL);
+  double cR = sqrt(gamma * PR / rhoR);
+
+  /* Eigenvalues for L, C, R states */
+  eigL[0] = vnL; eigL[1] = vnL; eigL[2] = vnL; eigL[3] = vnL - cL; eigL[4] = vnL + cL;
+  eigC[0] = vn;  eigC[1] = vn;  eigC[2] = vn;  eigC[3] = vn - a;   eigC[4] = vn + a;
+  eigR[0] = vnR; eigR[1] = vnR; eigR[2] = vnR; eigR[3] = vnR - cR; eigR[4] = vnR + cR;
+
+  /* Passive scalars have same eigenvalue as density (convected with flow) */
+  for (int k = 5; k < 12; k++) {
+    eigL[k] = vnL; eigC[k] = vn; eigR[k] = vnR;
+  }
+
+  /* ===== Build 5x5 eigenvector matrices inline ===== */
+  double L[25] = {0}, R[25] = {0};
+  double gm1 = gamma - 1.0;
+  double ek = 0.5 * vsq;
+  double a2inv = 1.0 / a2;
+  double twoA2inv = 0.5 * a2inv;
+
+  if (dir == _XDIR_) {
+    L[5*1+0] = (gm1*ek + a*vx) * twoA2inv;
+    L[5*1+1] = (-gm1*vx - a) * twoA2inv;
+    L[5*1+2] = (-gm1*vy) * twoA2inv;
+    L[5*1+3] = (-gm1*vz) * twoA2inv;
+    L[5*1+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vx) * twoA2inv;
+    L[5*4+1] = (-gm1*vx + a) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv;
+    L[5*4+3] = (-gm1*vz) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*2+0] = -vy; L[5*2+2] = 1.0;
+    L[5*3+0] = vz; L[5*3+3] = -1.0;
+
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[0*5+1] = 1.0; R[1*5+1] = vx-a; R[2*5+1] = vy; R[3*5+1] = vz; R[4*5+1] = h0-a*vx;
+    R[2*5+2] = 1.0; R[4*5+2] = vy;
+    R[3*5+3] = -1.0; R[4*5+3] = -vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx+a; R[2*5+4] = vy; R[3*5+4] = vz; R[4*5+4] = h0+a*vx;
+  } else if (dir == _YDIR_) {
+    L[5*2+0] = (gm1*ek + a*vy) * twoA2inv;
+    L[5*2+1] = (-gm1*vx) * twoA2inv;
+    L[5*2+2] = (-gm1*vy - a) * twoA2inv;
+    L[5*2+3] = (-gm1*vz) * twoA2inv;
+    L[5*2+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vy) * twoA2inv;
+    L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy + a) * twoA2inv;
+    L[5*4+3] = (-gm1*vz) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = -vx; L[5*1+1] = 1.0;
+    L[5*3+0] = vz; L[5*3+3] = -1.0;
+
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = 1.0; R[4*5+1] = vx;
+    R[0*5+2] = 1.0; R[1*5+2] = vx; R[2*5+2] = vy-a; R[3*5+2] = vz; R[4*5+2] = h0-a*vy;
+    R[3*5+3] = -1.0; R[4*5+3] = -vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy+a; R[3*5+4] = vz; R[4*5+4] = h0+a*vy;
+  } else { /* Z-direction */
+    L[5*3+0] = (gm1*ek + a*vz) * twoA2inv;
+    L[5*3+1] = (-gm1*vx) * twoA2inv;
+    L[5*3+2] = (-gm1*vy) * twoA2inv;
+    L[5*3+3] = (-gm1*vz - a) * twoA2inv;
+    L[5*3+4] = gm1 * twoA2inv;
+    L[5*0+0] = 1.0 - gm1*ek * a2inv;
+    L[5*0+1] = gm1*vx * a2inv;
+    L[5*0+2] = gm1*vy * a2inv;
+    L[5*0+3] = gm1*vz * a2inv;
+    L[5*0+4] = -gm1 * a2inv;
+    L[5*4+0] = (gm1*ek - a*vz) * twoA2inv;
+    L[5*4+1] = (-gm1*vx) * twoA2inv;
+    L[5*4+2] = (-gm1*vy) * twoA2inv;
+    L[5*4+3] = (-gm1*vz + a) * twoA2inv;
+    L[5*4+4] = gm1 * twoA2inv;
+    L[5*1+0] = vx; L[5*1+1] = -1.0;
+    L[5*2+0] = -vy; L[5*2+2] = 1.0;
+
+    R[0*5+0] = 1.0; R[1*5+0] = vx; R[2*5+0] = vy; R[3*5+0] = vz; R[4*5+0] = ek;
+    R[1*5+1] = -1.0; R[4*5+1] = -vx;
+    R[2*5+2] = 1.0; R[4*5+2] = vy;
+    R[0*5+3] = 1.0; R[1*5+3] = vx; R[2*5+3] = vy; R[3*5+3] = vz-a; R[4*5+3] = h0-a*vz;
+    R[0*5+4] = 1.0; R[1*5+4] = vx; R[2*5+4] = vy; R[3*5+4] = vz+a; R[4*5+4] = h0+a*vz;
+  }
+
+  /* ===== Transform base 5 variables to characteristic space ===== */
+  double ucL[5], ucR[5], fcL[5], fcR[5], fc[5];
+
+  #pragma unroll
+  for (int i = 0; i < 5; i++) {
+    ucL[i] = L[i*5+0]*uL_p[0] + L[i*5+1]*uL_p[1] + L[i*5+2]*uL_p[2] + L[i*5+3]*uL_p[3] + L[i*5+4]*uL_p[4];
+    ucR[i] = L[i*5+0]*uR_p[0] + L[i*5+1]*uR_p[1] + L[i*5+2]*uR_p[2] + L[i*5+3]*uR_p[3] + L[i*5+4]*uR_p[4];
+    fcL[i] = L[i*5+0]*fL_p[0] + L[i*5+1]*fL_p[1] + L[i*5+2]*fL_p[2] + L[i*5+3]*fL_p[3] + L[i*5+4]*fL_p[4];
+    fcR[i] = L[i*5+0]*fR_p[0] + L[i*5+1]*fR_p[1] + L[i*5+2]*fR_p[2] + L[i*5+3]*fR_p[3] + L[i*5+4]*fR_p[4];
+  }
+
+  /* ===== LLF characteristic fluxes for base 5 variables ===== */
+  #pragma unroll
+  for (int k = 0; k < 5; k++) {
+    double alpha = gpu_max3(gpu_absolute(eigL[k]), gpu_absolute(eigC[k]), gpu_absolute(eigR[k]));
+    fc[k] = 0.5 * (fcL[k] + fcR[k] + alpha * (ucL[k] - ucR[k]));
+  }
+
+  /* ===== Transform base 5 variables back to physical space ===== */
+  #pragma unroll
+  for (int i = 0; i < 5; i++) {
+    fI_p[i] = R[i*5+0]*fc[0] + R[i*5+1]*fc[1] + R[i*5+2]*fc[2] + R[i*5+3]*fc[3] + R[i*5+4]*fc[4];
+  }
+
+  /* ===== Simple LLF for passive scalars (vars 5-11) ===== */
+  /* These use identity eigenvectors, so characteristic = physical */
+  #pragma unroll
+  for (int k = 5; k < 12; k++) {
+    double alpha = gpu_max3(gpu_absolute(eigL[k]), gpu_absolute(eigC[k]), gpu_absolute(eigR[k]));
+    fI_p[k] = 0.5 * (fL_p[k] + fR_p[k] + alpha * (uL_p[k] - uR_p[k]));
+  }
+}
+
+/* Kernel: LLF (Local Lax-Friedrich) upwinding for NavierStokes3D - general fallback */
 GPU_KERNEL void gpu_ns3d_upwind_llf_kernel(
   double *fI, const double *fL, const double *fR, const double *uL, const double *uR, const double *u,
   int nvars, int ndims, const int *dim, const int *stride_with_ghosts, const int *bounds_inter,

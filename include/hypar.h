@@ -352,6 +352,10 @@ typedef struct main_parameters {
   double *gpu_parabolic_workspace_FDeriv;   /*!< workspace for flux derivative */
   size_t gpu_parabolic_workspace_size;      /*!< size of each workspace array in elements */
 
+  /*! GPU optimization: persistent workspace buffer for CFL computation */
+  double *gpu_cfl_workspace;                /*!< workspace for per-point CFL values */
+  size_t gpu_cfl_workspace_size;            /*!< size of CFL workspace in elements */
+
 #if defined(GPU_CUDA)
   void *gpu_stream_hyp;         /*!< CUDA stream for hyperbolic term computation */
   void *gpu_stream_par;         /*!< CUDA stream for parabolic term computation */

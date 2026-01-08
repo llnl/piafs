@@ -131,6 +131,8 @@ GPU_KERNEL void gpu_chemistry_photon_density_3d_first_layer_kernel(
 
 /*! GPU kernel to set photon density for subsequent k-layers in 3D (k > 0)
  *  Parallelized over i,j grid points, sequentially over k
+ *  NOTE: This is the legacy per-layer kernel, kept for compatibility.
+ *  Use gpu_chemistry_photon_density_3d_batched_kernel for better performance.
  */
 GPU_KERNEL void gpu_chemistry_photon_density_3d_next_layer_kernel(
   double* __restrict__ nv_hnu,
@@ -151,18 +153,87 @@ GPU_KERNEL void gpu_chemistry_photon_density_3d_next_layer_kernel(
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
-  
+
   if (i >= imax || j >= jmax) return;
-  
+
   // Compute 1D indices for current layer (k) and previous layer (k-1)
   int p_km1 = (i + ghosts) + (dim0 + 2 * ghosts) * ((j + ghosts) + (dim1 + 2 * ghosts) * (k - 1 + ghosts));
   int p     = (i + ghosts) + (dim0 + 2 * ghosts) * ((j + ghosts) + (dim1 + 2 * ghosts) * (k + ghosts));
-  
+
   // Get O3 concentration from previous layer
   double n_O3 = u[grid_stride * p_km1 + n_flow_vars + iO3];
-  
+
   // Compute damped photon density
   nv_hnu[p] = nv_hnu[p_km1] * gpu_hnu_damp_factor(sO3, n_O2_chem, dz, n_O3);
+}
+
+/*! GPU kernel to compute ALL z-layers of photon density in 3D in a SINGLE launch
+ *  Each thread handles one (i,j) column and iterates through all z-layers.
+ *  This eliminates ~(kmax-1) kernel launches per time step.
+ */
+GPU_KERNEL void gpu_chemistry_photon_density_3d_batched_kernel(
+  double* __restrict__ nv_hnu,
+  const double* __restrict__ u,
+  const double* __restrict__ imap,
+  int imax,
+  int jmax,
+  int kmax,
+  int dim0,
+  int dim1,
+  int dim2,
+  int ghosts,
+  int grid_stride,
+  int n_flow_vars,
+  double I0,
+  double c,
+  double h,
+  double nu,
+  double n_O2_chem,
+  double t_pulse_norm,
+  double t_start_norm,
+  double sO3,
+  double dz,
+  double t,
+  int first_rank_z,  /* 1 if this is the first rank in z-direction */
+  int kstart         /* Starting k index (0 if first_rank_z, else 0 but expects ghost data) */
+)
+{
+  int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+  if (i >= imax || j >= jmax) return;
+
+  const int stride_j = dim0 + 2 * ghosts;
+  const int stride_k = stride_j * (dim1 + 2 * ghosts);
+  const int ij_base = (i + ghosts) + stride_j * (j + ghosts);
+
+  // First layer (k=0) - only compute if this is the first rank in z
+  if (first_rank_z) {
+    int p0 = ij_base + stride_k * ghosts;
+    double imap_p = imap[p0];
+    nv_hnu[p0] = gpu_hnu_first_layer(I0, c, h, nu, n_O2_chem, t_pulse_norm, t_start_norm, imap_p, t);
+  }
+
+  // Subsequent layers - each depends on the previous layer
+  // Use register to cache previous layer's photon density
+  int p_prev = ij_base + stride_k * (kstart - 1 + ghosts);
+  double nv_hnu_prev = nv_hnu[p_prev];
+
+  #pragma unroll 4
+  for (int k = kstart; k < kmax; k++) {
+    int p_km1 = ij_base + stride_k * (k - 1 + ghosts);
+    int p     = ij_base + stride_k * (k + ghosts);
+
+    // Get O3 concentration from previous layer
+    double n_O3 = u[grid_stride * p_km1 + n_flow_vars + iO3];
+
+    // Compute damped photon density using cached value
+    double nv_hnu_curr = nv_hnu_prev * gpu_hnu_damp_factor(sO3, n_O2_chem, dz, n_O3);
+    nv_hnu[p] = nv_hnu_curr;
+
+    // Update cache for next iteration
+    nv_hnu_prev = nv_hnu_curr;
+  }
 }
 
 /*! GPU kernel to compute chemistry source terms for reaction species */
@@ -464,6 +535,63 @@ void gpu_launch_chemistry_photon_density_3d_next_layer(
     nv_hnu, u, imax, jmax, k, dim0, dim1, dim2, ghosts, grid_stride, n_flow_vars, sO3, n_O2_chem, dz
   );
   
+  GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
+#endif
+}
+
+/*! Launch wrapper for GPU batched photon density kernel (3D case)
+ *  This computes ALL z-layers in a SINGLE kernel launch, eliminating
+ *  ~(kmax-1) separate launches and their associated overhead.
+ */
+void gpu_launch_chemistry_photon_density_3d_batched(
+  double* nv_hnu,
+  const double* u,
+  const double* imap,
+  int imax,
+  int jmax,
+  int kmax,
+  int dim0,
+  int dim1,
+  int dim2,
+  int ghosts,
+  int grid_stride,
+  int n_flow_vars,
+  double I0,
+  double c,
+  double h,
+  double nu,
+  double n_O2_chem,
+  double t_pulse_norm,
+  double t_start_norm,
+  double sO3,
+  double dz,
+  double t,
+  int first_rank_z,
+  int kstart,
+  int blockSize
+)
+{
+#ifdef GPU_NONE
+  fprintf(stderr, "Error: gpu_launch_chemistry_photon_density_3d_batched called in CPU-only mode\n");
+  exit(1);
+#else
+  #ifndef DEFAULT_BLOCK_SIZE_2D
+  #define DEFAULT_BLOCK_SIZE_2D 16
+  #endif
+
+  if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE_2D;
+
+  dim3 blockDim(blockSize, blockSize);
+  dim3 gridDim((imax + blockSize - 1) / blockSize, (jmax + blockSize - 1) / blockSize);
+
+  GPU_KERNEL_LAUNCH(gpu_chemistry_photon_density_3d_batched_kernel, gridDim, blockDim)(
+    nv_hnu, u, imap, imax, jmax, kmax,
+    dim0, dim1, dim2, ghosts,
+    grid_stride, n_flow_vars,
+    I0, c, h, nu, n_O2_chem, t_pulse_norm, t_start_norm,
+    sO3, dz, t, first_rank_z, kstart
+  );
+
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
 #endif
 }

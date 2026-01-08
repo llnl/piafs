@@ -382,7 +382,10 @@ int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
 
   }
 
-  /* Check for NaN/Inf in final solution after all stages */
+  /* Check for NaN/Inf in final solution after all stages
+     Note: This is expensive on GPU (requires cudaMemcpy). Disabled by default
+     for Release builds. Enable with -DENABLE_NAN_CHECK=ON or Debug build. */
+#ifdef PIAFS_NAN_CHECK
 #ifdef GPU_CUDA
   if (GPUShouldUse()) {
     /* Copy to host for NaN check */
@@ -443,6 +446,7 @@ int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
     }
   }
 #endif
+#endif /* PIAFS_NAN_CHECK */
 
   return 0;
 }

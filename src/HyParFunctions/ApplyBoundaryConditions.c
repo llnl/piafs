@@ -118,7 +118,6 @@ int ApplyBoundaryConditions(void    *s,     /*!< Object of type #HyPar containin
         gpu_launch_bc_extrapolate(x, solver->nvars, solver->ndims, dim_local,
                                   solver->ghosts, bc_dim, bc_face, bc->is, bc->ie, 256);
         GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-        GPUSync();  /* Force sync to catch errors */
         gpu_bc_handled = 1;
       } else if (!strcmp(bc->bctype, _DIRICHLET_)) {
         gpu_launch_bc_dirichlet(x, bc->DirichletValue, solver->nvars, solver->ndims,

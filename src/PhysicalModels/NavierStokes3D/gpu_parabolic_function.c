@@ -94,7 +94,7 @@ int GPUNavierStokes3DParabolicFunction(
     IERR GPUMPIExchangeBoundariesnD(_MODEL_NDIMS_, nvars, solver->dim_local,
                                       solver->ghosts, mpi, QDerivZ);
     CHECKERR(ierr);
-    GPUSync(); // Ensure MPI exchange is complete before proceeding
+    /* Note: GPUMPIExchangeBoundariesnD uses synchronous cudaMemcpy, so no explicit sync needed */
 
     /* Scale derivatives by dxinv, dyinv, dzinv using GPU kernels */
     /* Use cached metadata arrays - no allocation/copy overhead */
