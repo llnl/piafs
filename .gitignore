@@ -6,7 +6,8 @@ Makefile.in
 aclocal.m4
 autom4te.cache/
 bin/
-build*
+build
+build.*
 config.h.in
 configure
 config.h
@@ -31,3 +32,6 @@ PIAFS
 VERSION
 test-driver
 test_run_temp/
+lib
+gmock
+gtest

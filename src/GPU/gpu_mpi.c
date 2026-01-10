@@ -265,28 +265,80 @@ int GPUMPIExchangeBoundariesnD(
       d_packbuf_capacity = total_buf_size;
     }
 
-    /* Pack ALL boundaries to device buffer first (overlaps kernel launches) */
-    for (d = 0; d < ndims; d++) {
-      if (neighbor_rank[2*d] != -1) {
-        gpu_launch_mpi_pack_boundary(var, &d_packbuf[2*d*stride], ndims, nvars, dim, ghosts, d, -1, 256);
-      }
-      if (neighbor_rank[2*d+1] != -1) {
-        gpu_launch_mpi_pack_boundary(var, &d_packbuf[(2*d+1)*stride], ndims, nvars, dim, ghosts, d, +1, 256);
+    /* Static streams for overlapping pack kernels with D2H transfers */
+    static void *mpi_streams[6] = {NULL}; /* Max 2*3 = 6 faces for 3D */
+    static int streams_initialized = 0;
+    const int nfaces = 2 * ndims;
+
+    if (!streams_initialized && mpi->use_gpu_pinned) {
+      /* Only use streams if we have pinned memory (required for async transfers) */
+      if (GPUCreateMPIStreams(mpi_streams, nfaces) == 0) {
+        streams_initialized = 1;
       }
     }
 
-    /* Sync to ensure all packing is complete */
-    GPUSync();
+    if (streams_initialized && mpi->use_gpu_pinned) {
+      /* Stream-based overlapped pack + D2H:
+         For each face: launch pack kernel on stream, then async D2H on same stream.
+         The async D2H will wait for the pack kernel to complete on that stream.
+         Then sync stream before MPI_Isend. */
 
-    /* Now copy all packed data to host (with pinned memory this is fast) */
-    for (d = 0; d < ndims; d++) {
-      if (neighbor_rank[2*d] != -1) {
-        const int bufsize = bufdim[d] * nvars;
-        GPUCopyToHost(&sendbuf[2*d*stride], &d_packbuf[2*d*stride], (size_t)bufsize * sizeof(double));
+      /* Launch pack kernels and async D2H transfers - interleaved for overlap */
+      for (d = 0; d < ndims; d++) {
+        if (neighbor_rank[2*d] != -1) {
+          const int face = 2*d;
+          const int bufsize = bufdim[d] * nvars;
+          gpu_launch_mpi_pack_boundary_stream(var, &d_packbuf[face*stride],
+                                              ndims, nvars, dim, ghosts, d, -1, 256,
+                                              mpi_streams[face]);
+          GPUCopyToHostAsync(&sendbuf[face*stride], &d_packbuf[face*stride],
+                             (size_t)bufsize * sizeof(double), mpi_streams[face]);
+        }
+        if (neighbor_rank[2*d+1] != -1) {
+          const int face = 2*d+1;
+          const int bufsize = bufdim[d] * nvars;
+          gpu_launch_mpi_pack_boundary_stream(var, &d_packbuf[face*stride],
+                                              ndims, nvars, dim, ghosts, d, +1, 256,
+                                              mpi_streams[face]);
+          GPUCopyToHostAsync(&sendbuf[face*stride], &d_packbuf[face*stride],
+                             (size_t)bufsize * sizeof(double), mpi_streams[face]);
+        }
       }
-      if (neighbor_rank[2*d+1] != -1) {
-        const int bufsize = bufdim[d] * nvars;
-        GPUCopyToHost(&sendbuf[(2*d+1)*stride], &d_packbuf[(2*d+1)*stride], (size_t)bufsize * sizeof(double));
+
+      /* Sync each stream before issuing MPI_Isend for that face */
+      for (d = 0; d < ndims; d++) {
+        if (neighbor_rank[2*d] != -1) {
+          GPUStreamSynchronize(mpi_streams[2*d]);
+        }
+        if (neighbor_rank[2*d+1] != -1) {
+          GPUStreamSynchronize(mpi_streams[2*d+1]);
+        }
+      }
+    } else {
+      /* Fallback: original batched approach (no stream overlap) */
+      /* Pack ALL boundaries to device buffer first (overlaps kernel launches) */
+      for (d = 0; d < ndims; d++) {
+        if (neighbor_rank[2*d] != -1) {
+          gpu_launch_mpi_pack_boundary(var, &d_packbuf[2*d*stride], ndims, nvars, dim, ghosts, d, -1, 256);
+        }
+        if (neighbor_rank[2*d+1] != -1) {
+          gpu_launch_mpi_pack_boundary(var, &d_packbuf[(2*d+1)*stride], ndims, nvars, dim, ghosts, d, +1, 256);
+        }
+      }
+
+      /* Sync to ensure all packing is complete */
+      GPUSync();
+
+      /* Now copy all packed data to host (with pinned memory this is fast) */
+      for (d = 0; d < ndims; d++) {
+        if (neighbor_rank[2*d] != -1) {
+          const int bufsize = bufdim[d] * nvars;
+          GPUCopyToHost(&sendbuf[2*d*stride], &d_packbuf[2*d*stride], (size_t)bufsize * sizeof(double));
+        }
+        if (neighbor_rank[2*d+1] != -1) {
+          const int bufsize = bufdim[d] * nvars;
+          GPUCopyToHost(&sendbuf[(2*d+1)*stride], &d_packbuf[(2*d+1)*stride], (size_t)bufsize * sizeof(double));
+        }
       }
     }
   } else {
@@ -358,25 +410,75 @@ int GPUMPIExchangeBoundariesnD(
       d_unpackbuf_capacity = total_buf_size;
     }
 
-    /* Copy all received data to device (with pinned memory this is fast) */
-    for (d = 0; d < ndims; d++) {
-      if (neighbor_rank[2*d] != -1) {
-        const int bufsize = bufdim[d] * nvars;
-        GPUCopyToDevice(&d_unpackbuf[2*d*stride], &recvbuf[2*d*stride], (size_t)bufsize * sizeof(double));
-      }
-      if (neighbor_rank[2*d+1] != -1) {
-        const int bufsize = bufdim[d] * nvars;
-        GPUCopyToDevice(&d_unpackbuf[(2*d+1)*stride], &recvbuf[(2*d+1)*stride], (size_t)bufsize * sizeof(double));
+    /* Static streams for overlapping H2D transfers with unpack kernels */
+    static void *mpi_recv_streams[6] = {NULL}; /* Max 2*3 = 6 faces for 3D */
+    static int recv_streams_initialized = 0;
+    const int nfaces = 2 * ndims;
+
+    if (!recv_streams_initialized && mpi->use_gpu_pinned) {
+      if (GPUCreateMPIStreams(mpi_recv_streams, nfaces) == 0) {
+        recv_streams_initialized = 1;
       }
     }
 
-    /* Launch all unpack kernels (they can overlap on the GPU) */
-    for (d = 0; d < ndims; d++) {
-      if (neighbor_rank[2*d] != -1) {
-        gpu_launch_mpi_unpack_boundary(var, &d_unpackbuf[2*d*stride], ndims, nvars, dim, ghosts, d, -1, 256);
+    if (recv_streams_initialized && mpi->use_gpu_pinned) {
+      /* Stream-based overlapped H2D + unpack:
+         For each face: launch async H2D on stream, then unpack kernel on same stream.
+         The unpack kernel will wait for the H2D to complete on that stream. */
+
+      /* Launch H2D transfers and unpack kernels - interleaved for overlap */
+      for (d = 0; d < ndims; d++) {
+        if (neighbor_rank[2*d] != -1) {
+          const int face = 2*d;
+          const int bufsize = bufdim[d] * nvars;
+          GPUCopyToDeviceAsync(&d_unpackbuf[face*stride], &recvbuf[face*stride],
+                               (size_t)bufsize * sizeof(double), mpi_recv_streams[face]);
+          gpu_launch_mpi_unpack_boundary_stream(var, &d_unpackbuf[face*stride],
+                                                ndims, nvars, dim, ghosts, d, -1, 256,
+                                                mpi_recv_streams[face]);
+        }
+        if (neighbor_rank[2*d+1] != -1) {
+          const int face = 2*d+1;
+          const int bufsize = bufdim[d] * nvars;
+          GPUCopyToDeviceAsync(&d_unpackbuf[face*stride], &recvbuf[face*stride],
+                               (size_t)bufsize * sizeof(double), mpi_recv_streams[face]);
+          gpu_launch_mpi_unpack_boundary_stream(var, &d_unpackbuf[face*stride],
+                                                ndims, nvars, dim, ghosts, d, +1, 256,
+                                                mpi_recv_streams[face]);
+        }
       }
-      if (neighbor_rank[2*d+1] != -1) {
-        gpu_launch_mpi_unpack_boundary(var, &d_unpackbuf[(2*d+1)*stride], ndims, nvars, dim, ghosts, d, +1, 256);
+
+      /* Sync all streams to ensure unpack is complete before proceeding */
+      for (d = 0; d < ndims; d++) {
+        if (neighbor_rank[2*d] != -1) {
+          GPUStreamSynchronize(mpi_recv_streams[2*d]);
+        }
+        if (neighbor_rank[2*d+1] != -1) {
+          GPUStreamSynchronize(mpi_recv_streams[2*d+1]);
+        }
+      }
+    } else {
+      /* Fallback: original approach (no stream overlap) */
+      /* Copy all received data to device (with pinned memory this is fast) */
+      for (d = 0; d < ndims; d++) {
+        if (neighbor_rank[2*d] != -1) {
+          const int bufsize = bufdim[d] * nvars;
+          GPUCopyToDevice(&d_unpackbuf[2*d*stride], &recvbuf[2*d*stride], (size_t)bufsize * sizeof(double));
+        }
+        if (neighbor_rank[2*d+1] != -1) {
+          const int bufsize = bufdim[d] * nvars;
+          GPUCopyToDevice(&d_unpackbuf[(2*d+1)*stride], &recvbuf[(2*d+1)*stride], (size_t)bufsize * sizeof(double));
+        }
+      }
+
+      /* Launch all unpack kernels (they can overlap on the GPU) */
+      for (d = 0; d < ndims; d++) {
+        if (neighbor_rank[2*d] != -1) {
+          gpu_launch_mpi_unpack_boundary(var, &d_unpackbuf[2*d*stride], ndims, nvars, dim, ghosts, d, -1, 256);
+        }
+        if (neighbor_rank[2*d+1] != -1) {
+          gpu_launch_mpi_unpack_boundary(var, &d_unpackbuf[(2*d+1)*stride], ndims, nvars, dim, ghosts, d, +1, 256);
+        }
       }
     }
   } else {

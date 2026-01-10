@@ -64,6 +64,11 @@ message(STATUS "Binary name: ${PIAFS_EXECUTABLE_NAME}")
 # Main executable
 add_executable(${PIAFS_EXECUTABLE_NAME} main.cpp)
 
+# Place binary in bin/ subdirectory of build directory
+set_target_properties(${PIAFS_EXECUTABLE_NAME} PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
 # Include build_info.h
 target_include_directories(${PIAFS_EXECUTABLE_NAME} PRIVATE ${CMAKE_BINARY_DIR})
 

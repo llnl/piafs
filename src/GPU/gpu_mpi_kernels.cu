@@ -213,4 +213,193 @@ extern "C" void gpu_launch_mpi_unpack_boundary(
   );
 }
 
+/* Stream-aware versions for overlapping pack/unpack with async transfers */
+
+extern "C" void gpu_launch_mpi_pack_boundary_stream(
+  const double *var,
+  double *buf,
+  int ndims,
+  int nvars,
+  const int *dim,
+  int ghosts,
+  int dir,
+  int side,
+  int blockSize,
+  void *stream
+)
+{
+  if (!var || !buf || !dim) return;
+  if (ndims < 1 || ndims > 3) return;
+  if (dir < 0 || dir >= ndims) return;
+
+  const int dim0 = dim[0];
+  const int dim1 = (ndims > 1) ? dim[1] : 1;
+  const int dim2 = (ndims > 2) ? dim[2] : 1;
+
+  int npts = 1;
+  for (int d = 0; d < ndims; d++) {
+    if (d == dir) npts *= ghosts;
+    else npts *= dim[d];
+  }
+
+  GPULaunchConfig cfg = GPUConfigureLaunch((size_t)npts, blockSize);
+
+#ifdef GPU_CUDA
+  cudaStream_t s = stream ? *(cudaStream_t*)stream : 0;
+  gpu_mpi_pack_boundary_kernel<<<cfg.gridSize, cfg.blockSize, 0, s>>>(
+    var, buf, ndims, nvars, dim0, dim1, dim2, ghosts, dir, side, npts
+  );
+#elif defined(GPU_HIP)
+  hipStream_t s = stream ? *(hipStream_t*)stream : 0;
+  gpu_mpi_pack_boundary_kernel<<<cfg.gridSize, cfg.blockSize, 0, s>>>(
+    var, buf, ndims, nvars, dim0, dim1, dim2, ghosts, dir, side, npts
+  );
+#endif
+}
+
+extern "C" void gpu_launch_mpi_unpack_boundary_stream(
+  double *var,
+  const double *buf,
+  int ndims,
+  int nvars,
+  const int *dim,
+  int ghosts,
+  int dir,
+  int side,
+  int blockSize,
+  void *stream
+)
+{
+  if (!var || !buf || !dim) return;
+  if (ndims < 1 || ndims > 3) return;
+  if (dir < 0 || dir >= ndims) return;
+
+  const int dim0 = dim[0];
+  const int dim1 = (ndims > 1) ? dim[1] : 1;
+  const int dim2 = (ndims > 2) ? dim[2] : 1;
+
+  int npts = 1;
+  for (int d = 0; d < ndims; d++) {
+    if (d == dir) npts *= ghosts;
+    else npts *= dim[d];
+  }
+
+  GPULaunchConfig cfg = GPUConfigureLaunch((size_t)npts, blockSize);
+
+#ifdef GPU_CUDA
+  cudaStream_t s = stream ? *(cudaStream_t*)stream : 0;
+  gpu_mpi_unpack_boundary_kernel<<<cfg.gridSize, cfg.blockSize, 0, s>>>(
+    var, buf, ndims, nvars, dim0, dim1, dim2, ghosts, dir, side, npts
+  );
+#elif defined(GPU_HIP)
+  hipStream_t s = stream ? *(hipStream_t*)stream : 0;
+  gpu_mpi_unpack_boundary_kernel<<<cfg.gridSize, cfg.blockSize, 0, s>>>(
+    var, buf, ndims, nvars, dim0, dim1, dim2, ghosts, dir, side, npts
+  );
+#endif
+}
+
+/* MPI stream management */
+
+extern "C" int GPUCreateMPIStreams(void **streams, int nstreams)
+{
+  if (!streams || nstreams <= 0) return 1;
+
+#ifdef GPU_CUDA
+  for (int i = 0; i < nstreams; i++) {
+    cudaStream_t *s = (cudaStream_t*)malloc(sizeof(cudaStream_t));
+    if (!s) {
+      /* Clean up previously created streams */
+      for (int j = 0; j < i; j++) {
+        if (streams[j]) {
+          cudaStreamDestroy(*(cudaStream_t*)streams[j]);
+          free(streams[j]);
+          streams[j] = NULL;
+        }
+      }
+      return 1;
+    }
+    cudaError_t err = cudaStreamCreate(s);
+    if (err != cudaSuccess) {
+      free(s);
+      for (int j = 0; j < i; j++) {
+        if (streams[j]) {
+          cudaStreamDestroy(*(cudaStream_t*)streams[j]);
+          free(streams[j]);
+          streams[j] = NULL;
+        }
+      }
+      return 1;
+    }
+    streams[i] = (void*)s;
+  }
+  return 0;
+
+#elif defined(GPU_HIP)
+  for (int i = 0; i < nstreams; i++) {
+    hipStream_t *s = (hipStream_t*)malloc(sizeof(hipStream_t));
+    if (!s) {
+      for (int j = 0; j < i; j++) {
+        if (streams[j]) {
+          hipStreamDestroy(*(hipStream_t*)streams[j]);
+          free(streams[j]);
+          streams[j] = NULL;
+        }
+      }
+      return 1;
+    }
+    hipError_t err = hipStreamCreate(s);
+    if (err != hipSuccess) {
+      free(s);
+      for (int j = 0; j < i; j++) {
+        if (streams[j]) {
+          hipStreamDestroy(*(hipStream_t*)streams[j]);
+          free(streams[j]);
+          streams[j] = NULL;
+        }
+      }
+      return 1;
+    }
+    streams[i] = (void*)s;
+  }
+  return 0;
+
+#else
+  for (int i = 0; i < nstreams; i++) {
+    streams[i] = NULL;
+  }
+  return 0;
+#endif
+}
+
+extern "C" int GPUDestroyMPIStreams(void **streams, int nstreams)
+{
+  if (!streams) return 0;
+
+#ifdef GPU_CUDA
+  for (int i = 0; i < nstreams; i++) {
+    if (streams[i]) {
+      cudaStreamDestroy(*(cudaStream_t*)streams[i]);
+      free(streams[i]);
+      streams[i] = NULL;
+    }
+  }
+  return 0;
+
+#elif defined(GPU_HIP)
+  for (int i = 0; i < nstreams; i++) {
+    if (streams[i]) {
+      hipStreamDestroy(*(hipStream_t*)streams[i]);
+      free(streams[i]);
+      streams[i] = NULL;
+    }
+  }
+  return 0;
+
+#else
+  (void)nstreams;
+  return 0;
+#endif
+}
+
 

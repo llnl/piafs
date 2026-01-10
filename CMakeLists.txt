@@ -453,10 +453,11 @@ add_subdirectory(Tests/unit)
 # Add regression tests (CMake-based, replaces test_mpi.sh)
 add_subdirectory(Tests)
 
-# Add a fixture to ensure binary is prepared before testing
+# Add a fixture to ensure binary is built before testing
+# The binary is now placed directly in bin/ via RUNTIME_OUTPUT_DIRECTORY
 add_test(
   NAME prepare_piafs_binary
-  COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target prepare_test_binary
+  COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --config $<CONFIG>
 )
 set_tests_properties(prepare_piafs_binary PROPERTIES
   FIXTURES_SETUP prepare_binary
@@ -486,58 +487,3 @@ message(STATUS "  Testing: Enabled (use 'make test' or 'ctest')")
 message(STATUS "  MPI executor for tests: ${MPIEXEC}")
 message(STATUS "")
 
-# Create a custom target to copy PIAFS binary to bin/ before running tests
-# This must be after src/CMakeLists.txt is processed so PIAFS_EXECUTABLE_NAME is available
-if(EXISTS "${CMAKE_SOURCE_DIR}/src/CMakeLists.txt")
-  # Get the executable name from src/CMakeLists.txt
-  # We need to read it or set it here - let's set it here to match src/CMakeLists.txt logic
-  set(PIAFS_NAME_SUFFIX "")
-  
-  # Add compiler info
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(PIAFS_NAME_SUFFIX "${PIAFS_NAME_SUFFIX}-gcc")
-  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(PIAFS_NAME_SUFFIX "${PIAFS_NAME_SUFFIX}-clang")
-  elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Intel")
-    set(PIAFS_NAME_SUFFIX "${PIAFS_NAME_SUFFIX}-intel")
-  else()
-    string(TOLOWER "${CMAKE_CXX_COMPILER_ID}" COMPILER_LOWER)
-    set(PIAFS_NAME_SUFFIX "${PIAFS_NAME_SUFFIX}-${COMPILER_LOWER}")
-  endif()
-  
-  # Add MPI/serial info
-  if(ENABLE_SERIAL)
-    set(PIAFS_NAME_SUFFIX "${PIAFS_NAME_SUFFIX}-serial")
-  else()
-    set(PIAFS_NAME_SUFFIX "${PIAFS_NAME_SUFFIX}-mpi")
-  endif()
-  
-  # Add OpenMP info
-  if(ENABLE_OMP)
-    set(PIAFS_NAME_SUFFIX "${PIAFS_NAME_SUFFIX}-omp")
-  endif()
-  
-  # Add GPU info
-  if(ENABLE_GPU)
-    if(ENABLE_CUDA)
-      set(PIAFS_NAME_SUFFIX "${PIAFS_NAME_SUFFIX}-cuda")
-    elseif(ENABLE_HIP)
-      set(PIAFS_NAME_SUFFIX "${PIAFS_NAME_SUFFIX}-hip")
-    endif()
-  endif()
-  
-  # Add build type (if not Release)
-  if(NOT CMAKE_BUILD_TYPE STREQUAL "Release")
-    string(TOLOWER "${CMAKE_BUILD_TYPE}" BUILD_TYPE_LOWER)
-    set(PIAFS_NAME_SUFFIX "${PIAFS_NAME_SUFFIX}-${BUILD_TYPE_LOWER}")
-  endif()
-  
-  set(PIAFS_EXECUTABLE_NAME "PIAFS${PIAFS_NAME_SUFFIX}")
-  
-  add_custom_target(prepare_test_binary
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/bin
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${PIAFS_EXECUTABLE_NAME}> ${CMAKE_BINARY_DIR}/bin/${PIAFS_EXECUTABLE_NAME}
-    DEPENDS ${PIAFS_EXECUTABLE_NAME}
-    COMMENT "Copying ${PIAFS_EXECUTABLE_NAME} binary to bin/ for testing"
-  )
-endif()

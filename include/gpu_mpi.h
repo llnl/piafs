@@ -46,6 +46,37 @@ void gpu_launch_mpi_unpack_boundary(
   int blockSize
 );
 
+/* Stream-aware versions for overlapping pack/unpack with transfers */
+void gpu_launch_mpi_pack_boundary_stream(
+  const double *var,
+  double *buf,
+  int ndims,
+  int nvars,
+  const int *dim,
+  int ghosts,
+  int dir,
+  int side,
+  int blockSize,
+  void *stream
+);
+
+void gpu_launch_mpi_unpack_boundary_stream(
+  double *var,
+  const double *buf,
+  int ndims,
+  int nvars,
+  const int *dim,
+  int ghosts,
+  int dir,
+  int side,
+  int blockSize,
+  void *stream
+);
+
+/* MPI stream management (one stream per dimension face) */
+int GPUCreateMPIStreams(void **streams, int nstreams);
+int GPUDestroyMPIStreams(void **streams, int nstreams);
+
 #ifdef __cplusplus
 }
 #endif

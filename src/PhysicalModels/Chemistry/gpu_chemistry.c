@@ -192,7 +192,7 @@ int GPUChemistrySetPhotonDensity(
         first_rank_z, kstart,
         16  // block size for 2D grid
       );
-      GPUSync();
+      /* No GPUSync needed - next kernel on same stream waits automatically */
     } else {
       // Multiple ranks in z: Need MPI synchronization between ranks
       // Use batched kernel within each rank's local domain
@@ -229,19 +229,20 @@ int GPUChemistrySetPhotonDensity(
             first_rank_z, kstart,
             16  // block size for 2D grid
           );
-          GPUSync();
+          /* No GPUSync needed - GPUCopyToHost uses synchronous memcpy which waits */
 
           meow[my_rank_z] = 1;
         }
 
         // Copy nv_hnu from GPU to host for MPI exchange
+        // Note: GPUCopyToHost uses synchronous cudaMemcpy which waits for prior kernels
         if (GPUCopyToHost(nv_hnu_host_temp, nv_hnu_gpu, npoints * sizeof(double))) {
           fprintf(stderr, "Error: Failed to copy nv_hnu from GPU to host\n");
           free(nv_hnu_host_temp);
           free(meow);
           return 1;
         }
-        GPUSync();
+        /* No GPUSync needed - synchronous memcpy already completed */
 
         // MPI boundary exchange on host
         MPIExchangeBoundariesnD(solver->ndims, 1, dim, ghosts, mpi, nv_hnu_host_temp);
@@ -275,9 +276,9 @@ int GPUChemistrySetPhotonDensity(
       a_t,
       256  // block size
     );
-    GPUSync();
+    /* No GPUSync needed - next kernel on same stream waits automatically */
   }
-  
+
   // nv_hnu stays on GPU - no need to copy back to host
   // It will be used directly by gpu_launch_chemistry_source
   // Use GPUChemistryCopyPhotonDensityToHost() when host access is needed
