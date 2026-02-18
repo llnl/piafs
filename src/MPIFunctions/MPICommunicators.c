@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MPICommunicators.c
     @brief Functions to create and destroy MPI subcommunicators
     @author Debojyoti Ghosh

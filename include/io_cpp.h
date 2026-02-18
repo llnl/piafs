@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file io_cpp.h
     @author Debojyoti Ghosh
     @brief Function declarations for file I/O functions.

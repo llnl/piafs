@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file CalculateError.c
     @author Debojyoti Ghosh
     @brief Computes the error in the solution.

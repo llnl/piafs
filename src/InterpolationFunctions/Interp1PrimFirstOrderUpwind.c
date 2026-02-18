@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Interp1PrimFirstOrderUpwind.c
  *  @brief First order upwind Scheme (Component-wise application to vectors).
  *  @author Debojyoti Ghosh

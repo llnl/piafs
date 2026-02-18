@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file timeintegration.h
     @author Debojyoti Ghosh
     @brief Contains function declarations for time integration

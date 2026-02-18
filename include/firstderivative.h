@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file firstderivative.h
     @brief Definitions for the functions computing the first derivative.
     @author Debojyoti Ghosh

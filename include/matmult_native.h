@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file matmult_native.h
     @brief Contains macros and function definitions for common matrix multiplication.
     @author Debojyoti Ghosh

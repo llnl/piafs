@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file navierstokes2d.h
     @brief 2D Navier Stokes equations (compressible flows)
     @author Debojyoti Ghosh

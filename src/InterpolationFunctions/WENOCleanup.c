@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file WENOCleanup.c
     @brief Cleans up allocations specific to WENO-type methods
     @author Debojyoti Ghosh

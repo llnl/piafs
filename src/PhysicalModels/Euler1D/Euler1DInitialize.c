@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Euler1DInitialize.c
     @author Debojyoti Ghosh
     @brief Initialize the 1D Euler equations module.

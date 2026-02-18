@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file WENOFifthOrderCalculateWeights.c
     @brief Functions to compute the nonlinear weights for WENO-type schemes
     @author Debojyoti Ghosh

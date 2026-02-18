@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file tridiagLUInit.c
     @brief Initialize the tridiagLU solver
     @author Debojyoti Ghosh

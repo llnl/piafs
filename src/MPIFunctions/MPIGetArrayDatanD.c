@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MPIGetArrayDatanD.c
     @brief Send a part of a local array to another MPI rank
     @author Debojyoti Ghosh

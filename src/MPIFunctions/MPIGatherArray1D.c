@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MPIGatherArray1D.c
     @brief Gathers local 1D arrays to a global 1D array
     @author Debojyoti Ghosh

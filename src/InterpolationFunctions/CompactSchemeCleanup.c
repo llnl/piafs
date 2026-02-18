@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file CompactSchemeCleanup.c
     @brief Cleans up allocations specific to compact finite-difference methods
     @author Debojyoti Ghosh

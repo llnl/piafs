@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Euler1DFlux.c
     @author Debojyoti Ghosh
     @brief Contains the functions to compute the hyperbolic flux for the 1D Euler equations over the domain.

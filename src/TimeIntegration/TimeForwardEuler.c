@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file TimeForwardEuler.c
     @brief Forward Euler method
     @author Debojyoti Ghosh

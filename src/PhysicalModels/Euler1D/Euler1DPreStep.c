@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Euler1DPreStep.c
     @author Debojyoti Ghosh
     @brief Contains the 1D Euler-specific function to be called at the beginning of each time step.

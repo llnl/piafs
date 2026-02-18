@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file mathfunctions_cpp.h
     @brief Contains function definitions for common mathematical functions for C++ code.
     @author Debojyoti Ghosh

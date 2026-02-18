@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Euler1DComputeCFL.c
     @author Debojyoti Ghosh
     @brief Contains the function to compute maximum CFL over the domain for the 1D Euler equations physical model.

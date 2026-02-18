@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file SingleSimulationDefine.cpp
     @brief Define a single simulation object
     @author Debojyoti Ghosh

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file mpivars.h
     @brief MPI related function definitions.
     @author Debojyoti Ghosh

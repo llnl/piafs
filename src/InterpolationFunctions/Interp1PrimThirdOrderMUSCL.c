@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Interp1PrimThirdOrderMUSCL.c
     @author Debojyoti Ghosh
     @brief 3rd order MUSCL scheme with Koren's limiter (component-wise application to vectors)

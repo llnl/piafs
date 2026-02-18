@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file blocktridiagIterJacobi.c
     @brief Solve a block tridiagonal system with the Jacobi method
     @author Debojyoti Ghosh

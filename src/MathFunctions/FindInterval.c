@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file FindInterval.c
     @author Debojyoti Ghosh
     @brief Find grid point indices corresponding to a spatial interval.

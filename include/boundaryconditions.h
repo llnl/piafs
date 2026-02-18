@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file boundaryconditions.h
     @brief Containts the structures and definitions for boundary condition implementation
     @author Debojyoti Ghosh

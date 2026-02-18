@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file NavierStokes2DEigen.c
     @author Debojyoti Ghosh
     @brief Contains the functions to compute left and right eigenvectors for the 2D Navier Stokes equations.

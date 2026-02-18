@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file EnsembleSimulationsDefine.cpp
     @brief Define an ensemble simulation object
     @author Debojyoti Ghosh

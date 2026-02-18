@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file mpivars_struct.h
     @brief MPI related structure.
     @author Debojyoti Ghosh

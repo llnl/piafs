@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file IncrementFilename.c
     @author Debojyoti Ghosh
     @brief Functions for incrementing filename indices

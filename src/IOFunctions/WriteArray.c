@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file WriteArray.c
     @author Debojyoti Ghosh
     @brief Write a vector field, stored as an array, to file

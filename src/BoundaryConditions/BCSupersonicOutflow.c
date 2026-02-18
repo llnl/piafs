@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file BCSupersonicOutflow.c
     @author Debojyoti Ghosh
     @brief Supersonic outflow boundary conditions (specific to Euler/Navier-Stokes systems)

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MPIPartitionArraynD.c
     @brief Partition a global n-dimensional array
     @author Debojyoti Ghosh

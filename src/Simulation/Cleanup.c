@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Cleanup.c
     @author Debojyoti Ghosh
     @brief Clean up and free memory after simulation is complete.

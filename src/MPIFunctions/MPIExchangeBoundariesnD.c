@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MPIExchangeBoundariesnD.c
     @brief Exchange data and fill in ghost points for an n-dimensional array
     @author Debojyoti Ghosh

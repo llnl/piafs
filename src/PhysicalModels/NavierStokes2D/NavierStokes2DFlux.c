@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file NavierStokes2DFlux.c
     @author Debojyoti Ghosh
     @brief Functions to compute the hyperbolic flux for 2D Navier-Stokes equations

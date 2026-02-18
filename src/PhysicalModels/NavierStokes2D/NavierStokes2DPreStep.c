@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file NavierStokes2DPreStep.c
     @author Debojyoti Ghosh
     @brief Contains the 2D Navier-Stokes-specific function to be called at the beginning of each time step.

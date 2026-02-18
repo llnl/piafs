@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file interpolation.h
     @brief Definitions for the functions computing the interpolated value of the primitive at the cell interfaces from the cell-centered values.
     @author Debojyoti Ghosh

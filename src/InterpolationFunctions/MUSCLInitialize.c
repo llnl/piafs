@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MUSCLInitialize.c
     @brief Initialize the 2nd or 3rd order MUSCL scheme
     @author Debojyoti Ghosh

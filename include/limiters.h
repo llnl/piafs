@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file limiters.h
     @brief Definitions for limiter functions used in MUSCL-type reconstruction schemes.
     @author Debojyoti Ghosh
