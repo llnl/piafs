@@ -10,7 +10,7 @@ echo "Setting up PIAFS regression benchmarks"
 echo "========================================="
 
 # Get parameters from environment or use defaults
-BENCHMARKS_REPO="${BENCHMARKS_REPO:-ssh://git@czgitlab.llnl.gov:7999/piafs/piafs_benchmarks.git}"
+BENCHMARKS_REPO="${BENCHMARKS_REPO:-https://github.com/debog/piafs_benchmarks.git}"
 BENCHMARKS_BRANCH="${BENCHMARKS_BRANCH:-master}"
 BENCHMARKS_DIR="${BENCHMARKS_DIR:-${PIAFS_DIR}/test_run_temp/benchmarks}"
 EXPECTED_BENCHMARKS="${EXPECTED_BENCHMARKS:-}"

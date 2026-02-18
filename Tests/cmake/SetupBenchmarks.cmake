@@ -17,7 +17,7 @@ cmake_minimum_required(VERSION 3.10)
 message(STATUS "Setting up PIAFS regression test benchmarks...")
 
 # Configuration
-set(BENCHMARKS_REPO "ssh://git@czgitlab.llnl.gov:7999/piafs/piafs_benchmarks.git")
+set(BENCHMARKS_REPO "https://github.com/debog/piafs_benchmarks.git")
 set(BENCHMARKS_BRANCH "master")
 set(TEST_RUN_DIR "${PIAFS_BINARY_DIR}/test_run_temp")
 set(BENCHMARKS_DIR "${TEST_RUN_DIR}/benchmarks")
