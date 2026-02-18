@@ -1,0 +1,81 @@
+name: CMake GPU Builds
+
+on: [push, pull_request]
+
+# GPU builds are compile-only: GitHub Actions runners do not have GPU hardware.
+# Unit and regression tests requiring GPU execution must be run on HPC systems.
+
+jobs:
+
+  cuda:
+    name: CUDA (MPICH)
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install MPI
+      run: .github/workflows/dependencies/dependencies_mpich.sh
+
+    - name: Install CUDA toolkit
+      run: .github/workflows/dependencies/dependencies_cuda.sh
+
+    - name: Verify CUDA installation
+      run: /usr/local/cuda/bin/nvcc --version
+
+    - name: Configure
+      run: |
+        mkdir build && cd build
+        cmake -DENABLE_GPU=ON -DENABLE_CUDA=ON \
+              -DCMAKE_CUDA_ARCHITECTURES=75 \
+              -DCUDAToolkit_ROOT=/usr/local/cuda \
+              -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc \
+              -DCMAKE_BUILD_TYPE=Release ..
+      env:
+        PATH: /usr/local/cuda/bin:/usr/bin:/bin:$PATH
+
+    - name: Build
+      run: cmake --build build -j2
+      timeout-minutes: 30
+      env:
+        PATH: /usr/local/cuda/bin:/usr/bin:/bin:$PATH
+
+    - name: Verify executable
+      run: |
+        ls build/bin/PIAFS*
+        echo "CUDA build successful"
+
+  hip:
+    name: HIP/ROCm (serial)
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install ROCm / HIP
+      run: .github/workflows/dependencies/dependencies_rocm.sh
+
+    - name: Verify HIP installation
+      run: /opt/rocm/bin/hipcc --version
+
+    - name: Configure
+      run: |
+        mkdir build && cd build
+        cmake -DENABLE_GPU=ON -DENABLE_HIP=ON \
+              -DENABLE_SERIAL=ON \
+              -DCMAKE_CXX_COMPILER=/opt/rocm/bin/hipcc \
+              -DCMAKE_HIP_ARCHITECTURES=gfx906 \
+              -DCMAKE_BUILD_TYPE=Release ..
+      env:
+        HIP_PLATFORM: amd
+        ROCM_PATH: /opt/rocm
+
+    - name: Build
+      run: cmake --build build -j2
+      timeout-minutes: 30
+      env:
+        HIP_PLATFORM: amd
+        ROCM_PATH: /opt/rocm
+
+    - name: Verify executable
+      run: |
+        ls build/bin/PIAFS*
+        echo "HIP build successful"

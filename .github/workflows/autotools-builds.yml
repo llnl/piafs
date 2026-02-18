@@ -17,6 +17,8 @@ jobs:
       run: autoreconf -i && CC=gcc CXX=g++ ./configure --enable-serial
     - name: Build
       run: make -j$(nproc)
+    - name: Test
+      run: make check
     - name: Verify executable
       run: |
         make install
@@ -34,6 +36,8 @@ jobs:
       run: autoreconf -i && ./configure
     - name: Build
       run: make -j$(nproc)
+    - name: Test
+      run: make check
     - name: Verify executable
       run: |
         make install
@@ -51,6 +55,8 @@ jobs:
       run: autoreconf -i && ./configure
     - name: Build
       run: make -j$(nproc)
+    - name: Test
+      run: make check
     - name: Verify executable
       run: |
         make install
@@ -68,6 +74,8 @@ jobs:
       run: autoreconf -i && ./configure --enable-omp
     - name: Build
       run: make -j$(nproc)
+    - name: Test
+      run: make check
     - name: Verify executable
       run: |
         make install

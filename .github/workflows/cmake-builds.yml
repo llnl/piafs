@@ -1,0 +1,62 @@
+name: CMake Builds
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: ${{ matrix.config.name }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - name: "Serial (GCC)"
+            cmake_options: "-DENABLE_SERIAL=ON"
+            deps_script: ""
+
+          - name: "MPI (MPICH)"
+            cmake_options: ""
+            deps_script: ".github/workflows/dependencies/dependencies_mpich.sh"
+
+          - name: "MPI (OpenMPI)"
+            cmake_options: ""
+            deps_script: ".github/workflows/dependencies/dependencies_openmpi.sh"
+
+          - name: "MPI + OpenMP (OpenMPI)"
+            cmake_options: "-DENABLE_OMP=ON"
+            deps_script: ".github/workflows/dependencies/dependencies_openmpi.sh"
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install base dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends cmake build-essential g++
+
+    - name: Install MPI dependencies
+      if: matrix.config.deps_script != ''
+      run: ${{ matrix.config.deps_script }}
+
+    - name: Configure
+      run: |
+        mkdir build && cd build
+        cmake ${{ matrix.config.cmake_options }} -DCMAKE_BUILD_TYPE=Release ..
+
+    - name: Build
+      run: cmake --build build -j$(nproc)
+
+    - name: Run unit tests
+      run: |
+        cd build
+        ctest -L unit --output-on-failure -j$(nproc)
+      env:
+        # Allow OpenMPI to run as root inside GitHub Actions containers
+        OMPI_ALLOW_RUN_AS_ROOT: "1"
+        OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
+
+    - name: Verify executable
+      run: |
+        ls build/bin/PIAFS*
+        echo "${{ matrix.config.name }} build successful"
