@@ -11,6 +11,7 @@ PIAFS: Photochemically Induced Acousto-optics Fluid Simulations
 [Compiling](#Compiling) -
 [Running](#Running) -
 [Plotting](#Plotting) -
+[Release](#Release) -
 
 </div>
 
@@ -99,3 +100,7 @@ PIAFS_DIR=/path/to/piafs
 2D:
 + If `op_file_format` is set to `tecplot2d`, the solutions are written as a 2D ASCII Tecplot file and
   can be visualized in Tecplot or VisIt.
+
+## Release
+
+LLNL-CODE-2015997
