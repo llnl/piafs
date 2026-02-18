@@ -14,18 +14,22 @@ jobs:
           - name: "Serial (GCC)"
             cmake_options: "-DENABLE_SERIAL=ON"
             deps_script: ""
+            run_regression: false
 
           - name: "MPI (MPICH)"
             cmake_options: ""
             deps_script: ".github/workflows/dependencies/dependencies_mpich.sh"
+            run_regression: true
 
           - name: "MPI (OpenMPI)"
             cmake_options: ""
             deps_script: ".github/workflows/dependencies/dependencies_openmpi.sh"
+            run_regression: true
 
           - name: "MPI + OpenMP (OpenMPI)"
             cmake_options: "-DENABLE_OMP=ON"
             deps_script: ".github/workflows/dependencies/dependencies_openmpi.sh"
+            run_regression: true
 
     steps:
     - uses: actions/checkout@v4
@@ -55,6 +59,20 @@ jobs:
         # Allow OpenMPI to run as root inside GitHub Actions containers
         OMPI_ALLOW_RUN_AS_ROOT: "1"
         OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
+        # Allow oversubscription (up to 4 MPI ranks on 2-vCPU runners)
+        OMPI_MCA_rmaps_base_oversubscribe: "1"
+
+    - name: Run regression tests
+      if: matrix.config.run_regression
+      run: |
+        cd build
+        ctest -L regression --output-on-failure -j1
+      env:
+        # Allow OpenMPI to run as root inside GitHub Actions containers
+        OMPI_ALLOW_RUN_AS_ROOT: "1"
+        OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: "1"
+        # Allow oversubscription (up to 4 MPI ranks on 2-vCPU runners)
+        OMPI_MCA_rmaps_base_oversubscribe: "1"
 
     - name: Verify executable
       run: |
