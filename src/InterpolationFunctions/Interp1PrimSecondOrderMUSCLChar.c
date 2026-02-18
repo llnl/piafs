@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Interp1PrimSecondOrderMUSCLChar.c
     @author Debojyoti Ghosh
     @brief Characteristic-based 2nd-order MUSCL scheme

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file VolumeIntegral.c
     @author Debojyoti Ghosh
     @brief Compute the volume integral of the solution

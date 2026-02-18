@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file ReadInputs.c
     @author Debojyoti Ghosh
     @brief Read the input parameters from \b solver.inp

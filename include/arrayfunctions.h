@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file arrayfunctions.h
     @brief Contains macros and function definitions for common array operations.
     @author Debojyoti Ghosh

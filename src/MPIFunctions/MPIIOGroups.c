@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MPIIOGroups.c
     @brief Create I/O groups of MPI ranks
     @author Debojyoti Ghosh

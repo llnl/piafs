@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file tridiagLUGS.c
     @brief Solve tridiagonal systems of equations in parallel using "gather-and-solve"
     @author Debojyoti Ghosh

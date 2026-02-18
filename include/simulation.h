@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file simulation.h
     @brief Base class for simulation and declarations for C functions
     @author Debojyoti Ghosh

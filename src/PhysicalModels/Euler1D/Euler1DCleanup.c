@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Euler1DCleanup.c
     @author Debojyoti Ghosh
     @brief Contains the function to clean up the 1D Euler physics module

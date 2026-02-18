@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file blocktridiagLU.c
     @brief Solve block tridiagonal systems using the LU decomposition method
     @author Debojyoti Ghosh

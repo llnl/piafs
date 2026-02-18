@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file NavierStokes2DComputeCFL.c
     @author Debojyoti Ghosh
     @brief Compute the maximum CFL.

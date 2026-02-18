@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file NavierStokes2DInitialize.c
     @author Debojyoti Ghosh
     @brief Initialization of the physics-related variables and function pointers for the 2D Navier-Stokes system

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file NonLinearInterpolation.c
     @author Debojyoti Ghosh
     @brief Compute the coefficients of a non-linear interpolation method (such as WENO, CRWENO)

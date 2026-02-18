@@ -11,6 +11,7 @@ PIAFS: Photochemically Induced Acousto-optics Fluid Simulations
 [Compiling](#compiling) -
 [Running](#running) -
 [Plotting](#plotting)
+[Release](#release) -
 
 </div>
 
@@ -23,12 +24,12 @@ equations with chemical heating on Cartesian grids.
 
 (With SSH keys)
 ```
-git clone ssh://git@czgitlab.llnl.gov:7999/piafs/piafs.git
+git clone git@github.com:LLNL/piafs.git
 ```
 
-(Without SSH keys)
+(With HTTPS)
 ```
-https://lc.llnl.gov/gitlab/piafs/piafs.git
+git clone https://github.com/LLNL/piafs.git
 ```
 
 ## Documentation
@@ -233,3 +234,7 @@ PIAFS_DIR=/path/to/piafs
 2D:
 + If `op_file_format` is set to `tecplot2d`, the solutions are written as a 2D ASCII Tecplot file and
   can be visualized in Tecplot or VisIt.
+
+## Release
+
+LLNL-CODE-2015997

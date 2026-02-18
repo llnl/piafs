@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Solve.cpp
     @author Debojyoti Ghosh
     @brief  Solve the governing equations in time

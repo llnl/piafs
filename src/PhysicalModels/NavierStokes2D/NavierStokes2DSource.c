@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file NavierStokes2DSource.c
     @author Debojyoti Ghosh
     @brief Compute the source term for the 2D Navier Stokes system

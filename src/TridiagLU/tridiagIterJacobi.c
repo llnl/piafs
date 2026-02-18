@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file tridiagIterJacobi.c
     @brief Solve tridiagonal systems of equations with the point Jacobi method
     @author Debojyoti Ghosh

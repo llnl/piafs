@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file BCReflect.c
     @author Debojyoti Ghosh
     @brief Reflection boundary condition

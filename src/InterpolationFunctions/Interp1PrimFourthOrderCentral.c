@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Interp1PrimFourthOrderCentral.c
     @author Debojyoti Ghosh
     @brief 4th order central scheme (component-wise application to vectors)

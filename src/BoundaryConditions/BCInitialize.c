@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file BCInitialize.c
     @author Debojyoti Ghosh
     @brief Initialize boundary-conditions-related function pointers.

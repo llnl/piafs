@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file WriteText.c
     @author Debojyoti Ghosh
     @brief Write a vector field and its grid to a text file

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Interp1PrimFifthOrderCompactUpwind.c
  *  @brief 5th order compact upwind scheme (component-wise application to vectors).
  *  @author Debojyoti Ghosh

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file InterpolateGlobalnDVar.c
     @brief Functions to interpolate from one grid to another
     @author Debojyoti Ghosh

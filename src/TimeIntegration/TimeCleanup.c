@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file TimeCleanup.c
     @brief Clean up time integration
     @author Debojyoti Ghosh

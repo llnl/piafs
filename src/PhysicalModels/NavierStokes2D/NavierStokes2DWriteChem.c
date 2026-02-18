@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file NavierStokes2DWriteChem.c
     @author Debojyoti Ghosh
     @brief Function to write out the reaction-related variables

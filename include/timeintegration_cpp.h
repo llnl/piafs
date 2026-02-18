@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file timeintegration_cpp.h
     @author Debojyoti Ghosh
     @brief Contains C++ function declarations for time integration

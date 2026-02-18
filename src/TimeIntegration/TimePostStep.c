@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file TimePostStep.c
     @brief Post-time-step function
     @author Debojyoti Ghosh

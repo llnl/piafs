@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file common_cpp.h
     @brief Some common functions used here and there (C++ declarations)
     @author Debojyoti Ghosh

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Interp1PrimSecondOrderMUSCL.c
     @author Debojyoti Ghosh
     @brief 2nd order MUSCL scheme (component-wise application to vectors)

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Euler1DUpwind.c
     @author Debojyoti Ghosh
     @brief Contains functions to compute the upwind flux at grid interfaces for the 1D Euler equations.

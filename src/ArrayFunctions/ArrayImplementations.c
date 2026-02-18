@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file ArrayImplementations.c
     @author Debojyoti Ghosh
     @brief Implementation of array functions.

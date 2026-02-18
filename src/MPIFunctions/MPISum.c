@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MPISum.c
     @brief Functions to compute the sum across MPI ranks
     @author Debojyoti Ghosh

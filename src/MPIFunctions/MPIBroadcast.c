@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MPIBroadcast.c
     @brief Functions to broadcast over all MPI ranks
     @author Debojyoti Ghosh

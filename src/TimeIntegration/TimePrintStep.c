@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file TimePrintStep.c
     @brief Print to screen
     @author Debojyoti Ghosh

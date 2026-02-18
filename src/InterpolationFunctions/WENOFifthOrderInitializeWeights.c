@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file WENOFifthOrderInitializeWeights.c
     @brief Initialize the arrays for nonlinear weights of WENO-type schemes
     @author Debojyoti Ghosh

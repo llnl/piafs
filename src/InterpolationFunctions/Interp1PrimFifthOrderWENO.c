@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Interp1PrimFifthOrderWENO.c
  *  @brief WENO5 Scheme (Component-wise application to vectors).
  *  @author Debojyoti Ghosh

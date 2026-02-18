@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file Euler1DSource.c
     @author Debojyoti Ghosh
     @brief Contains the functions to compute the source terms for the 1D Euler equations.

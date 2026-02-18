@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MPIRank1D.c
     @brief Compute the 1D rank
     @author Debojyoti Ghosh

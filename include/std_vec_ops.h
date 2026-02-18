@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file std_vec_ops.h
     @brief Contains some vector ops
     @author Debojyoti Ghosh

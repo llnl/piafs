@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file ChemistryCleanup.c
     @author Debojyoti Ghosh
     @brief Contains the function to clean up the chemisty module

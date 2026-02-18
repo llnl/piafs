@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file ensemble_simulations.h
     @brief Ensemble simulation class
     @author Debojyoti Ghosh

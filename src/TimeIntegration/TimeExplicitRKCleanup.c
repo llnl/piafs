@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file TimeExplicitRKCleanup.c
     @brief Clean up explicit Runge-Kutta time integrator
     @author Debojyoti Ghosh

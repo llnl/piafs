@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file MPIGatherArraynD.c
     @brief Gather an n-dimensional array in to a global array
     @author Debojyoti Ghosh

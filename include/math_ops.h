@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file math_ops.h
     @brief Contains macros for common mathematical functions.
     @author Debojyoti Ghosh

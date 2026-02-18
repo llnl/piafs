@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file NavierStokes2DFunctions.c
     @author Debojyoti Ghosh
     @brief Miscellaneous functions for the 2D Navier Stokes equations.

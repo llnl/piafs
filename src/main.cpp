@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file main.cpp
  *  @brief Main driver.
  * The main driver function that calls the initialization, solving, and cleaning up functions.

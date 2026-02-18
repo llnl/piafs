@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file InitializePhysicsData.c
     @author Debojyoti Ghosh
     @brief Read in any arrays/data that physics model wants

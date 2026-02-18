@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file FillGhostCells.c
     @brief Fill the ghost cells of a global array
     @author Debojyoti Ghosh

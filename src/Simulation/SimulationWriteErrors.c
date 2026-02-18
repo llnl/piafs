@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file SimulationWriteErrors.c
     @brief Write errors for each simulation
     @author Debojyoti Ghosh

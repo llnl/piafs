@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file ApplyBoundaryConditions.c
  *  @author Debojyoti Ghosh
  *  @brief Apply physical boundary conditions to domain.

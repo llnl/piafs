@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file BCNoslipWall.c
     @author Debojyoti Ghosh
     @brief No-slip wall boundary conditions (can also handle moving walls)

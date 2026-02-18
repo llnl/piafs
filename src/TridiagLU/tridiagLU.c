@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: 2018, Lawrence Livermore National Security, LLC
+
 /*! @file tridiagLU.c
     @brief Solve tridiagonal systems of equation using parallel LU decomposition
     @author Debojyoti Ghosh
