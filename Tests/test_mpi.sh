@@ -65,7 +65,7 @@ rm -rf $test_run_dir && mkdir -p $test_run_dir
 benchmarks_checkout_dir=$test_run_dir/benchmarks
 
 # do not change these, unless you know what you are doing
-piafs_benchmarks_repo="ssh://git@czgitlab.llnl.gov:7999/piafs/piafs_benchmarks.git"
+piafs_benchmarks_repo="https://github.com/debog/piafs_benchmarks.git"
 piafs_benchmarks_branch="master"
 piafs_benchmarks_dir=$test_run_dir/benchmarks
 
