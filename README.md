@@ -24,12 +24,12 @@ equations with chemical heating on Cartesian grids.
 
 (With SSH keys)
 ```
-git clone ssh://git@czgitlab.llnl.gov:7999/piafs/piafs.git
+git clone git@github.com:LLNL/piafs.git
 ```
 
-(Without SSH keys)
+(With HTTPS)
 ```
-https://lc.llnl.gov/gitlab/piafs/piafs.git
+git clone https://github.com/LLNL/piafs.git
 ```
 
 ## Documentation
