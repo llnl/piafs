@@ -1,0 +1,20 @@
+name: Style
+
+on: [push, pull_request]
+
+jobs:
+  tabs:
+    name: Check for tabs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check tabs
+        run: bash .github/workflows/style/check_tabs.sh
+
+  trailing_whitespaces:
+    name: Check trailing whitespaces
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check trailing whitespaces
+        run: bash .github/workflows/style/check_trailing_whitespaces.sh
