@@ -34,7 +34,19 @@ git clone https://github.com/LLNL/piafs.git
 
 ## Documentation
 
-Running `doxygen Doxyfile` will generate the documentation.
+**Online Documentation:** The complete documentation is available at [piafs.readthedocs.io](https://piafs.readthedocs.io/)
+
+**Building Documentation Locally:**
+
+To build the Sphinx documentation locally:
+```bash
+cd docs
+pip install -r requirements.txt
+make html
+```
+The generated HTML documentation will be in `docs/build/html/`. Open `docs/build/html/index.html` in a browser to view.
+
+**API Documentation:** Running `doxygen Doxyfile` will generate the API reference documentation.
 
 ## Compiling
 
