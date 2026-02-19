@@ -57,6 +57,7 @@ echo "Executing benchmark..."
 cd "$TEST_RUN_DIR"
 
 # Export environment variables for the test
+export PIAFS_USE_GPU=0  # Disable GPU on CI nodes (no GPU access)
 export PIAFS_EXEC_W_PATH
 export MPI_EXEC
 
