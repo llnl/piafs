@@ -445,13 +445,32 @@ configure_file(
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 # Testing support
+# Detect MPI implementation - skip tests for OpenMPI (benchmarks generated with MPICH)
+set(SKIP_REGRESSION_TESTS OFF)
+if(MPI_C_FOUND AND NOT ENABLE_SERIAL)
+  execute_process(
+    COMMAND ${MPI_C_COMPILER} --version
+    OUTPUT_VARIABLE MPI_VERSION_OUTPUT
+    ERROR_VARIABLE MPI_VERSION_OUTPUT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+  )
+  if(MPI_VERSION_OUTPUT MATCHES "Open MPI")
+    message(STATUS "Detected OpenMPI - skipping regression tests (benchmarks generated with MPICH)")
+    set(SKIP_REGRESSION_TESTS ON)
+  endif()
+endif()
+
 enable_testing()
 
 # Add unit tests
 add_subdirectory(Tests/unit)
 
 # Add regression tests (CMake-based, replaces test_mpi.sh)
-add_subdirectory(Tests)
+if(NOT SKIP_REGRESSION_TESTS)
+  add_subdirectory(Tests)
+else()
+  message(STATUS "Regression tests disabled for OpenMPI builds")
+endif()
 
 # Add a fixture to ensure binary is built before testing
 # The binary is now placed directly in bin/ via RUNTIME_OUTPUT_DIRECTORY

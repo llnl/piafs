@@ -46,7 +46,14 @@ TESTS_ENVIRONMENT = \
 	BENCHMARKS_DIR=$(abs_top_builddir)/test_run_temp/benchmarks \
 	EXPECTED_BENCHMARKS="$(REGRESSION_BENCHMARKS)"
 
-# Run all regression tests through wrapper script with individual reporting
+# Conditionally run regression tests based on MPI implementation
+# Skip for OpenMPI (benchmarks were generated with MPICH)
+if !SKIP_REGRESSION_TESTS
+TESTS = Tests/autotools/run_all_tests.sh
+else
+TESTS =
+endif
+
 # For out-of-source builds, create symlink to test scripts in build directory
 check-local:
 	@test -d Tests || mkdir -p Tests
@@ -56,5 +63,3 @@ check-local:
 			ln -sf $(abs_top_srcdir)/Tests/autotools/$$script Tests/autotools/$$script; \
 		fi; \
 	done
-
-TESTS = Tests/autotools/run_all_tests.sh

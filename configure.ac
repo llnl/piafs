@@ -205,6 +205,26 @@ if test "x$enable_serial" != "xyes"; then
 fi
 AC_SUBST(PIAFS_MPI_VERSION)
 
+dnl Detect MPI implementation - skip regression tests for OpenMPI
+dnl (benchmarks were generated with MPICH)
+SKIP_REGRESSION_TESTS="no"
+if test "x$enable_serial" != "xyes"; then
+  AC_MSG_CHECKING([MPI implementation])
+  if test -n "$MPICC"; then
+    MPI_IMPL_CHECK=`$MPICC --version 2>/dev/null | head -n1`
+    if echo "$MPI_IMPL_CHECK" | grep -q "Open MPI"; then
+      AC_MSG_RESULT([OpenMPI detected])
+      AC_MSG_NOTICE([Skipping regression tests - benchmarks were generated with MPICH])
+      SKIP_REGRESSION_TESTS="yes"
+    else
+      AC_MSG_RESULT([non-OpenMPI (likely MPICH or compatible)])
+    fi
+  else
+    AC_MSG_RESULT([unknown])
+  fi
+fi
+AM_CONDITIONAL([SKIP_REGRESSION_TESTS], [test "x$SKIP_REGRESSION_TESTS" = "xyes"])
+
 dnl Set build configuration
 if test "x$enable_serial" = "xyes"; then
   PIAFS_MPI_MODE="serial"
