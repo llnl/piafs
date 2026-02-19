@@ -18,3 +18,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check trailing whitespaces
         run: bash .github/workflows/style/check_trailing_whitespaces.sh
+
+  indentation:
+    name: Check indentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check indentation
+        run: bash .github/workflows/style/check_indentation.sh
