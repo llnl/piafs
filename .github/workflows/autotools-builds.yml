@@ -20,7 +20,7 @@ jobs:
     - name: Verify executable
       run: |
         make install
-        test -f bin/PIAFS
+        ls bin/PIAFS*
         echo "Serial build successful (regression tests skipped - require MPI)"
 
   mpich:
@@ -43,7 +43,7 @@ jobs:
     - name: Verify executable
       run: |
         make install
-        test -f bin/PIAFS
+        ls bin/PIAFS*
         echo "MPICH build successful"
 
   openmpi:
@@ -69,7 +69,7 @@ jobs:
     - name: Verify executable
       run: |
         make install
-        test -f bin/PIAFS
+        ls bin/PIAFS*
         echo "OpenMPI build successful"
 
   openmp:
@@ -95,5 +95,5 @@ jobs:
     - name: Verify executable
       run: |
         make install
-        test -f bin/PIAFS
+        ls bin/PIAFS*
         echo "OpenMPI + OpenMP build successful"
