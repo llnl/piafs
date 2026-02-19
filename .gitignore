@@ -33,5 +33,6 @@ VERSION
 test-driver
 test_run_temp/
 lib
+lib64
 gmock
 gtest
