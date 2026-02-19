@@ -10,6 +10,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Always use stdout/stderr which work in all environments
 OUTPUT=/dev/stdout
 
+# Check if using srun without SLURM allocation (login nodes)
+if [ -n "$MPI_EXEC" ] && [[ "$MPI_EXEC" =~ srun ]] && [ -z "$SLURM_JOB_ID" ]; then
+  echo "=========================================" >&2
+  echo "SKIPPING: Tests require SLURM allocation when using srun" >&2
+  echo "MPI_EXEC is set to: $MPI_EXEC" >&2
+  echo "Not in SLURM job (SLURM_JOB_ID is empty)" >&2
+  echo "Run tests inside salloc or sbatch, or reconfigure with --with-mpiexec" >&2
+  echo "=========================================" >&2
+  exit 77  # Special exit code for "test skipped" in autotools
+fi
+
 # Run setup first
 echo "=========================================" >&2
 echo "SETUP: Cloning benchmarks and compiling diff utility" >&2
