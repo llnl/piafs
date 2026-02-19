@@ -1,0 +1,72 @@
+# top-level variables, these are (unexpectedly) not overridden within a child
+# pipeline, see: https://gitlab.com/gitlab-org/gitlab/-/issues/357275
+variables:
+  # To migrate the GitLab runner directory, use the following commands:
+  # rm -rf ${HOME}/.jacamar-ci
+  # mkdir /p/vast1/${USER}/gitlab-runner
+  # ln -s /p/vast1/${USER}/gitlab-runner ${HOME}/.jacamar-ci
+  CUSTOM_CI_BUILDS_DIR:
+    value: "/p/vast1/$USER/gitlab-runner/piafs"
+    expand: false
+
+  # Limit build directory sprawl
+  JACAMAR_LIMITED_DIR: 1
+
+  # Recursively update the submodules when cloning the project
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_DEPTH: 1
+  GIT_SUBMODULE_DEPTH: 1
+
+  DEFAULT_BRANCH: master
+
+  ALLOC_NAME: ${CI_PROJECT_NAME}_ci_${CI_PIPELINE_ID}
+  ALLOC_QUEUE: pci
+  ALLOC_BANK: asccasc
+
+  TEST_SCRIPT: .gitlab/LC/gitlab_test.sh
+
+# Common rules for all CI pipelines - conditions are checked in order and the
+# checks break on the first condition satisfied
+workflow:
+  rules:
+    # Test the default branch
+    - if: $CI_COMMIT_BRANCH == $DEFAULT_BRANCH
+    # Do not test if the commit message contains [skip-ci]
+    - if: $CI_COMMIT_MESSAGE =~ /\[skip-ci\]/
+      when: never
+    # Test if the commit message contains [run-ci]
+    - if: $CI_COMMIT_MESSAGE =~ /\[run-ci\]/
+    # Test branches starting with "gitlab"
+    - if: $CI_COMMIT_BRANCH =~ /^gitlab.*/
+    # Test merge requests
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    # Do not test on push
+    - if: $CI_PIPELINE_SOURCE == "push"
+      when: never
+    # Default to always test
+    - when: always
+
+# High level stages
+stages:
+  - build-and-test
+
+# Template for parent pipelines that create a sub-pipeline
+.build-and-test:
+  stage: build-and-test
+  trigger:
+    include:
+      # File that defines the job template for a machine
+      - local: '.gitlab/LC/runners/${CI_MACHINE}.yml'
+      # File that defines jobs on a machine
+      - local: '.gitlab/LC/jobs/${CI_MACHINE}.yml'
+    strategy: depend
+    forward:
+      pipeline_variables: true
+
+include:
+  # This include is required for LC with Gitlab 17+
+  # Refer to https://hpc.llnl.gov/technical-bulletins/bulletin-568
+  - project: 'lc-templates/id_tokens'
+    file: 'id_tokens.yml'
+  # File that creates the parent pipelines for each machine
+  - local: '.gitlab/LC/pipelines.yml'

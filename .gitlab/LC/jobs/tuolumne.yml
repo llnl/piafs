@@ -1,0 +1,9 @@
+tuolumne_hip_6_4_0:
+  variables:
+    MODULE_LIST: cmake/3.29.2 ninja/1.10.2 rocm/6.4.0 rocmcc/6.4.0-cce-19.0.0d-magic cray-mpich/8.1.31
+    PIAFS_ENABLE_HIP: "ON"
+    AMD_ARCH: "gfx942"
+    BUILD_TYPE: "Release"
+    CMAKE_CXX_COMPILER: CC
+    CMAKE_C_COMPILER: cc
+  extends: .job_on_tuolumne

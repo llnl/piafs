@@ -1,0 +1,5 @@
+# PIAFS GitLab CI Configuration
+# This file includes the LC (Livermore Computing) CI pipeline configuration
+
+include:
+  - local: '.gitlab/LC/.gitlab-ci.yml'
