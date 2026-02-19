@@ -21,23 +21,23 @@ int GPUNavierStokes3DFlux(
 {
   HyPar *solver = (HyPar*) s;
   NavierStokes3D *param = (NavierStokes3D*) solver->physics;
-  
+
   if (!param) {
     fprintf(stderr, "Error: GPUNavierStokes3DFlux: param is NULL\n");
     return 1;
   }
-  
+
   int ndims = solver->ndims;
   int nvars = param->nvars;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
   double gamma = param->gamma;
-  
+
   /* Launch GPU kernel */
   gpu_launch_ns3d_flux(f, u, nvars, ndims, dim, stride_with_ghosts, ghosts, dir, gamma, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();
-  
+
   return 0;
 }
 

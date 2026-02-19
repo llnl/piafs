@@ -31,10 +31,10 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative_kernel(
     int p = idx;
     int p1 = idx;  /* left interface */
     int p2 = idx + 1;  /* right interface (for interior points) */
-    
+
     /* Get dxinv value for this point */
     double dx = dxinv[dir_offset + idx];
-    
+
     for (int v = 0; v < nvars; v++) {
       if (p2 < npoints + 1) {  /* valid right interface */
         hyp[p*nvars + v] += dx * (fluxI[p2*nvars + v] - fluxI[p1*nvars + v]);
@@ -85,13 +85,13 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative_nd_kernel(
     if (i != dir) nlines *= dim[i];
   }
   int total_points = nlines * npoints_dir;
-  
+
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < total_points) {
     /* Decompose idx into line index and point index along dir */
     int line_idx = idx / npoints_dir;
     int point_idx = idx % npoints_dir;
-    
+
     /* Reconstruct multi-dimensional index for this point */
     int index[3]; /* Support up to 3D */
     int temp = line_idx;
@@ -101,13 +101,13 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative_nd_kernel(
       temp /= dim[i];
     }
     index[dir] = point_idx;
-    
+
     /* Compute 1D array index for this point (with ghosts) */
     int p = 0;
     for (int i = 0; i < ndims; i++) {
       p += (index[i] + ghosts) * stride_with_ghosts[i];
     }
-    
+
     /* Compute interface indices - interfaces don't have ghost points */
     int index1[3], index2[3];
     for (int i = 0; i < ndims; i++) {
@@ -115,7 +115,7 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative_nd_kernel(
       index2[i] = index[i];
     }
     index2[dir]++;
-    
+
     /* Interface array has dim_interface[d] = dim[d] + 1 points (no ghosts) */
     int dim_interface[3];
     for (int i = 0; i < ndims; i++) {
@@ -133,7 +133,7 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative_nd_kernel(
       p1 = p1 * dim_interface[i] + index1[i];
       p2 = p2 * dim_interface[i] + index2[i];
     }
-    
+
     /* Bounds check for interface indices */
     int size_interface = 1;
     for (int i = 0; i < ndims; i++) {
@@ -143,16 +143,16 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative_nd_kernel(
       /* Out of bounds - skip this point */
       return;
     }
-    
+
     /* Get dxinv value for this point */
     double dx = dxinv[dir_offset + ghosts + point_idx];
-    
+
     /* Validate dxinv */
     if (isnan(dx) || isinf(dx) || dx == 0.0) {
       /* Invalid dxinv - skip this point */
       return;
     }
-    
+
     /* Compute derivative for all variables */
     for (int v = 0; v < nvars; v++) {
       double flux_diff = fluxI[p2 * nvars + v] - fluxI[p1 * nvars + v];
@@ -162,7 +162,7 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative_nd_kernel(
       }
       hyp[p * nvars + v] += dx * flux_diff;
     }
-    
+
     /* Handle boundary flux integrals (atomic operations for thread safety) */
     if (point_idx == 0) {
       for (int v = 0; v < nvars; v++) {

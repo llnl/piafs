@@ -85,8 +85,8 @@ void gpu_launch_euler1d_upwind_roe(
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
   int total_threads = numBlocks * blockSize;
-  
-  /* Allocate workspace for Roe scheme: per thread needs 
+
+  /* Allocate workspace for Roe scheme: per thread needs
    * 3*nvars (udiff, uavg, udiss) + 5*nvars*nvars (D, L, R, DL, modA) */
   size_t workspace_per_thread = 3 * nvars + 5 * nvars * nvars;
   size_t total_workspace = total_threads * workspace_per_thread;
@@ -101,7 +101,7 @@ void gpu_launch_euler1d_upwind_roe(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
     ghosts, dir, gamma, workspace
   );
-  
+
   /* Free workspace */
   GPUFree(workspace);
 }
@@ -124,8 +124,8 @@ void gpu_launch_euler1d_upwind_rf(
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
   int total_threads = numBlocks * blockSize;
-  
-  /* Allocate workspace for RF scheme: per thread needs 
+
+  /* Allocate workspace for RF scheme: per thread needs
    * 9*nvars (uavg, fcL, fcR, ucL, ucR, fc, eigL, eigC, eigR) + 3*nvars*nvars (L, R, D) */
   size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
   size_t total_workspace = total_threads * workspace_per_thread;
@@ -139,7 +139,7 @@ void gpu_launch_euler1d_upwind_rf(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
     ghosts, dir, gamma, workspace
   );
-  
+
   GPUFree(workspace);
 }
 
@@ -161,7 +161,7 @@ void gpu_launch_euler1d_upwind_llf(
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
   int total_threads = numBlocks * blockSize;
-  
+
   /* Allocate workspace for LLF scheme: same as RF */
   size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
   size_t total_workspace = total_threads * workspace_per_thread;
@@ -175,7 +175,7 @@ void gpu_launch_euler1d_upwind_llf(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
     ghosts, dir, gamma, workspace
   );
-  
+
   GPUFree(workspace);
 }
 
@@ -197,8 +197,8 @@ void gpu_launch_euler1d_upwind_rusanov(
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
   int total_threads = numBlocks * blockSize;
-  
-  /* Allocate workspace for Rusanov scheme: per thread needs 
+
+  /* Allocate workspace for Rusanov scheme: per thread needs
    * 2*nvars (uavg, udiff) */
   size_t workspace_per_thread = 2 * nvars;
   size_t total_workspace = total_threads * workspace_per_thread;
@@ -212,7 +212,7 @@ void gpu_launch_euler1d_upwind_rusanov(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
     ghosts, dir, gamma, workspace
   );
-  
+
   GPUFree(workspace);
 }
 

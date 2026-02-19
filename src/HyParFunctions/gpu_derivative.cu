@@ -24,12 +24,12 @@ GPU_KERNEL void gpu_first_derivative_second_order_kernel(
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= npoints) return;
-  
+
   /* Compute derivatives at ALL points including ghosts, matching CPU behavior */
   int qC = idx * stride;  /* current point */
   int qL = (idx - 1) * stride;  /* left neighbor */
   int qR = (idx + 1) * stride;  /* right neighbor */
-  
+
   for (int v = 0; v < nvars; v++) {
     if (idx == 0) {
       /* First point: one-sided forward */
@@ -58,10 +58,10 @@ GPU_KERNEL void gpu_first_derivative_fourth_order_kernel(
 {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx >= npoints) return;
-  
+
   const double one_twelve = 1.0/12.0;
   int qC = idx * stride;
-  
+
   /* Match CPU: use different schemes depending on position */
   if (idx == 0) {
     /* First point: 4th order forward biased */
@@ -69,7 +69,7 @@ GPU_KERNEL void gpu_first_derivative_fourth_order_kernel(
     int qp2 = (idx + 2) * stride;
     int qp3 = (idx + 3) * stride;
     int qp4 = (idx + 4) * stride;
-    
+
     for (int v = 0; v < nvars; v++) {
       Df[qC*nvars+v] = one_twelve * (-25.0*f[qC*nvars+v] + 48.0*f[qp1*nvars+v] - 36.0*f[qp2*nvars+v] + 16.0*f[qp3*nvars+v] - 3.0*f[qp4*nvars+v]);
     }
@@ -79,7 +79,7 @@ GPU_KERNEL void gpu_first_derivative_fourth_order_kernel(
     int qp1 = (idx + 1) * stride;
     int qp2 = (idx + 2) * stride;
     int qp3 = (idx + 3) * stride;
-    
+
     for (int v = 0; v < nvars; v++) {
       Df[qC*nvars+v] = one_twelve * (-3.0*f[qm1*nvars+v] - 10.0*f[qC*nvars+v] + 18.0*f[qp1*nvars+v] - 6.0*f[qp2*nvars+v] + f[qp3*nvars+v]);
     }
@@ -89,7 +89,7 @@ GPU_KERNEL void gpu_first_derivative_fourth_order_kernel(
     int qR = (idx + 1) * stride;
     int qLL = (idx - 2) * stride;
     int qRR = (idx + 2) * stride;
-    
+
     for (int v = 0; v < nvars; v++) {
       Df[qC*nvars+v] = one_twelve * (f[qLL*nvars+v] - 8.0*f[qL*nvars+v] + 8.0*f[qR*nvars+v] - f[qRR*nvars+v]);
     }
@@ -99,7 +99,7 @@ GPU_KERNEL void gpu_first_derivative_fourth_order_kernel(
     int qm2 = (idx - 2) * stride;
     int qm1 = (idx - 1) * stride;
     int qp1 = (idx + 1) * stride;
-    
+
     for (int v = 0; v < nvars; v++) {
       Df[qC*nvars+v] = one_twelve * (-f[qm3*nvars+v] + 6.0*f[qm2*nvars+v] - 18.0*f[qm1*nvars+v] + 10.0*f[qC*nvars+v] + 3.0*f[qp1*nvars+v]);
     }
@@ -109,7 +109,7 @@ GPU_KERNEL void gpu_first_derivative_fourth_order_kernel(
     int qm3 = (idx - 3) * stride;
     int qm2 = (idx - 2) * stride;
     int qm1 = (idx - 1) * stride;
-    
+
     for (int v = 0; v < nvars; v++) {
       Df[qC*nvars+v] = one_twelve * (3.0*f[qm4*nvars+v] - 16.0*f[qm3*nvars+v] + 36.0*f[qm2*nvars+v] - 48.0*f[qm1*nvars+v] + 25.0*f[qC*nvars+v]);
     }
@@ -354,7 +354,7 @@ GPU_KERNEL void gpu_first_derivative_first_order_3d_nvars12_kernel(
     #pragma unroll
     for (int v = 0; v < 12; v++) d[v] = 0.5 * (f[qR*12+v] - f[qL*12+v]);
   }
-  
+
   /* Write output - compute output index separately */
   int qC_out = tid * 12;
   #pragma unroll

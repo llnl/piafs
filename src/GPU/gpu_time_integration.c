@@ -80,7 +80,7 @@ int GPUTimeRHSFunctionExplicit(
     const int nvars = solver->nvars;
     const int npoints_wghosts = solver->npoints_local_wghosts;
     int size = npoints_wghosts * nvars;
-    
+
     /* Safety check: ensure arrays are valid */
     if (!rhs || !u || !solver->hyp || !solver->par) {
       fprintf(stderr, "Error: GPUTimeRHSFunctionExplicit: NULL pointer detected\n");
@@ -185,7 +185,7 @@ int GPUTimeRHSFunctionExplicit(
         solver->Upwind
       );
       if (hyp_ierr) return hyp_ierr;
-      
+
       /* Validate hyp after computation (Debug builds only) */
 #ifdef PIAFS_NAN_CHECK
       if (GPUShouldValidate()) {
@@ -205,7 +205,7 @@ int GPUTimeRHSFunctionExplicit(
         }
       }
 #endif
-      
+
       /* Add to RHS (negate for hyperbolic term) */
       GPUArrayAXPY(solver->hyp, -1.0, rhs, size);
     }
@@ -226,7 +226,7 @@ int GPUTimeRHSFunctionExplicit(
       /* SourceFunction is already set to GPU version if GPU is enabled */
       int sou_ierr = solver->SourceFunction(solver->source, u, solver, mpi, t);
       if (sou_ierr) return sou_ierr;
-      
+
       /* Add source term to RHS on GPU */
       GPUArrayAdd(rhs, rhs, solver->source, size);
     }

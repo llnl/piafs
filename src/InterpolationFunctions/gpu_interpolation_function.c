@@ -48,31 +48,31 @@ int GPUInterpolateInterfacesHypWENO5(
 {
   HyPar *solver = (HyPar*) s;
   WENOParameters *weno = (WENOParameters*) solver->interp;
-  
+
   if (!weno) {
     fprintf(stderr, "Error: GPUInterpolateInterfacesHypWENO5: weno is NULL\n");
     return 1;
   }
-  
+
   int ndims = solver->ndims;
   int nvars = solver->nvars;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   /* Compute bounds for interface array */
   int bounds_inter[3]; /* Support up to 3D */
   for (int i = 0; i < ndims; i++) {
     bounds_inter[i] = dim[i];
   }
   bounds_inter[dir] = dim[dir] + 1; /* One more interface than cells */
-  
+
   /* Compute total interface size */
   int size_interface = 1;
   for (int i = 0; i < ndims; i++) {
     size_interface *= bounds_inter[i];
   }
-  
+
   /* Use device-resident weights computed by GPUWENOFifthOrderCalculateWeights*. */
   if (!weno->w1_gpu || !weno->w2_gpu || !weno->w3_gpu) {
     /* Lazy init: if weights have not been computed yet this step (or nonlinear limiting disabled),
@@ -86,7 +86,7 @@ int GPUInterpolateInterfacesHypWENO5(
   double *w1_gpu = weno->w1_gpu + (upw < 0 ? 2*weno->size : 0) + (uflag ? weno->size : 0) + weno->offset[dir];
   double *w2_gpu = weno->w2_gpu + (upw < 0 ? 2*weno->size : 0) + (uflag ? weno->size : 0) + weno->offset[dir];
   double *w3_gpu = weno->w3_gpu + (upw < 0 ? 2*weno->size : 0) + (uflag ? weno->size : 0) + weno->offset[dir];
-  
+
   /* Launch GPU kernel */
   gpu_launch_weno5_interpolation_nd(
     fI, fC, w1_gpu, w2_gpu, w3_gpu,
@@ -94,9 +94,9 @@ int GPUInterpolateInterfacesHypWENO5(
     ghosts, dir, upw, 256
   );
   if (GPUShouldSyncEveryOp()) GPUSync();
-  
+
   /* weights persist on device */
-  
+
   return 0;
 }
 
@@ -209,31 +209,31 @@ int GPUInterpolateInterfacesHypMUSCL2(
 {
   HyPar *solver = (HyPar*) s;
   MUSCLParameters *muscl = (MUSCLParameters*) solver->interp;
-  
+
   if (!muscl) {
     fprintf(stderr, "Error: GPUInterpolateInterfacesHypMUSCL2: muscl is NULL\n");
     return 1;
   }
-  
+
   int ndims = solver->ndims;
   int nvars = solver->nvars;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   /* Compute bounds for interface array */
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   int limiter_id = get_limiter_id(muscl->limiter_type);
-  
+
   gpu_launch_muscl2_interpolation_nd(
     fI, fC, nvars, ndims, dim, stride_with_ghosts, bounds_inter,
     ghosts, dir, upw, limiter_id, 256
   );
   if (GPUShouldSyncEveryOp()) GPUSync();
-  
+
   return 0;
 }
 
@@ -252,29 +252,29 @@ int GPUInterpolateInterfacesHypMUSCL3(
 {
   HyPar *solver = (HyPar*) s;
   MUSCLParameters *muscl = (MUSCLParameters*) solver->interp;
-  
+
   if (!muscl) {
     fprintf(stderr, "Error: GPUInterpolateInterfacesHypMUSCL3: muscl is NULL\n");
     return 1;
   }
-  
+
   int ndims = solver->ndims;
   int nvars = solver->nvars;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   /* Compute bounds for interface array */
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   gpu_launch_muscl3_interpolation_nd(
     fI, fC, nvars, ndims, dim, stride_with_ghosts, bounds_inter,
     ghosts, dir, upw, muscl->eps, 256
   );
   if (GPUShouldSyncEveryOp()) GPUSync();
-  
+
   return 0;
 }
 
@@ -293,37 +293,37 @@ int GPUInterpolateInterfacesHypMUSCL2Char(
 {
   HyPar *solver = (HyPar*) s;
   MUSCLParameters *muscl = (MUSCLParameters*) solver->interp;
-  
+
   if (!muscl) {
     fprintf(stderr, "Error: GPUInterpolateInterfacesHypMUSCL2Char: muscl is NULL\n");
     return 1;
   }
-  
+
   int nvars = solver->nvars;
-  
+
   double gamma = 1.4;
   if (solver->physics) {
     NavierStokes3D *param = (NavierStokes3D*) solver->physics;
     if (param) gamma = param->gamma;
   }
-  
+
   int ndims = solver->ndims;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   int limiter_id = get_limiter_id(muscl->limiter_type);
-  
+
   gpu_launch_muscl2_interpolation_nd_char_ns3d(
     fI, fC, u, nvars, ndims, dim, stride_with_ghosts, bounds_inter,
     ghosts, dir, upw, limiter_id, gamma, 256
   );
   if (GPUShouldSyncEveryOp()) GPUSync();
-  
+
   return 0;
 }
 
@@ -342,35 +342,35 @@ int GPUInterpolateInterfacesHypMUSCL3Char(
 {
   HyPar *solver = (HyPar*) s;
   MUSCLParameters *muscl = (MUSCLParameters*) solver->interp;
-  
+
   if (!muscl) {
     fprintf(stderr, "Error: GPUInterpolateInterfacesHypMUSCL3Char: muscl is NULL\n");
     return 1;
   }
-  
+
   int nvars = solver->nvars;
-  
+
   double gamma = 1.4;
   if (solver->physics) {
     NavierStokes3D *param = (NavierStokes3D*) solver->physics;
     if (param) gamma = param->gamma;
   }
-  
+
   int ndims = solver->ndims;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   gpu_launch_muscl3_interpolation_nd_char_ns3d(
     fI, fC, u, nvars, ndims, dim, stride_with_ghosts, bounds_inter,
     ghosts, dir, upw, muscl->eps, gamma, 256
   );
   if (GPUShouldSyncEveryOp()) GPUSync();
-  
+
   return 0;
 }
 
@@ -387,11 +387,11 @@ int GPUInterpolateInterfacesHypFirstOrderUpwind(
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   gpu_launch_first_order_upwind_nd(fI, fC, nvars, ndims, dim, stride_with_ghosts, bounds_inter,
                                    ghosts, dir, upw, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();
@@ -405,22 +405,22 @@ int GPUInterpolateInterfacesHypFirstOrderUpwindChar(
 {
   HyPar *solver = (HyPar*) s;
   int nvars = solver->nvars;
-  
+
   double gamma = 1.4;
   if (solver->physics) {
     NavierStokes3D *param = (NavierStokes3D*) solver->physics;
     if (param) gamma = param->gamma;
   }
-  
+
   int ndims = solver->ndims;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   gpu_launch_first_order_upwind_nd_char_ns3d(fI, fC, u, nvars, ndims, dim, stride_with_ghosts,
                                               bounds_inter, ghosts, dir, upw, gamma, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();
@@ -438,11 +438,11 @@ int GPUInterpolateInterfacesHypSecondOrderCentral(
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   gpu_launch_second_order_central_nd(fI, fC, nvars, ndims, dim, stride_with_ghosts, bounds_inter,
                                       ghosts, dir, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();
@@ -456,22 +456,22 @@ int GPUInterpolateInterfacesHypSecondOrderCentralChar(
 {
   HyPar *solver = (HyPar*) s;
   int nvars = solver->nvars;
-  
+
   double gamma = 1.4;
   if (solver->physics) {
     NavierStokes3D *param = (NavierStokes3D*) solver->physics;
     if (param) gamma = param->gamma;
   }
-  
+
   int ndims = solver->ndims;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   gpu_launch_second_order_central_nd_char_ns3d(fI, fC, u, nvars, ndims, dim, stride_with_ghosts,
                                                 bounds_inter, ghosts, dir, gamma, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();
@@ -489,11 +489,11 @@ int GPUInterpolateInterfacesHypFourthOrderCentral(
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   gpu_launch_fourth_order_central_nd(fI, fC, nvars, ndims, dim, stride_with_ghosts, bounds_inter,
                                       ghosts, dir, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();
@@ -507,22 +507,22 @@ int GPUInterpolateInterfacesHypFourthOrderCentralChar(
 {
   HyPar *solver = (HyPar*) s;
   int nvars = solver->nvars;
-  
+
   double gamma = 1.4;
   if (solver->physics) {
     NavierStokes3D *param = (NavierStokes3D*) solver->physics;
     if (param) gamma = param->gamma;
   }
-  
+
   int ndims = solver->ndims;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   gpu_launch_fourth_order_central_nd_char_ns3d(fI, fC, u, nvars, ndims, dim, stride_with_ghosts,
                                                 bounds_inter, ghosts, dir, gamma, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();
@@ -540,11 +540,11 @@ int GPUInterpolateInterfacesHypFifthOrderUpwind(
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   gpu_launch_fifth_order_upwind_nd(fI, fC, nvars, ndims, dim, stride_with_ghosts, bounds_inter,
                                     ghosts, dir, upw, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();
@@ -558,22 +558,22 @@ int GPUInterpolateInterfacesHypFifthOrderUpwindChar(
 {
   HyPar *solver = (HyPar*) s;
   int nvars = solver->nvars;
-  
+
   double gamma = 1.4;
   if (solver->physics) {
     NavierStokes3D *param = (NavierStokes3D*) solver->physics;
     if (param) gamma = param->gamma;
   }
-  
+
   int ndims = solver->ndims;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
-  
+
   int bounds_inter[3];
   for (int i = 0; i < ndims; i++) bounds_inter[i] = dim[i];
   bounds_inter[dir] = dim[dir] + 1;
-  
+
   gpu_launch_fifth_order_upwind_nd_char_ns3d(fI, fC, u, nvars, ndims, dim, stride_with_ghosts,
                                               bounds_inter, ghosts, dir, upw, gamma, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();

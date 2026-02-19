@@ -22,20 +22,20 @@ double GPUEuler1DComputeCFL(
   HyPar *solver = (HyPar*) s;
   MPIVariables *mpi = (MPIVariables*) m;
   Euler1D *param = (Euler1D*) solver->physics;
-  
+
   if (!GPUShouldUse()) {
     extern double Euler1DComputeCFL(void*, void*, double, double);
     return Euler1DComputeCFL(s, m, dt, t);
   }
-  
+
   int ndims = solver->ndims;
   int *dim = solver->dim_local;
-  
+
   int npoints = 1;
   for (int i = 0; i < ndims; i++) {
     npoints *= dim[i];
   }
-  
+
   if (npoints == 0) {
     return 0.0;
   }
@@ -64,10 +64,10 @@ double GPUEuler1DComputeCFL(
                                               solver->gpu_reduce_buffer,
                                               solver->gpu_reduce_buffer_size,
                                               solver->gpu_reduce_result, 256);
-  
+
   double global_max_cfl = 0.0;
   MPIMax_double(&global_max_cfl, &max_cfl, 1, &mpi->world);
-  
+
   return global_max_cfl;
 }
 

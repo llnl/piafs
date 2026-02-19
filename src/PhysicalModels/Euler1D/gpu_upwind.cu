@@ -118,7 +118,7 @@ GPU_KERNEL void gpu_euler1d_upwind_roe_kernel(
     int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
     size_t workspace_per_thread = 3 * nvars + 5 * nvars * nvars;
     double *my_workspace = workspace + thread_id * workspace_per_thread;
-    
+
     /* Partition workspace */
     double *udiff = my_workspace;
     double *uavg = udiff + nvars;
@@ -184,7 +184,7 @@ GPU_KERNEL void gpu_euler1d_upwind_rf_kernel(
     int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
     size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
     double *my_workspace = workspace + thread_id * workspace_per_thread;
-    
+
     /* Partition workspace */
     double *uavg = my_workspace;
     double *fcL = uavg + nvars;
@@ -254,7 +254,7 @@ GPU_KERNEL void gpu_euler1d_upwind_llf_kernel(
     int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
     size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
     double *my_workspace = workspace + thread_id * workspace_per_thread;
-    
+
     /* Partition workspace */
     double *uavg = my_workspace;
     double *fcL = uavg + nvars;
@@ -318,7 +318,7 @@ GPU_KERNEL void gpu_euler1d_upwind_rusanov_kernel(
     int thread_id = blockIdx.x * blockDim.x + threadIdx.x;
     size_t workspace_per_thread = 2 * nvars;
     double *my_workspace = workspace + thread_id * workspace_per_thread;
-    
+
     /* Partition workspace */
     double *uavg = my_workspace;
     double *udiff = uavg + nvars;

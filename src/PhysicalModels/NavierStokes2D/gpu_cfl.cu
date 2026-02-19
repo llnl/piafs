@@ -32,7 +32,7 @@ GPU_KERNEL void gpu_ns2d_compute_cfl_kernel(
   for (int i = 0; i < ndims; i++) {
     npoints *= dim[i];
   }
-  
+
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < npoints) {
     int index[3];
@@ -41,12 +41,12 @@ GPU_KERNEL void gpu_ns2d_compute_cfl_kernel(
       index[i] = temp % dim[i];
       temp /= dim[i];
     }
-    
+
     int p = 0;
     for (int i = 0; i < ndims; i++) {
       p += (index[i] + ghosts) * stride_with_ghosts[i];
     }
-    
+
     /* Get flow variables (GPU-safe) */
     double rho = u[p*nvars + 0];
     double vx = (rho == 0.0) ? 0.0 : u[p*nvars + 1] / rho;
@@ -54,19 +54,19 @@ GPU_KERNEL void gpu_ns2d_compute_cfl_kernel(
     double e = u[p*nvars + 3];
     double vsq = (vx*vx) + (vy*vy);
     double P = (e - 0.5*rho*vsq) * (gamma - 1.0);
-    
-    if (isnan(rho) || isinf(rho) || rho <= 0.0 || 
+
+    if (isnan(rho) || isinf(rho) || rho <= 0.0 ||
         isnan(P) || isinf(P) || P <= 0.0) {
       cfl_local[idx] = 0.0;
       return;
     }
-    
+
     double c = sqrt(gamma * P / rho);
     if (isnan(c) || isinf(c) || c <= 0.0) {
       cfl_local[idx] = 0.0;
       return;
     }
-    
+
     double max_local_cfl = 0.0;
     for (int dir = 0; dir < ndims; dir++) {
       int dir_offset = 0;
@@ -74,11 +74,11 @@ GPU_KERNEL void gpu_ns2d_compute_cfl_kernel(
         dir_offset += (dim[k] + 2 * ghosts);
       }
       double dxinv_dir = dxinv[dir_offset + ghosts + index[dir]];
-      
+
       double v_mag = 0.0;
       if (dir == 0) v_mag = fabs(vx);
       else if (dir == 1) v_mag = fabs(vy);
-      
+
       double local_cfl = (v_mag + c) * dt * dxinv_dir;
       if (isnan(local_cfl) || isinf(local_cfl)) {
         local_cfl = 0.0;
@@ -87,7 +87,7 @@ GPU_KERNEL void gpu_ns2d_compute_cfl_kernel(
         max_local_cfl = local_cfl;
       }
     }
-    
+
     cfl_local[idx] = max_local_cfl;
   }
 }

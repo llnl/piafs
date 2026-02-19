@@ -28,37 +28,37 @@ int GPUChemistryAllocate(void* a_p, int npoints_total, int nz)
 
   nv_hnu_size = npoints_total * nz;
   imap_size = npoints_total;
-  
+
   // Allocate GPU memory for nv_hnu
   if (GPUAllocate((void**)&nv_hnu_gpu, nv_hnu_size * sizeof(double))) {
     fprintf(stderr, "Error: Failed to allocate GPU memory for nv_hnu\n");
     return 1;
   }
-  
+
   // Initialize GPU memory to zero
   if (GPUMemset(nv_hnu_gpu, 0, nv_hnu_size * sizeof(double))) {
     fprintf(stderr, "Error: Failed to initialize GPU memory for nv_hnu\n");
     GPUFree(nv_hnu_gpu);
     return 1;
   }
-  
+
   // Allocate GPU memory for imap and copy from host
   if (GPUAllocate((void**)&imap_gpu, imap_size * sizeof(double))) {
     fprintf(stderr, "Error: Failed to allocate GPU memory for imap\n");
     GPUFree(nv_hnu_gpu);
     return 1;
   }
-  
+
   if (GPUCopyToDevice(imap_gpu, chem->imap, imap_size * sizeof(double))) {
     fprintf(stderr, "Error: Failed to copy imap to GPU\n");
     GPUFree(nv_hnu_gpu);
     GPUFree(imap_gpu);
     return 1;
   }
-  
+
   // Keep chem->nv_hnu pointing to host memory (already allocated in ChemistryInitialize)
   // The GPU pointers (nv_hnu_gpu, imap_gpu) will be used internally in GPU functions
-  
+
   return 0;
 }
 
@@ -66,24 +66,24 @@ int GPUChemistryAllocate(void* a_p, int npoints_total, int nz)
 int GPUChemistryFree(void* a_p)
 {
   Chemistry *chem = (Chemistry*) a_p;
-  
+
   // Free GPU memory
   if (nv_hnu_gpu) {
     GPUFree(nv_hnu_gpu);
     nv_hnu_gpu = NULL;
   }
-  
+
   if (imap_gpu) {
     GPUFree(imap_gpu);
     imap_gpu = NULL;
   }
-  
+
   // Keep chem->nv_hnu pointing to host memory (don't set to NULL)
   // The actual memory will be freed in ChemistryCleanup
-  
+
   nv_hnu_size = 0;
   imap_size = 0;
-  
+
   return 0;
 }
 
@@ -117,10 +117,10 @@ int GPUChemistrySource(
     fprintf(stderr, "Error: GPUChemistrySetPhotonDensity failed\n");
     return 1;
   }
-  
+
   // Step 2: Launch GPU kernel to compute chemistry sources
   double gamma_m1_inv = 1.0 / (chem->gamma - 1.0);
-  
+
   gpu_launch_chemistry_source(
     a_S, a_U, nv_hnu_gpu,
     npoints, solver->nvars, chem->n_flow_vars,
@@ -137,7 +137,7 @@ int GPUChemistrySource(
     gamma_m1_inv,
     256  // block size
   );
-  
+
   if (GPUShouldSyncEveryOp()) GPUSync();
 
   return 0;
@@ -265,9 +265,9 @@ int GPUChemistrySetPhotonDensity(
 
   } else {
     // 1D/2D case: Each grid point processes its z-stack independently
-    
+
     int nz = chem->z_i + 1;
-    
+
     gpu_launch_chemistry_photon_density_1d2d(
       nv_hnu_gpu, a_U, imap_gpu,
       npoints, chem->grid_stride, chem->z_stride, chem->n_flow_vars, nz,
@@ -290,17 +290,17 @@ int GPUChemistrySetPhotonDensity(
 int GPUChemistryCopyPhotonDensityToHost(void* a_p)
 {
   Chemistry *chem = (Chemistry*) a_p;
-  
+
   if (!nv_hnu_gpu || nv_hnu_size <= 0) {
     // GPU not enabled or not allocated
     return 0;
   }
-  
+
   if (GPUCopyToHost(chem->nv_hnu, nv_hnu_gpu, nv_hnu_size * sizeof(double))) {
     fprintf(stderr, "Error: Failed to copy nv_hnu from GPU to host\n");
     return 1;
   }
-  
+
   return 0;
 }
 

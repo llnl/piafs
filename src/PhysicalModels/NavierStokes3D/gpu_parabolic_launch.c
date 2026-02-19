@@ -29,12 +29,12 @@ void gpu_launch_ns3d_viscous_flux_x(
     double uz = QDerivZ[i*nvars + 1];
     double wz = QDerivZ[i*nvars + 3];
     double Tx = QDerivX[i*nvars + 4];
-    
+
     double tau_xx = two_third * (mu * inv_Re) * (2*ux - vy - wz);
     double tau_xy = (mu * inv_Re) * (uy + vx);
     double tau_xz = (mu * inv_Re) * (uz + wx);
     double qx = (kappa * inv_Re * inv_gamma_m1 * inv_Pr) * Tx;
-    
+
     FViscous[i*nvars + 0] = 0.0;
     FViscous[i*nvars + 1] = tau_xx;
     FViscous[i*nvars + 2] = tau_xy;
@@ -70,12 +70,12 @@ void gpu_launch_ns3d_viscous_flux_y(
     double vz = QDerivZ[i*nvars + 2];
     double wz = QDerivZ[i*nvars + 3];
     double Ty = QDerivY[i*nvars + 4];
-    
+
     double tau_yx = (mu * inv_Re) * (uy + vx);
     double tau_yy = two_third * (mu * inv_Re) * (-ux + 2*vy - wz);
     double tau_yz = (mu * inv_Re) * (vz + wy);
     double qy = (kappa * inv_Re * inv_gamma_m1 * inv_Pr) * Ty;
-    
+
     FViscous[i*nvars + 0] = 0.0;
     FViscous[i*nvars + 1] = tau_yx;
     FViscous[i*nvars + 2] = tau_yy;
@@ -111,12 +111,12 @@ void gpu_launch_ns3d_viscous_flux_z(
     double vz = QDerivZ[i*nvars + 2];
     double wz = QDerivZ[i*nvars + 3];
     double Tz = QDerivZ[i*nvars + 4];
-    
+
     double tau_zx = (mu * inv_Re) * (uz + wx);
     double tau_zy = (mu * inv_Re) * (vz + wy);
     double tau_zz = two_third * (mu * inv_Re) * (-ux - vy + 2*wz);
     double qz = (kappa * inv_Re * inv_gamma_m1 * inv_Pr) * Tz;
-    
+
     FViscous[i*nvars + 0] = 0.0;
     FViscous[i*nvars + 1] = tau_zx;
     FViscous[i*nvars + 2] = tau_zy;
@@ -144,14 +144,14 @@ void gpu_launch_ns3d_get_primitive(
     double rho_v = u[i*nvars + 2];
     double rho_w = u[i*nvars + 3];
     double e = u[i*nvars + 4];
-    
+
     double uvel = (rho == 0) ? 0.0 : rho_u / rho;
     double vvel = (rho == 0) ? 0.0 : rho_v / rho;
     double wvel = (rho == 0) ? 0.0 : rho_w / rho;
     double vsq = uvel*uvel + vvel*vvel + wvel*wvel;
     double P = (e - 0.5*rho*vsq) * (gamma - 1.0);
     double T = gamma * P / rho;  /* matches CPU: Q[p+4] = physics->gamma*pressure/Q[p+0] */
-    
+
     Q[i*nvars + 0] = rho;
     Q[i*nvars + 1] = uvel;
     Q[i*nvars + 2] = vvel;

@@ -119,7 +119,7 @@ for k0 in range(size[2]):
     wvel = cons_sol[3,:,:,:,:] / cons_sol[0,:,:,:,:]
     pressure = 0.4 * (cons_sol[4,:,:,:,:] - 0.5*(cons_sol[1,:,:,:,:]*cons_sol[1,:,:,:,:]+cons_sol[2,:,:,:,:]*cons_sol[2,:,:,:,:]+cons_sol[3,:,:,:,:]*cons_sol[3,:,:,:,:])/cons_sol[0,:,:,:,:])
     temperature = 1.4 * pressure / rho
-  
+
     fig = plt.figure(figsize=figsize)
     ax = plt.axes()
     ax.set( xlim=(np.min(x), np.max(x)), ylim=(0, t_final) )
@@ -133,7 +133,7 @@ for k0 in range(size[2]):
     print('Saving %s' % plt_fname)
     plt.savefig(plt_fname)
     plt.close()
-  
+
     fig = plt.figure(figsize=figsize)
     ax = plt.axes()
     ax.set( xlim=(np.min(x), np.max(x)), ylim=(0, t_final) )
@@ -147,7 +147,7 @@ for k0 in range(size[2]):
     print('Saving %s' % plt_fname)
     plt.savefig(plt_fname)
     plt.close()
-  
+
     fig = plt.figure(figsize=figsize)
     ax = plt.axes()
     ax.set( xlim=(np.min(x), np.max(x)), ylim=(0, t_final) )

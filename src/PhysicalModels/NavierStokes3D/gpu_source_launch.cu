@@ -21,9 +21,9 @@ void gpu_launch_ns3d_source_zero(
   }
 #else
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  
+
   int gridSize = (npoints + blockSize - 1) / blockSize;
-  
+
   GPU_KERNEL_LAUNCH(gpu_ns3d_source_zero_kernel, gridSize, blockSize)(
     source, nvars, npoints
   );

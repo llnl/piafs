@@ -13,9 +13,9 @@ void GPUArraySetValue(double *x, double value, int n)
 {
   /* Clear any previous errors before launching kernel */
   GPU_GET_LAST_ERROR();
-  
+
   gpu_launch_array_set_value(x, value, n, DEFAULT_BLOCK_SIZE);
-  
+
   /* Check for errors after kernel launch */
   int err = GPU_GET_LAST_ERROR();
   if (err != GPU_SUCCESS) {
@@ -29,9 +29,9 @@ void GPUArrayCopy(double *dst, const double *src, int n)
 {
   /* Clear any previous errors before launching kernel */
   GPU_GET_LAST_ERROR();
-  
+
   gpu_launch_array_copy(dst, src, n, DEFAULT_BLOCK_SIZE);
-  
+
   /* Check for errors after kernel launch */
   int err = GPU_GET_LAST_ERROR();
   if (err != GPU_SUCCESS) {

@@ -111,7 +111,7 @@ j0 = 0
 for s in range(nsims):
   solution_snapshots_sim = solution_snapshots[s*n_snapshots:(s+1)*n_snapshots]
   solution = np.transpose(solution_snapshots_sim.reshape(n_snapshots,size[2],size[1],size[0],nspecies))
-  
+
   for n in range(n_snapshots):
     fig, ax = plt.subplots(nrows=2, ncols=4, figsize=figsize)
     for var in range(nspecies):

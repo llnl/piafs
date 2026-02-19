@@ -144,7 +144,7 @@ int Initialize( void *s,    /*!< Array of simulation objects of type #Simulation
       size *= (simobj[n].solver.dim_local[i]+2*simobj[n].solver.ghosts);
     }
     simobj[n].solver.ndof_cells_wghosts = simobj[n].solver.nvars*size;
-    
+
     /* Allocate on GPU if available, otherwise on host */
 #ifdef GPU_CUDA
     if (GPUShouldUse()) {
@@ -194,15 +194,15 @@ int Initialize( void *s,    /*!< Array of simulation objects of type #Simulation
       size += (simobj[n].solver.dim_local[i]+2*simobj[n].solver.ghosts);
     }
     simobj[n].solver.size_x = size;
-    
+
     /* Always allocate grid arrays on CPU (they don't change and are accessed by CPU code) */
     simobj[n].solver.x = (double*) calloc (size,sizeof(double));
     simobj[n].solver.dxinv = (double*) calloc (size,sizeof(double));
-    
+
     /* Initialize device pointers to NULL */
     simobj[n].solver.d_x = NULL;
     simobj[n].solver.d_dxinv = NULL;
-    
+
     /* Allocate device copies for GPU builds (needed by GPU kernels like CFL computation) */
 #if defined(GPU_CUDA) || defined(GPU_HIP)
     if (GPUShouldUse()) {
@@ -223,12 +223,12 @@ int Initialize( void *s,    /*!< Array of simulation objects of type #Simulation
     for (i=0; i<simobj[n].solver.ndims; i++) {
       size *= (simobj[n].solver.dim_local[i]+2*simobj[n].solver.ghosts);
     }
-    
+
 #ifdef GPU_CUDA
     if (GPUShouldUse() && simobj[n].solver.u) {
       /* Already allocated in GPUAllocateSolutionArrays */
       /* Just verify they exist */
-      if (!simobj[n].solver.uC || !simobj[n].solver.fluxC || 
+      if (!simobj[n].solver.uC || !simobj[n].solver.fluxC ||
           !simobj[n].solver.Deriv1 || !simobj[n].solver.Deriv2) {
         fprintf(stderr, "Error: GPU cell-centered arrays not properly allocated\n");
         return 1;
@@ -243,7 +243,7 @@ int Initialize( void *s,    /*!< Array of simulation objects of type #Simulation
     if (GPUShouldUse() && simobj[n].solver.u) {
       /* Already allocated in GPUAllocateSolutionArrays */
       /* Just verify they exist */
-      if (!simobj[n].solver.uC || !simobj[n].solver.fluxC || 
+      if (!simobj[n].solver.uC || !simobj[n].solver.fluxC ||
           !simobj[n].solver.Deriv1 || !simobj[n].solver.Deriv2) {
         fprintf(stderr, "Error: GPU cell-centered arrays not properly allocated\n");
         return 1;
@@ -265,11 +265,11 @@ int Initialize( void *s,    /*!< Array of simulation objects of type #Simulation
     size = 1;  for (i=0; i<simobj[n].solver.ndims; i++) size *= (simobj[n].solver.dim_local[i]+1);
     size *= simobj[n].solver.nvars;
     simobj[n].solver.ndof_nodes = size;
-    
+
 #ifdef GPU_CUDA
     if (GPUShouldUse() && simobj[n].solver.u) {
       /* Already allocated in GPUAllocateSolutionArrays */
-      if (!simobj[n].solver.fluxI || !simobj[n].solver.uL || 
+      if (!simobj[n].solver.fluxI || !simobj[n].solver.uL ||
           !simobj[n].solver.uR || !simobj[n].solver.fL || !simobj[n].solver.fR) {
         fprintf(stderr, "Error: GPU interface arrays not properly allocated\n");
         return 1;
@@ -284,7 +284,7 @@ int Initialize( void *s,    /*!< Array of simulation objects of type #Simulation
 #elif defined(GPU_HIP)
     if (GPUShouldUse() && simobj[n].solver.u) {
       /* Already allocated in GPUAllocateSolutionArrays */
-      if (!simobj[n].solver.fluxI || !simobj[n].solver.uL || 
+      if (!simobj[n].solver.fluxI || !simobj[n].solver.uL ||
           !simobj[n].solver.uR || !simobj[n].solver.fL || !simobj[n].solver.fR) {
         fprintf(stderr, "Error: GPU interface arrays not properly allocated\n");
         return 1;
@@ -346,7 +346,7 @@ int Initialize( void *s,    /*!< Array of simulation objects of type #Simulation
     simobj[n].solver.TotalBoundaryIntegral = (double*) calloc (simobj[n].solver.nvars,sizeof(double));
     simobj[n].solver.ConservationError     = (double*) calloc (simobj[n].solver.nvars,sizeof(double));
     for (i=0; i<simobj[n].solver.nvars; i++) simobj[n].solver.ConservationError[i] = -1;
-    
+
     /* StageBoundaryIntegral and StepBoundaryIntegral need to be on GPU if GPU is enabled */
     int bf_size = 2*simobj[n].solver.ndims*simobj[n].solver.nvars;
 #ifdef GPU_CUDA

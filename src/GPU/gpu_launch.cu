@@ -21,10 +21,10 @@ void gpu_launch_array_copy(double *dst, const double *src, int n, int blockSize)
 #else
   /* Clear any previous errors */
   GPU_GET_LAST_ERROR();
-  
+
   if (blockSize <= 0) blockSize = GPUGetBlockSize("memory_bound", n);
   int gridSize = (n + blockSize - 1) / blockSize;
-  
+
   /* Safety checks */
   if (!dst || !src) {
     fprintf(stderr, "Error: gpu_launch_array_copy: NULL pointer (dst=%p, src=%p, n=%d)\n", dst, src, n);
@@ -34,9 +34,9 @@ void gpu_launch_array_copy(double *dst, const double *src, int n, int blockSize)
     fprintf(stderr, "Error: gpu_launch_array_copy: invalid size n=%d\n", n);
     exit(1);
   }
-  
+
   GPU_KERNEL_LAUNCH(gpu_array_copy, gridSize, blockSize)(dst, src, n);
-  
+
   /* Check for errors immediately after launch */
   int err = GPU_GET_LAST_ERROR();
   if (err != GPU_SUCCESS) {
@@ -54,10 +54,10 @@ void gpu_launch_array_set_value(double *x, double value, int n, int blockSize)
 #else
   /* Clear any previous errors */
   GPU_GET_LAST_ERROR();
-  
+
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
   int gridSize = (n + blockSize - 1) / blockSize;
-  
+
   /* Safety checks */
   if (!x) {
     fprintf(stderr, "Error: gpu_launch_array_set_value: NULL pointer (x=%p, n=%d)\n", x, n);
@@ -67,9 +67,9 @@ void gpu_launch_array_set_value(double *x, double value, int n, int blockSize)
     fprintf(stderr, "Error: gpu_launch_array_set_value: invalid size n=%d\n", n);
     exit(1);
   }
-  
+
   GPU_KERNEL_LAUNCH(gpu_array_set_value, gridSize, blockSize)(x, value, n);
-  
+
   /* Check for errors immediately after launch */
   int err = GPU_GET_LAST_ERROR();
   if (err != GPU_SUCCESS) {
@@ -247,7 +247,7 @@ double gpu_launch_array_max_opt(const double *x, int n,
   if (n <= 0) return 0.0;
 
   int gridSize = (n + blockSize - 1) / blockSize;
-  
+
   /* Check if buffer is large enough */
   size_t required_size = gridSize * sizeof(double);
   if (required_size > buffer_size) {

@@ -187,7 +187,7 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative(
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   int npoints = 1;
   for (int d = 0; d < ndims; d++) npoints *= dim[d];
-  
+
   if (idx < npoints) {
     /* Compute multi-dimensional index from linear index */
     int index[3] = {0, 0, 0};
@@ -196,13 +196,13 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative(
       index[d] = temp % dim[d];
       temp /= dim[d];
     }
-    
+
     /* Compute 1D index with ghosts */
     int p = index[ndims-1] + ghosts;
     for (int d = ndims-2; d >= 0; d--) {
       p = p * (dim[d] + 2*ghosts) + (index[d] + ghosts);
     }
-    
+
     /* Compute interface indices */
     int index1[3], index2[3];
     for (int d = 0; d < ndims; d++) {
@@ -210,7 +210,7 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative(
       index2[d] = index[d];
     }
     index2[dir]++;
-    
+
     /* Compute interface 1D indices (no ghosts) */
     int p1 = index1[ndims-1];
     int p2 = index2[ndims-1];
@@ -219,7 +219,7 @@ GPU_KERNEL void gpu_hyperbolic_flux_derivative(
       p1 = p1 * dim_interface + index1[d];
       p2 = p2 * dim_interface + index2[d];
     }
-    
+
     /* Compute derivative */
     double dx = dxinv[offset + ghosts + index[dir]];
     for (int v = 0; v < nvars; v++) {

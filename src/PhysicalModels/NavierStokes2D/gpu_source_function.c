@@ -17,16 +17,16 @@ int GPUNavierStokes2DSource(double *source, double *u, void *s, void *m, double 
   NavierStokes2D *param = (NavierStokes2D*) solver->physics;
   if (!param) { fprintf(stderr, "Error: GPUNavierStokes2DSource: param is NULL\n"); return 1; }
   int nvars = param->nvars, npoints = solver->npoints_local_wghosts;
-  
+
   // Initialize source to zero
   gpu_launch_ns2d_source_zero(source, nvars, npoints, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();
-  
+
   // Add chemistry source terms if enabled
   if (param->include_chem) {
     GPUChemistrySource(solver, u, source, param->chem, m, t);
   }
-  
+
   return 0;
 }
 

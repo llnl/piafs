@@ -80,7 +80,7 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
   int           ferr;
 
   static int count = 0;
-  
+
   if (!mpi->rank) {
     fflush(stdout);
   }
@@ -519,7 +519,7 @@ int ChemistryInitialize( void*  s, /*!< Solver object of type #HyPar */
       _ArrayIncrementIndex_(solver->ndims,solver->dim_local,index,done);
 
     }
-    
+
     if (!mpi->rank) {
       fflush(stdout);
     }

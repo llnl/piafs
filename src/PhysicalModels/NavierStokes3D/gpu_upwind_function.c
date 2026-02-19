@@ -25,33 +25,33 @@ int GPUNavierStokes3DUpwindRoe(
 {
   HyPar *solver = (HyPar*) s;
   NavierStokes3D *param = (NavierStokes3D*) solver->physics;
-  
+
   if (!param) {
     fprintf(stderr, "Error: GPUNavierStokes3DUpwindRoe: param is NULL\n");
     return 1;
   }
-  
+
   int ndims = solver->ndims;
   int nvars = param->nvars;
   int ghosts = solver->ghosts;
   int *dim = solver->dim_local;
   int *stride_with_ghosts = solver->stride_with_ghosts;
   double gamma = param->gamma;
-  
+
   /* Compute bounds for interface array */
   int bounds_inter[3]; /* Support up to 3D */
   for (int i = 0; i < ndims; i++) {
     bounds_inter[i] = dim[i];
   }
   bounds_inter[dir] = dim[dir] + 1; /* One more interface than cells */
-  
+
   /* Launch GPU kernel */
   gpu_launch_ns3d_upwind_roe(
     fI, fL, fR, uL, uR, u, nvars, ndims, dim, stride_with_ghosts, bounds_inter,
     ghosts, dir, gamma, 256
   );
   if (GPUShouldSyncEveryOp()) GPUSync();
-  
+
   return 0;
 }
 
