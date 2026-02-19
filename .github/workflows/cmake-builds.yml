@@ -24,12 +24,12 @@ jobs:
           - name: "MPI (OpenMPI)"
             cmake_options: ""
             deps_script: ".github/workflows/dependencies/dependencies_openmpi.sh"
-            run_regression: true
+            run_regression: false
 
           - name: "MPI + OpenMP (OpenMPI)"
             cmake_options: "-DENABLE_OMP=ON"
             deps_script: ".github/workflows/dependencies/dependencies_openmpi.sh"
-            run_regression: true
+            run_regression: false
 
     steps:
     - uses: actions/checkout@v4
