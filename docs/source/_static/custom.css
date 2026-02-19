@@ -1,0 +1,25 @@
+/* Custom CSS for PIAFS documentation */
+
+/* Improve code block styling */
+.highlight {
+    background: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+/* Better table styling */
+.wy-table-responsive table td,
+.wy-table-responsive table th {
+    white-space: normal;
+}
+
+/* Improve readability */
+.rst-content {
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+/* Better spacing for sections */
+.section {
+    margin-bottom: 2em;
+}

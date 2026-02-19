@@ -235,6 +235,10 @@ PIAFS_DIR=/path/to/piafs
 + If `op_file_format` is set to `tecplot2d`, the solutions are written as a 2D ASCII Tecplot file and
   can be visualized in Tecplot or VisIt.
 
+## Funding
+
+This work was funded by the Laboratory Research and Development Program at LLNL under Project Tracking Code No. 24-ERD-001.
+
 ## Release
 
 LLNL-CODE-2015997
