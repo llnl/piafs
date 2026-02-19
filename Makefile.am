@@ -47,4 +47,14 @@ TESTS_ENVIRONMENT = \
 	EXPECTED_BENCHMARKS="$(REGRESSION_BENCHMARKS)"
 
 # Run all regression tests through wrapper script with individual reporting
-TESTS = $(srcdir)/Tests/autotools/run_all_tests.sh
+# For out-of-source builds, create symlink to test scripts in build directory
+check-local:
+	@test -d Tests || mkdir -p Tests
+	@test -d Tests/autotools || mkdir -p Tests/autotools
+	@for script in run_all_tests.sh setup_benchmarks.sh run_regression_test.sh generate-test-scripts.sh regression_test_wrapper.sh; do \
+		if test ! -e Tests/autotools/$$script; then \
+			ln -sf $(abs_top_srcdir)/Tests/autotools/$$script Tests/autotools/$$script; \
+		fi; \
+	done
+
+TESTS = Tests/autotools/run_all_tests.sh
