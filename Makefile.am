@@ -47,4 +47,4 @@ TESTS_ENVIRONMENT = \
 	EXPECTED_BENCHMARKS="$(REGRESSION_BENCHMARKS)"
 
 # Run all regression tests through wrapper script with individual reporting
-TESTS = Tests/autotools/run_all_tests.sh
+TESTS = $(srcdir)/Tests/autotools/run_all_tests.sh
