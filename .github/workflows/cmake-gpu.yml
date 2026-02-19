@@ -13,6 +13,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install base dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends cmake build-essential g++
+
     - name: Install MPI
       run: .github/workflows/dependencies/dependencies_mpich.sh
 
@@ -49,6 +54,11 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - uses: actions/checkout@v4
+
+    - name: Install base dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends cmake build-essential g++
 
     - name: Install ROCm / HIP
       run: .github/workflows/dependencies/dependencies_rocm.sh

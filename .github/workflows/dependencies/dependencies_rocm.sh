@@ -14,5 +14,4 @@ https://repo.radeon.com/rocm/apt/6.0/ jammy main" \
 sudo apt-get update
 sudo apt-get install -y --no-install-recommends \
     hip-dev \
-    rocm-cmake \
-    rocm-llvm-dev
+    rocm-cmake
