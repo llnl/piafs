@@ -64,14 +64,18 @@ jobs:
       run: .github/workflows/dependencies/dependencies_rocm.sh
 
     - name: Verify HIP installation
-      run: /opt/rocm/bin/hipcc --version
+      run: |
+        source /etc/profile.d/rocm.sh
+        hipcc --version
+        which hipcc
 
     - name: Configure
       run: |
+        source /etc/profile.d/rocm.sh
         mkdir build && cd build
         cmake -DENABLE_GPU=ON -DENABLE_HIP=ON \
               -DENABLE_SERIAL=ON \
-              -DCMAKE_CXX_COMPILER=/opt/rocm/bin/hipcc \
+              -DCMAKE_CXX_COMPILER=$(which hipcc) \
               -DCMAKE_HIP_ARCHITECTURES=gfx906 \
               -DCMAKE_BUILD_TYPE=Release ..
       env:
@@ -79,7 +83,9 @@ jobs:
         ROCM_PATH: /opt/rocm
 
     - name: Build
-      run: cmake --build build -j2
+      run: |
+        source /etc/profile.d/rocm.sh
+        cmake --build build -j2
       timeout-minutes: 30
       env:
         HIP_PLATFORM: amd
