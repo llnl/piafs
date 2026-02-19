@@ -1,0 +1,31 @@
+---
+# clang-tidy configuration for PIAFS
+# Focus on critical bug detection only - avoid style and legacy code patterns
+
+Checks: >
+  -*,
+  clang-analyzer-core.*,
+  clang-analyzer-deadcode.*,
+  clang-analyzer-security.FloatLoopCounter,
+  clang-analyzer-security.insecureAPI.UncheckedReturn,
+  clang-analyzer-unix.*,
+  bugprone-assert-side-effect,
+  bugprone-dangling-handle,
+  bugprone-infinite-loop,
+  bugprone-integer-division,
+  bugprone-misplaced-widening-cast,
+  bugprone-not-null-terminated-result,
+  bugprone-parent-virtual-call,
+  bugprone-sizeof-expression,
+  bugprone-suspicious-memset-usage,
+  bugprone-undefined-memory-manipulation,
+  bugprone-use-after-move,
+  performance-inefficient-algorithm,
+  performance-inefficient-vector-operation,
+  performance-move-const-arg,
+  performance-unnecessary-copy-initialization
+
+WarningsAsErrors: ''
+
+HeaderFilterRegex: '.*'
+FormatStyle: none
