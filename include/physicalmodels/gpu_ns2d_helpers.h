@@ -22,10 +22,10 @@
 GPU_DEVICE_FUNC void gpu_ns2d_roe_average(double *uavg, const double *uL, const double *uR, int nvars, double gamma) {
   double rhoL = uL[0];
   double rhoR = uR[0];
-  
+
   double tL = sqrt(rhoL);
   double tR = sqrt(rhoR);
-  
+
   /* Check for invalid sqrt */
   #if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
     if (isnan(tL) || isinf(tL) || isnan(tR) || isinf(tR)) {
@@ -38,7 +38,7 @@ GPU_DEVICE_FUNC void gpu_ns2d_roe_average(double *uavg, const double *uL, const 
       return;
     }
   #endif
-  
+
   double vxL = (rhoL == 0) ? 0 : uL[1] / rhoL;
   double vyL = (rhoL == 0) ? 0 : uL[2] / rhoL;
   double eL = uL[3];
@@ -46,7 +46,7 @@ GPU_DEVICE_FUNC void gpu_ns2d_roe_average(double *uavg, const double *uL, const 
   double PL = (eL - 0.5*rhoL*vsqL) * (gamma - 1.0);
   double cLsq = gamma * PL / rhoL;
   double HL = 0.5*vsqL + cLsq / (gamma - 1.0);
-  
+
   double vxR = (rhoR == 0) ? 0 : uR[1] / rhoR;
   double vyR = (rhoR == 0) ? 0 : uR[2] / rhoR;
   double eR = uR[3];
@@ -54,7 +54,7 @@ GPU_DEVICE_FUNC void gpu_ns2d_roe_average(double *uavg, const double *uL, const 
   double PR = (eR - 0.5*rhoR*vsqR) * (gamma - 1.0);
   double cRsq = gamma * PR / rhoR;
   double HR = 0.5*vsqR + cRsq / (gamma - 1.0);
-  
+
   double rho = tL * tR;
   double vx = (tL*vxL + tR*vxR) / (tL + tR);
   double vy = (tL*vyL + tR*vyR) / (tL + tR);
@@ -63,12 +63,12 @@ GPU_DEVICE_FUNC void gpu_ns2d_roe_average(double *uavg, const double *uL, const 
   double csq = (gamma - 1.0) * (H - 0.5*vsq);
   double P = csq * rho / gamma;
   double e = P / (gamma - 1.0) + 0.5*rho*vsq;
-  
+
   uavg[0] = rho;
   uavg[1] = rho * vx;
   uavg[2] = rho * vy;
   uavg[3] = e;
-  
+
   /* Passive scalars */
   for (int m_i = _NS2D_NVARS_; m_i < nvars; m_i++) {
     uavg[m_i] = sqrt(uL[m_i]) * sqrt(uR[m_i]);
@@ -84,28 +84,28 @@ GPU_DEVICE_FUNC void gpu_ns2d_left_eigenvectors(const double *u, double *L, doub
     for (int i = 0; i < nvars; i++) L[i*nvars + i] = 1.0;
     return;
   }
-  
+
   double vx = u[1] / rho;
   double vy = u[2] / rho;
   double e = u[3];
   double vsq = vx*vx + vy*vy;
   double P = (e - 0.5*rho*vsq) * (gamma - 1.0);
-  
+
   if (P <= 0.0) {
     for (int i = 0; i < nvars*nvars; i++) L[i] = 0.0;
     for (int i = 0; i < nvars; i++) L[i*nvars + i] = 1.0;
     return;
   }
-  
+
   double a = sqrt(gamma * P / rho);
   double ga_m1 = gamma - 1.0;
   double ek = 0.5 * vsq;
   double nx = 0.0, ny = 0.0;
   double un;
-  
+
   /* Initialize to zero */
   for (int i = 0; i < nvars*nvars; i++) L[i] = 0.0;
-  
+
   if (dir == _XDIR_) {
     un = vx;
     nx = 1.0;
@@ -145,7 +145,7 @@ GPU_DEVICE_FUNC void gpu_ns2d_left_eigenvectors(const double *u, double *L, doub
     L[1*nvars+2] = -nx;
     L[1*nvars+3] = 0.0;
   }
-  
+
   /* Passive scalars: identity */
   for (int m_i = _NS2D_NVARS_; m_i < nvars; m_i++) {
     L[m_i*nvars + m_i] = 1.0;
@@ -161,29 +161,29 @@ GPU_DEVICE_FUNC void gpu_ns2d_right_eigenvectors(const double *u, double *R, dou
     for (int i = 0; i < nvars; i++) R[i*nvars + i] = 1.0;
     return;
   }
-  
+
   double vx = u[1] / rho;
   double vy = u[2] / rho;
   double e = u[3];
   double vsq = vx*vx + vy*vy;
   double P = (e - 0.5*rho*vsq) * (gamma - 1.0);
-  
+
   if (P <= 0.0) {
     for (int i = 0; i < nvars*nvars; i++) R[i] = 0.0;
     for (int i = 0; i < nvars; i++) R[i*nvars + i] = 1.0;
     return;
   }
-  
+
   double a = sqrt(gamma * P / rho);
   double ga_m1 = gamma - 1.0;
   double ek = 0.5 * vsq;
   double h0 = a*a / ga_m1 + ek;
   double nx = 0.0, ny = 0.0;
   double un;
-  
+
   /* Initialize to zero */
   for (int i = 0; i < nvars*nvars; i++) R[i] = 0.0;
-  
+
   if (dir == _XDIR_) {
     un = vx;
     nx = 1.0;
@@ -223,7 +223,7 @@ GPU_DEVICE_FUNC void gpu_ns2d_right_eigenvectors(const double *u, double *R, dou
     R[2*nvars+1] = -nx;
     R[3*nvars+1] = vx*ny - vy*nx;
   }
-  
+
   /* Passive scalars: identity */
   for (int m_i = _NS2D_NVARS_; m_i < nvars; m_i++) {
     R[m_i*nvars + m_i] = 1.0;

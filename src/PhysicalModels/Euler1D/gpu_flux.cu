@@ -26,18 +26,18 @@ GPU_KERNEL void gpu_euler1d_flux_kernel(
   for (int i = 0; i < ndims; i++) {
     total_points *= (dim[i] + 2 * ghosts);
   }
-  
+
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < total_points) {
     /* idx is already the flat index into the array with ghosts, so p = idx */
     int p = idx;
-    
+
     double rho = u[p*nvars + 0];
     double v = (rho == 0) ? 0 : u[p*nvars + 1] / rho;
     double e = u[p*nvars + 2];
     double vsq = v*v;
     double P = (gamma - 1.0) * (e - 0.5 * rho * vsq);
-    
+
     f[p*nvars + 0] = rho * v;
     f[p*nvars + 1] = rho * v * v + P;
     f[p*nvars + 2] = (e + P) * v;

@@ -191,20 +191,20 @@ int TimePostStep(void *ts /*!< Object of type #TimeIntegration */)
         /* BoundaryIntegral accesses StepBoundaryIntegral - need host copy. dxinv is already on host */
         int bf_size = 2*sim[ns].solver.ndims*sim[ns].solver.nvars;
         double *StepBoundaryIntegral_host = (double*) malloc(bf_size * sizeof(double));
-        
+
         if (StepBoundaryIntegral_host) {
           GPUCopyToHost(StepBoundaryIntegral_host, sim[ns].solver.StepBoundaryIntegral, bf_size * sizeof(double));
-          
+
           /* Temporarily swap pointer */
           double *StepBoundaryIntegral_save = sim[ns].solver.StepBoundaryIntegral;
           sim[ns].solver.StepBoundaryIntegral = StepBoundaryIntegral_host;
-          
+
           IERR sim[ns].solver.BoundaryIntegralFunction( &(sim[ns].solver),
                                                         &(sim[ns].mpi)); CHECKERR(ierr);
-          
+
           /* Restore original pointer */
           sim[ns].solver.StepBoundaryIntegral = StepBoundaryIntegral_save;
-          
+
           free(StepBoundaryIntegral_host);
         } else {
           fprintf(stderr, "Error: Failed to allocate host buffer for BoundaryIntegral\n");
@@ -219,20 +219,20 @@ int TimePostStep(void *ts /*!< Object of type #TimeIntegration */)
         /* BoundaryIntegral accesses StepBoundaryIntegral - need host copy. dxinv is already on host */
         int bf_size = 2*sim[ns].solver.ndims*sim[ns].solver.nvars;
         double *StepBoundaryIntegral_host = (double*) malloc(bf_size * sizeof(double));
-        
+
         if (StepBoundaryIntegral_host) {
           GPUCopyToHost(StepBoundaryIntegral_host, sim[ns].solver.StepBoundaryIntegral, bf_size * sizeof(double));
-          
+
           /* Temporarily swap pointer */
           double *StepBoundaryIntegral_save = sim[ns].solver.StepBoundaryIntegral;
           sim[ns].solver.StepBoundaryIntegral = StepBoundaryIntegral_host;
-          
+
           IERR sim[ns].solver.BoundaryIntegralFunction( &(sim[ns].solver),
                                                         &(sim[ns].mpi)); CHECKERR(ierr);
-          
+
           /* Restore original pointer */
           sim[ns].solver.StepBoundaryIntegral = StepBoundaryIntegral_save;
-          
+
           free(StepBoundaryIntegral_host);
         } else {
           fprintf(stderr, "Error: Failed to allocate host buffer for BoundaryIntegral\n");

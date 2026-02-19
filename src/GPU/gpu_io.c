@@ -23,28 +23,28 @@ int GPUWriteBinary(
   int size, d;
   size_t bytes;
   FILE *out;
-  
+
   /* Calculate sizes */
   int grid_size = 0;
   for (d = 0; d < ndims; d++) grid_size += dim[d];
   int sol_size = 1;
   for (d = 0; d < ndims; d++) sol_size *= dim[d];
   sol_size *= nvars;
-  
+
   /* Allocate host buffers */
   double *x_host = NULL;
   double *u_host = NULL;
-  
+
   x_host = (double*) malloc(grid_size * sizeof(double));
   u_host = (double*) malloc(sol_size * sizeof(double));
-  
+
   if (!x_host || !u_host) {
     fprintf(stderr, "Error: Failed to allocate host buffers for I/O\n");
     if (x_host) free(x_host);
     if (u_host) free(u_host);
     return 1;
   }
-  
+
   /* Copy from device to host */
   if (GPUShouldUse()) {
     GPUCopyToHost(x_host, x, grid_size * sizeof(double));
@@ -55,7 +55,7 @@ int GPUWriteBinary(
     for (int i = 0; i < grid_size; i++) x_host[i] = x[i];
     for (int i = 0; i < sol_size; i++) u_host[i] = u[i];
   }
-  
+
   /* Write to file */
   out = fopen(f, "wb");
   if (!out) {
@@ -64,7 +64,7 @@ int GPUWriteBinary(
     free(u_host);
     return 1;
   }
-  
+
   bytes = fwrite(&ndims, sizeof(int), 1, out);
   if ((int)bytes != 1) {
     fprintf(stderr, "Error in GPUWriteBinary(): Unable to write ndims.\n");
@@ -73,7 +73,7 @@ int GPUWriteBinary(
     free(u_host);
     return 1;
   }
-  
+
   bytes = fwrite(&nvars, sizeof(int), 1, out);
   if ((int)bytes != 1) {
     fprintf(stderr, "Error in GPUWriteBinary(): Unable to write nvars.\n");
@@ -82,7 +82,7 @@ int GPUWriteBinary(
     free(u_host);
     return 1;
   }
-  
+
   bytes = fwrite(dim, sizeof(int), ndims, out);
   if ((int)bytes != ndims) {
     fprintf(stderr, "Error in GPUWriteBinary(): Unable to write dimensions.\n");
@@ -91,7 +91,7 @@ int GPUWriteBinary(
     free(u_host);
     return 1;
   }
-  
+
   bytes = fwrite(x_host, sizeof(double), grid_size, out);
   if ((int)bytes != grid_size) {
     fprintf(stderr, "Error in GPUWriteBinary(): Unable to write grid.\n");
@@ -100,7 +100,7 @@ int GPUWriteBinary(
     free(u_host);
     return 1;
   }
-  
+
   bytes = fwrite(u_host, sizeof(double), sol_size, out);
   if ((int)bytes != sol_size) {
     fprintf(stderr, "Error in GPUWriteBinary(): Unable to write solution.\n");
@@ -109,7 +109,7 @@ int GPUWriteBinary(
     free(u_host);
     return 1;
   }
-  
+
   fclose(out);
   free(x_host);
   free(u_host);
@@ -128,25 +128,25 @@ int GPUWriteText(
 )
 {
   FILE *out;
-  
+
   /* Calculate sizes */
   int grid_size = 0;
   for (int d = 0; d < ndims; d++) grid_size += dim[d];
   int sol_size = 1;
   for (int d = 0; d < ndims; d++) sol_size *= dim[d];
   sol_size *= nvars;
-  
+
   /* Allocate host buffers */
   double *x_host = (double*) malloc(grid_size * sizeof(double));
   double *u_host = (double*) malloc(sol_size * sizeof(double));
-  
+
   if (!x_host || !u_host) {
     fprintf(stderr, "Error: Failed to allocate host buffers for I/O\n");
     if (x_host) free(x_host);
     if (u_host) free(u_host);
     return 1;
   }
-  
+
   /* Copy from device to host */
   if (GPUShouldUse()) {
     GPUCopyToHost(x_host, x, grid_size * sizeof(double));
@@ -157,7 +157,7 @@ int GPUWriteText(
     for (int i = 0; i < grid_size; i++) x_host[i] = x[i];
     for (int i = 0; i < sol_size; i++) u_host[i] = u[i];
   }
-  
+
   /* Write to file */
   out = fopen(f, "w");
   if (!out) {
@@ -166,7 +166,7 @@ int GPUWriteText(
     free(u_host);
     return 1;
   }
-  
+
   int done = 0;
   _ArraySetValue_(index, ndims, 0);
   while (!done) {
@@ -182,7 +182,7 @@ int GPUWriteText(
     fprintf(out, "\n");
     _ArrayIncrementIndex_(ndims, dim, index, done);
   }
-  
+
   fclose(out);
   free(x_host);
   free(u_host);
@@ -202,13 +202,13 @@ int GPUReadBinary(
   int size, d;
   size_t bytes;
   FILE *in;
-  
+
   in = fopen(f, "rb");
   if (!in) {
     fprintf(stderr, "Error: could not open %s for reading.\n", f);
     return 1;
   }
-  
+
   /* Read header */
   int file_ndims, file_nvars;
   bytes = fread(&file_ndims, sizeof(int), 1, in);
@@ -217,14 +217,14 @@ int GPUReadBinary(
     fclose(in);
     return 1;
   }
-  
+
   bytes = fread(&file_nvars, sizeof(int), 1, in);
   if ((int)bytes != 1 || file_nvars != nvars) {
     fprintf(stderr, "Error in GPUReadBinary(): nvars mismatch.\n");
     fclose(in);
     return 1;
   }
-  
+
   int file_dim[ndims];
   bytes = fread(file_dim, sizeof(int), ndims, in);
   if ((int)bytes != ndims) {
@@ -232,18 +232,18 @@ int GPUReadBinary(
     fclose(in);
     return 1;
   }
-  
+
   /* Calculate sizes */
   int grid_size = 0;
   for (d = 0; d < ndims; d++) grid_size += dim[d];
   int sol_size = 1;
   for (d = 0; d < ndims; d++) sol_size *= dim[d];
   sol_size *= nvars;
-  
+
   /* Allocate host buffers for reading */
   double *x_host = (double*) malloc(grid_size * sizeof(double));
   double *u_host = (double*) malloc(sol_size * sizeof(double));
-  
+
   if (!x_host || !u_host) {
     fprintf(stderr, "Error: Failed to allocate host buffers for I/O\n");
     fclose(in);
@@ -251,7 +251,7 @@ int GPUReadBinary(
     if (u_host) free(u_host);
     return 1;
   }
-  
+
   /* Read from file */
   bytes = fread(x_host, sizeof(double), grid_size, in);
   if ((int)bytes != grid_size) {
@@ -261,7 +261,7 @@ int GPUReadBinary(
     free(u_host);
     return 1;
   }
-  
+
   bytes = fread(u_host, sizeof(double), sol_size, in);
   if ((int)bytes != sol_size) {
     fprintf(stderr, "Error in GPUReadBinary(): Unable to read solution.\n");
@@ -270,9 +270,9 @@ int GPUReadBinary(
     free(u_host);
     return 1;
   }
-  
+
   fclose(in);
-  
+
   /* Copy to device if GPU is available */
   if (GPUShouldUse()) {
     GPUCopyToDevice(x, x_host, grid_size * sizeof(double));
@@ -284,7 +284,7 @@ int GPUReadBinary(
     for (int i = 0; i < grid_size; i++) x[i] = x_host[i];
     for (int i = 0; i < sol_size; i++) u[i] = u_host[i];
   }
-  
+
   free(x_host);
   free(u_host);
   return 0;

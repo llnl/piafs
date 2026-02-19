@@ -87,19 +87,19 @@ int ApplyBoundaryConditions(void    *s,     /*!< Object of type #HyPar containin
     }
     if (all_periodic_and_multi_proc) return 0;
 #endif
-    
+
     /* Apply boundary conditions directly on GPU using native kernels */
     int n;
     for (n = 0; n < nb; n++) {
       if (!boundary[n].on_this_proc) continue;
-      
+
       DomainBoundary *bc = &boundary[n];
       int bc_dim = bc->dim;
       int bc_face = bc->face;
-      
+
       /* Check if this BC type has a GPU implementation */
       int gpu_bc_handled = 0;
-      
+
       if (!strcmp(bc->bctype, _PERIODIC_)) {
 #ifdef serial
         /* Single-processor periodic: use GPU kernel */

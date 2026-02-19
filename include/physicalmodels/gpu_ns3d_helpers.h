@@ -31,10 +31,10 @@ GPU_DEVICE_FUNC void gpu_matvecmult(int n, double *y, const double *A, const dou
 GPU_DEVICE_FUNC void gpu_ns3d_roe_average(double *uavg, const double *uL, const double *uR, int nvars, double gamma) {
   double rhoL, vxL, vyL, vzL, eL, PL;
   double rhoR, vxR, vyR, vzR, eR, PR;
-  
+
   rhoL = uL[0];
   rhoR = uR[0];
-  
+
   /* Validate rho before computing sqrt - must match CPU macro behavior */
   double tL = sqrt(rhoL);
   double tR = sqrt(rhoR);
@@ -58,7 +58,7 @@ GPU_DEVICE_FUNC void gpu_ns3d_roe_average(double *uavg, const double *uL, const 
       return;
     }
   #endif
-  
+
   vxL = (rhoL == 0) ? 0 : uL[1] / rhoL;
   vyL = (rhoL == 0) ? 0 : uL[2] / rhoL;
   vzL = (rhoL == 0) ? 0 : uL[3] / rhoL;
@@ -67,7 +67,7 @@ GPU_DEVICE_FUNC void gpu_ns3d_roe_average(double *uavg, const double *uL, const 
   PL = (gamma - 1.0) * (eL - 0.5 * rhoL * vsqL);
   double cLsq = gamma * PL / rhoL;
   double HL = 0.5*vsqL + cLsq / (gamma-1.0);
-  
+
   vxR = (rhoR == 0) ? 0 : uR[1] / rhoR;
   vyR = (rhoR == 0) ? 0 : uR[2] / rhoR;
   vzR = (rhoR == 0) ? 0 : uR[3] / rhoR;
@@ -76,7 +76,7 @@ GPU_DEVICE_FUNC void gpu_ns3d_roe_average(double *uavg, const double *uL, const 
   PR = (gamma - 1.0) * (eR - 0.5 * rhoR * vsqR);
   double cRsq = gamma * PR / rhoR;
   double HR = 0.5*vsqR + cRsq / (gamma-1.0);
-  
+
   double rho = tL * tR;
   double vx = (tL*vxL + tR*vxR) / (tL + tR);
   double vy = (tL*vyL + tR*vyR) / (tL + tR);
@@ -85,7 +85,7 @@ GPU_DEVICE_FUNC void gpu_ns3d_roe_average(double *uavg, const double *uL, const 
   double vsq = vx*vx + vy*vy + vz*vz;
   double P = (gamma-1.0) * (H-0.5*vsq) * rho / gamma;
   double e = P/(gamma-1.0) + 0.5*rho*vsq;
-  
+
   uavg[0] = rho;
   uavg[1] = rho*vx;
   uavg[2] = rho*vy;
@@ -118,9 +118,9 @@ GPU_DEVICE_FUNC void gpu_ns3d_left_eigenvectors(const double *u, double *L, doub
   double a = sqrt(gamma * P / rho);
   double ga_minus_one = gamma - 1.0;
   double ek = 0.5 * vsq;
-  
+
   for (int i = 0; i < nvars*nvars; i++) L[i] = 0.0;
-  
+
   if (dir == _XDIR_) {
     L[1*nvars+0] = (ga_minus_one*ek + a*vx) / (2*a*a);
     L[1*nvars+1] = ((-ga_minus_one)*vx-a) / (2*a*a);
@@ -213,9 +213,9 @@ GPU_DEVICE_FUNC void gpu_ns3d_right_eigenvectors(const double *u, double *R, dou
   double ga_minus_one = gamma - 1.0;
   double ek = 0.5 * vsq;
   double h0 = a*a / ga_minus_one + ek;
-  
+
   for (int i = 0; i < nvars*nvars; i++) R[i] = 0.0;
-  
+
   if (dir == _XDIR_) {
     /* Column 0: entropy wave */
     R[0*nvars+0] = 1.0;
@@ -223,28 +223,28 @@ GPU_DEVICE_FUNC void gpu_ns3d_right_eigenvectors(const double *u, double *R, dou
     R[2*nvars+0] = vy;
     R[3*nvars+0] = vz;
     R[4*nvars+0] = ek;
-    
+
     /* Column 1: left-going acoustic wave */
     R[0*nvars+1] = 1.0;
     R[1*nvars+1] = vx - a;
     R[2*nvars+1] = vy;
     R[3*nvars+1] = vz;
     R[4*nvars+1] = h0 - a*vx;
-    
+
     /* Column 2: shear wave (y-direction) */
     R[0*nvars+2] = 0.0;
     R[1*nvars+2] = 0.0;
     R[2*nvars+2] = -1.0;
     R[3*nvars+2] = 0.0;
     R[4*nvars+2] = -vy;
-    
+
     /* Column 3: shear wave (z-direction) */
     R[0*nvars+3] = 0.0;
     R[1*nvars+3] = 0.0;
     R[2*nvars+3] = 0.0;
     R[3*nvars+3] = 1.0;
     R[4*nvars+3] = vz;
-    
+
     /* Column 4: right-going acoustic wave */
     R[0*nvars+4] = 1.0;
     R[1*nvars+4] = vx + a;
@@ -258,28 +258,28 @@ GPU_DEVICE_FUNC void gpu_ns3d_right_eigenvectors(const double *u, double *R, dou
     R[2*nvars+0] = vy;
     R[3*nvars+0] = vz;
     R[4*nvars+0] = ek;
-    
+
     /* Column 1: shear wave (x-direction) */
     R[0*nvars+1] = 0.0;
     R[1*nvars+1] = 1.0;
     R[2*nvars+1] = 0.0;
     R[3*nvars+1] = 0.0;
     R[4*nvars+1] = vx;
-    
+
     /* Column 2: left-going acoustic wave */
     R[0*nvars+2] = 1.0;
     R[1*nvars+2] = vx;
     R[2*nvars+2] = vy - a;
     R[3*nvars+2] = vz;
     R[4*nvars+2] = h0 - a*vy;
-    
+
     /* Column 3: shear wave (z-direction) */
     R[0*nvars+3] = 0.0;
     R[1*nvars+3] = 0.0;
     R[2*nvars+3] = 0.0;
     R[3*nvars+3] = -1.0;
     R[4*nvars+3] = -vz;
-    
+
     /* Column 4: right-going acoustic wave */
     R[0*nvars+4] = 1.0;
     R[1*nvars+4] = vx;
@@ -293,28 +293,28 @@ GPU_DEVICE_FUNC void gpu_ns3d_right_eigenvectors(const double *u, double *R, dou
     R[2*nvars+0] = vy;
     R[3*nvars+0] = vz;
     R[4*nvars+0] = ek;
-    
+
     /* Column 1: shear wave (x-direction) */
     R[0*nvars+1] = 0.0;
     R[1*nvars+1] = -1.0;
     R[2*nvars+1] = 0.0;
     R[3*nvars+1] = 0.0;
     R[4*nvars+1] = -vx;
-    
+
     /* Column 2: shear wave (y-direction) */
     R[0*nvars+2] = 0.0;
     R[1*nvars+2] = 0.0;
     R[2*nvars+2] = 1.0;
     R[3*nvars+2] = 0.0;
     R[4*nvars+2] = vy;
-    
+
     /* Column 3: left-going acoustic wave */
     R[0*nvars+3] = 1.0;
     R[1*nvars+3] = vx;
     R[2*nvars+3] = vy;
     R[3*nvars+3] = vz - a;
     R[4*nvars+3] = h0 - a*vz;
-    
+
     /* Column 4: right-going acoustic wave */
     R[0*nvars+4] = 1.0;
     R[1*nvars+4] = vx;

@@ -23,22 +23,22 @@ double GPUNavierStokes3DComputeCFL(
   HyPar *solver = (HyPar*) s;
   MPIVariables *mpi = (MPIVariables*) m;
   NavierStokes3D *param = (NavierStokes3D*) solver->physics;
-  
+
   if (!GPUShouldUse()) {
     /* Fall back to CPU version */
     extern double NavierStokes3DComputeCFL(void*, void*, double, double);
     return NavierStokes3DComputeCFL(s, m, dt, t);
   }
-  
+
   int ndims = solver->ndims;
   int *dim = solver->dim_local;
-  
+
   /* Compute total number of grid points (without ghosts) */
   int npoints = 1;
   for (int i = 0; i < ndims; i++) {
     npoints *= dim[i];
   }
-  
+
   if (npoints == 0) {
     return 0.0;
   }
@@ -68,11 +68,11 @@ double GPUNavierStokes3DComputeCFL(
                                               solver->gpu_reduce_buffer,
                                               solver->gpu_reduce_buffer_size,
                                               solver->gpu_reduce_result, 256);
-  
+
   /* Get global maximum across MPI ranks */
   double global_max_cfl = 0.0;
   MPIMax_double(&global_max_cfl, &max_cfl, 1, &mpi->world);
-  
+
   return global_max_cfl;
 }
 

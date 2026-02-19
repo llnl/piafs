@@ -40,14 +40,14 @@ int GPUNavierStokes2DParabolicFunction(double *par, double *u, void *s, void *m,
     double *QDerivY = solver->gpu_parabolic_workspace_QDerivY;
     double *FViscous = solver->gpu_parabolic_workspace_FViscous;
     double *FDeriv = solver->gpu_parabolic_workspace_FDeriv;
-    
+
     /* Verify workspace is large enough */
     if (solver->gpu_parabolic_workspace_size < (size_t)(size * nvars)) {
       fprintf(stderr, "Error: Parabolic workspace too small (%zu < %d)\n",
               solver->gpu_parabolic_workspace_size, size * nvars);
       return 1;
     }
-    
+
     /* Initialize arrays to zero */
     GPUMemset(QDerivX, 0, size * nvars * sizeof(double));
     GPUMemset(QDerivY, 0, size * nvars * sizeof(double));
@@ -71,7 +71,7 @@ int GPUNavierStokes2DParabolicFunction(double *par, double *u, void *s, void *m,
     /* Compute dxinv offsets for each direction */
     int offset_x = 0;
     int offset_y = dim[0] + 2 * ghosts;
-    
+
     gpu_launch_scale_array_with_dxinv(QDerivX, solver->d_dxinv, nvars, size, solver->ndims, dim_gpu, stride_gpu, ghosts, _XDIR_, offset_x, 256);
     gpu_launch_scale_array_with_dxinv(QDerivY, solver->d_dxinv, nvars, size, solver->ndims, dim_gpu, stride_gpu, ghosts, _YDIR_, offset_y, 256);
     if (GPUShouldSyncEveryOp()) GPUSync();

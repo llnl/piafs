@@ -59,7 +59,7 @@ void gpu_launch_hyperbolic_flux_derivative_nd(
   }
 #else
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
-  
+
   /* dim and stride_with_ghosts are GPU pointers - need to copy to host to compute grid size */
   int *dim_host = (int*) malloc(ndims * sizeof(int));
   int *stride_host = (int*) malloc(ndims * sizeof(int));
@@ -69,7 +69,7 @@ void gpu_launch_hyperbolic_flux_derivative_nd(
     if (stride_host) free(stride_host);
     return;
   }
-  
+
   GPUCopyToHost(dim_host, dim, ndims * sizeof(int));
   GPUCopyToHost(stride_host, stride_with_ghosts, ndims * sizeof(int));
   /* GPUCopyToHost uses a synchronous copy; avoid forced device sync here. */

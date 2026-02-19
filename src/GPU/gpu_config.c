@@ -14,7 +14,7 @@ static int gpu_config_initialized = 0;
 static void gpu_config_init(void)
 {
   if (gpu_config_initialized) return;
-  
+
   const char *env_block_size = getenv("PIAFS_GPU_BLOCK_SIZE");
   if (env_block_size) {
     int block_size = atoi(env_block_size);
@@ -25,7 +25,7 @@ static void gpu_config_init(void)
               env_block_size);
     }
   }
-  
+
   gpu_config_initialized = 1;
 }
 
@@ -33,12 +33,12 @@ static void gpu_config_init(void)
 int GPUGetBlockSize(const char *operation, int n)
 {
   gpu_config_init();
-  
+
   /* If user specified block size, use it */
   if (gpu_block_size_global > 0) {
     return gpu_block_size_global;
   }
-  
+
   /* Auto-select based on operation type and problem size */
   if (strcmp(operation, "memory_bound") == 0) {
     /* Memory-bound operations (copy, scale, add) - fewer threads, more blocks */
@@ -68,9 +68,9 @@ int GPUGetGridSize(int n, int blockSize)
 void GPUPrintConfig(int rank)
 {
   if (rank != 0) return;
-  
+
   gpu_config_init();
-  
+
   fprintf(stdout, "GPU Configuration:\n");
   if (gpu_block_size_global > 0) {
     fprintf(stdout, "  Block size: %d (user-specified via PIAFS_GPU_BLOCK_SIZE)\n",

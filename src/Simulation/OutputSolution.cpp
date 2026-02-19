@@ -60,49 +60,49 @@ int OutputSolution( void*   s,      /*!< Array of simulation objects of type #Si
     if (GPUShouldUse()) {
       int size_u = solver->npoints_local_wghosts * solver->nvars;
       int size_x = solver->size_x;
-      
+
       /* Safety checks */
       if (!solver->u || !solver->x) {
-        fprintf(stderr, "Error: OutputSolution: solver->u=%p or solver->x=%p is NULL\n", 
+        fprintf(stderr, "Error: OutputSolution: solver->u=%p or solver->x=%p is NULL\n",
                 solver->u, solver->x);
         continue;
       }
       if (size_u <= 0 || size_x <= 0) {
-        fprintf(stderr, "Error: OutputSolution: invalid sizes: size_u=%d, size_x=%d\n", 
+        fprintf(stderr, "Error: OutputSolution: invalid sizes: size_u=%d, size_x=%d\n",
                 size_u, size_x);
         continue;
       }
-      
+
       /* x is always on host, only need to copy u from device */
       double *u_host = (double*) malloc(size_u * sizeof(double));
-      
+
       if (!u_host) {
         fprintf(stderr, "Error: Failed to allocate host buffer for output (size_u=%d)\n", size_u);
         continue;
       }
-      
+
       if (GPUCopyToHost(u_host, solver->u, size_u * sizeof(double))) {
         fprintf(stderr, "Error: GPUCopyToHost failed for u\n");
         free(u_host);
         continue;
       }
-      
+
       /* Sync to ensure copy is complete */
       GPUSync();
-      
+
       /* Check for any GPU errors after sync - but don't exit on error during output */
       int gpu_err = GPU_GET_LAST_ERROR();
       if (gpu_err != GPU_SUCCESS) {
         fprintf(stderr, "Warning: GPU error detected after sync (error: %d), but continuing\n", gpu_err);
       }
-      
+
       /* Verify host array is valid */
       if (!u_host) {
         fprintf(stderr, "Error: Host array is NULL after copy\n");
         free(u_host);
         continue;
       }
-      
+
       int ierr = WriteArray(  solver->ndims,
                               solver->nvars,
                               solver->dim_global,
@@ -113,14 +113,14 @@ int OutputSolution( void*   s,      /*!< Array of simulation objects of type #Si
                               solver,
                               mpi,
                               fname_root );
-      
-      
+
+
       if (ierr) {
         fprintf(stderr, "Error: WriteArray returned error code %d\n", ierr);
       }
-      
+
       free(u_host);
-      
+
     } else {
       WriteArray(  solver->ndims,
                    solver->nvars,
@@ -137,49 +137,49 @@ int OutputSolution( void*   s,      /*!< Array of simulation objects of type #Si
     if (GPUShouldUse()) {
       int size_u = solver->npoints_local_wghosts * solver->nvars;
       int size_x = solver->size_x;
-      
+
       /* Safety checks */
       if (!solver->u || !solver->x) {
-        fprintf(stderr, "Error: OutputSolution: solver->u=%p or solver->x=%p is NULL\n", 
+        fprintf(stderr, "Error: OutputSolution: solver->u=%p or solver->x=%p is NULL\n",
                 solver->u, solver->x);
         continue;
       }
       if (size_u <= 0 || size_x <= 0) {
-        fprintf(stderr, "Error: OutputSolution: invalid sizes: size_u=%d, size_x=%d\n", 
+        fprintf(stderr, "Error: OutputSolution: invalid sizes: size_u=%d, size_x=%d\n",
                 size_u, size_x);
         continue;
       }
-      
+
       /* x is always on host, only need to copy u from device */
       double *u_host = (double*) malloc(size_u * sizeof(double));
-      
+
       if (!u_host) {
         fprintf(stderr, "Error: Failed to allocate host buffer for output (size_u=%d)\n", size_u);
         continue;
       }
-      
+
       if (GPUCopyToHost(u_host, solver->u, size_u * sizeof(double))) {
         fprintf(stderr, "Error: GPUCopyToHost failed for u\n");
         free(u_host);
         continue;
       }
-      
+
       /* Sync to ensure copy is complete */
       GPUSync();
-      
+
       /* Check for any GPU errors after sync - but don't exit on error during output */
       int gpu_err = GPU_GET_LAST_ERROR();
       if (gpu_err != GPU_SUCCESS) {
         fprintf(stderr, "Warning: GPU error detected after sync (error: %d), but continuing\n", gpu_err);
       }
-      
+
       /* Verify host array is valid */
       if (!u_host) {
         fprintf(stderr, "Error: Host array is NULL after copy\n");
         free(u_host);
         continue;
       }
-      
+
       int ierr = WriteArray(  solver->ndims,
                               solver->nvars,
                               solver->dim_global,
@@ -190,14 +190,14 @@ int OutputSolution( void*   s,      /*!< Array of simulation objects of type #Si
                               solver,
                               mpi,
                               fname_root );
-      
-      
+
+
       if (ierr) {
         fprintf(stderr, "Error: WriteArray returned error code %d\n", ierr);
       }
-      
+
       free(u_host);
-      
+
     } else {
       WriteArray(  solver->ndims,
                    solver->nvars,
@@ -230,10 +230,10 @@ int OutputSolution( void*   s,      /*!< Array of simulation objects of type #Si
 
   }
 
-  
+
   /* Force a flush and small delay to see if segfault is during return */
-  
+
   int retval = 0;
-  
+
   return(retval);
 }

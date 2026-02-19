@@ -23,24 +23,24 @@ int GPUNavierStokes3DSource(
 {
   HyPar *solver = (HyPar*) s;
   NavierStokes3D *param = (NavierStokes3D*) solver->physics;
-  
+
   if (!param) {
     fprintf(stderr, "Error: GPUNavierStokes3DSource: param is NULL\n");
     return 1;
   }
-  
+
   int nvars = param->nvars;
   int npoints = solver->npoints_local_wghosts;
-  
+
   /* Set source to zero on GPU */
   gpu_launch_ns3d_source_zero(source, nvars, npoints, 256);
   if (GPUShouldSyncEveryOp()) GPUSync();
-  
+
   /* Add chemistry source terms if enabled */
   if (param->include_chem) {
     GPUChemistrySource(solver, u, source, param->chem, m, t);
   }
-  
+
   return 0;
 }
 

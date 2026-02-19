@@ -81,7 +81,7 @@ void gpu_launch_ns2d_upwind_roe(
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
   int total_threads = numBlocks * blockSize;
-  
+
   /* Allocate workspace for Roe scheme: 3*nvars + 5*nvars*nvars per thread */
   size_t workspace_per_thread = 3 * nvars + 5 * nvars * nvars;
   size_t total_workspace = total_threads * workspace_per_thread;
@@ -95,7 +95,7 @@ void gpu_launch_ns2d_upwind_roe(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
     ghosts, dir, gamma, workspace
   );
-  
+
   GPUFree(workspace);
 }
 
@@ -117,7 +117,7 @@ void gpu_launch_ns2d_upwind_rf(
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
   int total_threads = numBlocks * blockSize;
-  
+
   /* Allocate workspace for RF scheme: 9*nvars + 3*nvars*nvars per thread */
   size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
   size_t total_workspace = total_threads * workspace_per_thread;
@@ -131,7 +131,7 @@ void gpu_launch_ns2d_upwind_rf(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
     ghosts, dir, gamma, workspace
   );
-  
+
   GPUFree(workspace);
 }
 
@@ -153,7 +153,7 @@ void gpu_launch_ns2d_upwind_llf(
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
   int total_threads = numBlocks * blockSize;
-  
+
   /* Allocate workspace for LLF scheme: 9*nvars + 3*nvars*nvars per thread */
   size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
   size_t total_workspace = total_threads * workspace_per_thread;
@@ -167,7 +167,7 @@ void gpu_launch_ns2d_upwind_llf(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
     ghosts, dir, gamma, workspace
   );
-  
+
   GPUFree(workspace);
 }
 
@@ -189,7 +189,7 @@ void gpu_launch_ns2d_upwind_rusanov(
 
   int numBlocks = (total_interfaces + blockSize - 1) / blockSize;
   int total_threads = numBlocks * blockSize;
-  
+
   /* Allocate workspace for Rusanov scheme: 2*nvars per thread */
   size_t workspace_per_thread = 2 * nvars;
   size_t total_workspace = total_threads * workspace_per_thread;
@@ -203,7 +203,7 @@ void gpu_launch_ns2d_upwind_rusanov(
     fI, fL, fR, uL, uR, u, nvars, ndims, d_dim, d_stride_with_ghosts, d_bounds_inter,
     ghosts, dir, gamma, workspace
   );
-  
+
   GPUFree(workspace);
 }
 

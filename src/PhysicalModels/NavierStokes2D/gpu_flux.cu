@@ -26,19 +26,19 @@ GPU_KERNEL void gpu_ns2d_flux_kernel(
   for (int i = 0; i < ndims; i++) {
     total_points *= (dim[i] + 2 * ghosts);
   }
-  
+
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < total_points) {
     /* idx is already the flat index into the array with ghosts, so p = idx */
     int p = idx;
-    
+
     double rho = u[p*nvars + 0];
     double vx = (rho == 0) ? 0 : u[p*nvars + 1] / rho;
     double vy = (rho == 0) ? 0 : u[p*nvars + 2] / rho;
     double e = u[p*nvars + 3];
     double vsq = vx*vx + vy*vy;
     double P = (gamma - 1.0) * (e - 0.5 * rho * vsq);
-    
+
     if (dir == _XDIR_) {
       f[p*nvars + 0] = rho * vx;
       f[p*nvars + 1] = rho * vx * vx + P;

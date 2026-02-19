@@ -70,10 +70,10 @@ int GPUHyperbolicFunction(
   for (d = 0; d < ndims; d++) {
     _ArrayCopy1D_(dim, dim_interface, ndims);
     dim_interface[d]++;
-    
+
     int size_cellcenter = 1;
     for (i = 0; i < ndims; i++) size_cellcenter *= (dim[i] + 2 * ghosts);
-    
+
     int size_interface = 1;
     for (i = 0; i < ndims; i++) size_interface *= dim_interface[i];
 
@@ -131,7 +131,7 @@ int GPUHyperbolicFunction(
             }
           }
         }
-        
+
         /* Call GPU interpolation through the solver function pointer.
            This ensures we honor hyp_interp_type (components vs characteristic)
            just like the CPU path does. */
@@ -157,7 +157,7 @@ int GPUHyperbolicFunction(
         double *uR_host = (double*) malloc(size_interface * nvars * sizeof(double));
         double *fluxL_host = (double*) malloc(size_interface * nvars * sizeof(double));
         double *fluxR_host = (double*) malloc(size_interface * nvars * sizeof(double));
-        
+
         if (!u_host || !FluxC_host || !x_host || !uL_host || !uR_host || !fluxL_host || !fluxR_host) {
           fprintf(stderr, "Error: Failed to allocate host buffers for CPU interpolation\n");
           if (u_host) free(u_host);
@@ -169,13 +169,13 @@ int GPUHyperbolicFunction(
           if (fluxR_host) free(fluxR_host);
           return 1;
         }
-        
+
         /* Copy from GPU to host */
         GPUCopyToHost(u_host, u, size_cellcenter * nvars * sizeof(double));
         GPUCopyToHost(FluxC_host, FluxC, size_cellcenter * nvars * sizeof(double));
         GPUCopyToHost(x_host, x + offset, (dim[d] + 2*ghosts) * sizeof(double));
         if (GPUShouldSyncEveryOp()) GPUSync();
-        
+
         /* Precalculate nonlinear interpolation coefficients if required */
         if (LimFlag && solver->SetInterpLimiterVar) {
           if (!solver->interp) {
@@ -198,7 +198,7 @@ int GPUHyperbolicFunction(
           solver->u = u_save;
           solver->x = x_save;
         }
-        
+
         /* Call CPU interpolation functions */
         double *u_save_interp = solver->u;
         double *x_save_interp = solver->x;
@@ -214,14 +214,14 @@ int GPUHyperbolicFunction(
         CHECKERR(ierr);
         solver->u = u_save_interp;
         solver->x = x_save_interp;
-        
+
         /* Copy back to GPU */
         GPUCopyToDevice(uL, uL_host, size_interface * nvars * sizeof(double));
         GPUCopyToDevice(uR, uR_host, size_interface * nvars * sizeof(double));
         GPUCopyToDevice(fluxL, fluxL_host, size_interface * nvars * sizeof(double));
         GPUCopyToDevice(fluxR, fluxR_host, size_interface * nvars * sizeof(double));
       if (GPUShouldSyncEveryOp()) GPUSync();
-        
+
         free(u_host);
         free(FluxC_host);
         free(x_host);
@@ -250,13 +250,13 @@ int GPUHyperbolicFunction(
       /* GPU enabled but InterpolateInterfacesHyp is NULL - this shouldn't happen */
       /* Copy to host, use CPU interpolation, copy back */
       fprintf(stderr, "Warning: GPU enabled but InterpolateInterfacesHyp is NULL, using CPU interpolation\n");
-      
+
       /* Allocate host buffers */
       double *u_host = (double*) malloc(size_cellcenter * nvars * sizeof(double));
       double *FluxC_host = (double*) malloc(size_cellcenter * nvars * sizeof(double));
       double *x_host = (double*) malloc((dim[d] + 2*ghosts) * sizeof(double));
       double *FluxI_host = (double*) malloc(size_interface * nvars * sizeof(double));
-      
+
       if (!u_host || !FluxC_host || !x_host || !FluxI_host) {
         fprintf(stderr, "Error: Failed to allocate host buffers for CPU interpolation fallback\n");
         if (u_host) free(u_host);
@@ -265,13 +265,13 @@ int GPUHyperbolicFunction(
         if (FluxI_host) free(FluxI_host);
         return 1;
       }
-      
+
       /* Copy from GPU to host */
       GPUCopyToHost(u_host, u, size_cellcenter * nvars * sizeof(double));
       GPUCopyToHost(FluxC_host, FluxC, size_cellcenter * nvars * sizeof(double));
       GPUCopyToHost(x_host, x + offset, (dim[d] + 2*ghosts) * sizeof(double));
       /* GPUCopyToHost uses a synchronous copy; avoid forced device sync here. */
-      
+
       /* Call CPU ReconstructHyperbolic - but it's static, so we need to call HyperbolicFunction's logic */
       /* For now, use simple default upwinding on host */
       /* This is a fallback - InterpolateInterfacesHyp should always be set */
@@ -280,11 +280,11 @@ int GPUHyperbolicFunction(
           FluxI_host[i*nvars + v] = 0.5 * (FluxC_host[i*nvars + v] + FluxC_host[(i+1)*nvars + v]);
         }
       }
-      
+
       /* Copy back to GPU */
       GPUCopyToDevice(FluxI, FluxI_host, size_interface * nvars * sizeof(double));
       if (GPUShouldSyncEveryOp()) GPUSync();
-      
+
       free(u_host);
       free(FluxC_host);
       free(x_host);
@@ -299,7 +299,7 @@ int GPUHyperbolicFunction(
       /* Use cached metadata arrays (already on device) */
       int *dim_gpu = solver->gpu_dim_local;
       int *stride_gpu = solver->gpu_stride_with_ghosts;
-      
+
       /* Launch multi-dimensional GPU kernel */
       gpu_launch_hyperbolic_flux_derivative_nd(
         hyp, FluxI, dxinv, solver->StageBoundaryIntegral,

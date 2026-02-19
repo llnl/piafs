@@ -86,7 +86,7 @@ int main(int argc, char **argv)
 {
   /* Set stdout to line-buffered mode for better output in multi-process context */
   setvbuf(stdout, NULL, _IOLBF, 0);
-  
+
   int               ierr = 0, d, n;
   struct timeval    main_start, solve_start;
   struct timeval    main_end  , solve_end  ;
@@ -127,7 +127,7 @@ int main(int argc, char **argv)
   MPI_Comm_dup(MPI_COMM_WORLD, &world);
   MPI_Comm_rank(MPI_COMM_WORLD,&rank );
   MPI_Comm_size(MPI_COMM_WORLD,&nproc);
-  
+
   /* Compute local rank (rank within the node) for GPU assignment */
   int local_rank = 0;
   int local_size = 1;
@@ -141,7 +141,7 @@ int main(int argc, char **argv)
     MPI_Comm_rank(shmcomm, &local_rank);
     MPI_Comm_size(shmcomm, &local_size);
     MPI_Comm_free(&shmcomm);
-    
+
     /* Initialize GPU for this MPI rank and get device count */
     if (GPUShouldUse()) {
       gpu_count_local = GPUInitializeMPI(rank, local_rank, local_size);
@@ -152,7 +152,7 @@ int main(int argc, char **argv)
     } else {
       gpu_count_local = GPUGetDeviceCount();
     }
-    
+
     /* Count total GPUs across all nodes (only local rank 0 contributes to avoid double counting) */
     int my_gpu_contribution = (local_rank == 0) ? gpu_count_local : 0;
     int my_node_contribution = (local_rank == 0) ? 1 : 0;
@@ -173,7 +173,7 @@ int main(int argc, char **argv)
 #ifdef GPU_CUDA
     {
       if (gpu_count_total > 0) {
-        printf("  GPU Devices: %d total (%d per node, %d node%s)", 
+        printf("  GPU Devices: %d total (%d per node, %d node%s)",
                gpu_count_total, gpu_count_local, num_nodes, num_nodes > 1 ? "s" : "");
         if (GPUShouldUse()) {
           printf(" (GPU ENABLED)\n");
@@ -185,7 +185,7 @@ int main(int argc, char **argv)
 #elif defined(GPU_HIP)
     {
       if (gpu_count_total > 0) {
-        printf("  GPU Devices: %d total (%d per node, %d node%s)", 
+        printf("  GPU Devices: %d total (%d per node, %d node%s)",
                gpu_count_total, gpu_count_local, num_nodes, num_nodes > 1 ? "s" : "");
         if (GPUShouldUse()) {
           printf(" (GPU ENABLED)\n");

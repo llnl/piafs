@@ -131,11 +131,11 @@ void gpu_launch_chemistry_photon_density_3d_batched(
 );
 
 /* GPU-enabled ChemistrySource function */
-int GPUChemistrySource(void* a_s, double* a_U, double* a_S, 
+int GPUChemistrySource(void* a_s, double* a_U, double* a_S,
                        void* a_p, void* a_m, double a_t);
 
 /* GPU-enabled ChemistrySetPhotonDensity function */
-int GPUChemistrySetPhotonDensity(void* a_s, void* a_p, void* a_m, 
+int GPUChemistrySetPhotonDensity(void* a_s, void* a_p, void* a_m,
                                   double* a_U, double a_t);
 
 /* GPU memory allocation for chemistry arrays */

@@ -27,7 +27,7 @@
 #else
   free(param->nv_hnu);
 #endif
-  
+
   free(param->imap);
 
   return 0;

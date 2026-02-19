@@ -33,7 +33,7 @@ GPU_KERNEL void gpu_ns3d_flux_kernel(
   for (int i = 0; i < ndims; i++) {
     total_points *= (dim[i] + 2 * ghosts);
   }
-  
+
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < total_points) {
     /* Decompose idx into multi-dimensional index */
@@ -44,7 +44,7 @@ GPU_KERNEL void gpu_ns3d_flux_kernel(
       index[i] = temp % (dim[i] + 2 * ghosts);
       temp /= (dim[i] + 2 * ghosts);
     }
-    
+
     /* Compute 1D index using stride_with_ghosts */
     /* stride_with_ghosts[i] is the stride for dimension i */
     /* index[i] already ranges from 0 to dim[i] + 2*ghosts - 1 (including ghosts) */
@@ -53,18 +53,18 @@ GPU_KERNEL void gpu_ns3d_flux_kernel(
     for (int i = 0; i < ndims; i++) {
       p += index[i] * stride_with_ghosts[i];
     }
-    
+
     /* Get flow variables from solution */
     double rho = u[p*nvars + 0];
     double vx  = u[p*nvars + 1] / rho;
     double vy  = u[p*nvars + 2] / rho;
     double vz  = u[p*nvars + 3] / rho;
     double e   = u[p*nvars + 4];
-    
+
     /* Compute pressure */
     double vsq = vx*vx + vy*vy + vz*vz;
     double P = (gamma - 1.0) * (e - 0.5 * rho * vsq);
-    
+
     /* Compute flux based on direction */
     if (dir == _XDIR_) {
       f[p*nvars + 0] = rho * vx;

@@ -25,7 +25,7 @@ void gpu_launch_array_multiply(double *z, const double *x, const double *y, int 
 double gpu_launch_array_max(const double *x, int n, int blockSize);
 
 /* Optimized version using persistent reduction buffers from solver */
-double gpu_launch_array_max_opt(const double *x, int n, 
+double gpu_launch_array_max_opt(const double *x, int n,
                                  double *reduce_buffer, size_t buffer_size,
                                  double *reduce_result, int blockSize);
 

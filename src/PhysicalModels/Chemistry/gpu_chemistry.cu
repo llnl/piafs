@@ -78,13 +78,13 @@ GPU_KERNEL void gpu_chemistry_photon_density_1d2d_kernel(
 {
   int p = blockIdx.x * blockDim.x + threadIdx.x;
   if (p >= npoints) return;
-  
+
   // First z-layer (iz = 0) from prescribed function
   double imap_p = imap[p];
   nv_hnu[nz * p + 0] = gpu_hnu_first_layer(
     I0, c, h, nu, n_O2_chem, t_pulse_norm, t_start_norm, imap_p, t
   );
-  
+
   // Remaining z-layers computed sequentially with damping
   for (int iz = 1; iz < nz; iz++) {
     double n_O3 = u[grid_stride * p + n_flow_vars + z_stride * (iz - 1) + iO3];
@@ -116,13 +116,13 @@ GPU_KERNEL void gpu_chemistry_photon_density_3d_first_layer_kernel(
 {
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   int j = blockIdx.y * blockDim.y + threadIdx.y;
-  
+
   if (i >= imax || j >= jmax) return;
-  
+
   int k = 0;
   // Compute 1D index
   int p = (i + ghosts) + (dim0 + 2 * ghosts) * ((j + ghosts) + (dim1 + 2 * ghosts) * (k + ghosts));
-  
+
   double imap_p = imap[p];
   nv_hnu[p] = gpu_hnu_first_layer(
     I0, c, h, nu, n_O2_chem, t_pulse_norm, t_start_norm, imap_p, t
@@ -281,8 +281,8 @@ GPU_KERNEL void gpu_chemistry_source_kernel(
     int rem = idx - k * stride_k;
     int j = rem / stride_j;
     int i = rem - j * stride_j;
-    if (i < ghosts || i >= dim0+ghosts || 
-        j < ghosts || j >= dim1+ghosts || 
+    if (i < ghosts || i >= dim0+ghosts ||
+        j < ghosts || j >= dim1+ghosts ||
         k < ghosts || k >= dim2+ghosts) {
       return; /* Ghost point, skip */
     }
@@ -292,11 +292,11 @@ GPU_KERNEL void gpu_chemistry_source_kernel(
    * For 1D/2D: nz>1, z_stride>0, nv_hnu[nz*idx+iz]
    */
   int nz = (ndims == 3) ? 1 : (z_i + 1);
-  
+
   for (int iz = 0; iz < nz; iz++) {
     int nfv = n_flow_vars + z_stride * iz;
     double n_hnu_val = (ndims == 3) ? nv_hnu[idx] : nv_hnu[nz * idx + iz];
-    
+
     // Load species concentrations
     double n_O2  = u[grid_stride * idx + nfv + iO2];
     double n_O3  = u[grid_stride * idx + nfv + iO3];
@@ -305,45 +305,45 @@ GPU_KERNEL void gpu_chemistry_source_kernel(
     double n_3Su = u[grid_stride * idx + nfv + i3Su];
     double n_1Sg = u[grid_stride * idx + nfv + i1Sg];
     double n_CO2 = u[grid_stride * idx + nfv + iCO2];
-    
+
     // Compute reaction source terms
     /* O2 */
     source[grid_stride * idx + nfv + iO2] = 0.0;
-    
+
     /* O3 */
-    source[grid_stride * idx + nfv + iO3] = 
+    source[grid_stride * idx + nfv + iO3] =
       - (k0a + k0b) * n_hnu_val * n_O3
       - (k2a + k2b) * n_O3 * n_1D
       - (k3a + k3b) * n_O3 * n_1Sg
       - k5 * n_O3 * n_3Su
       - k6 * n_1Dg * n_O3;
-    
+
     /* 1D */
-    source[grid_stride * idx + nfv + i1D] = 
+    source[grid_stride * idx + nfv + i1D] =
         k0a * n_hnu_val * n_O3
       - (k1a + k1b) * n_1D * n_O2
       - (k2a + k2b) * n_1D * n_O3
       - k4 * n_1D * n_CO2;
-    
+
     /* 1Dg */
-    source[grid_stride * idx + nfv + i1Dg] = 
+    source[grid_stride * idx + nfv + i1Dg] =
         k0a * n_hnu_val * n_O3
       + k5 * n_O3 * n_3Su
       - k6 * n_1Dg * n_O3;
-    
+
     /* 3Su */
-    source[grid_stride * idx + nfv + i3Su] = 
+    source[grid_stride * idx + nfv + i3Su] =
         k2a * n_O3 * n_1D
       - k5 * n_O3 * n_3Su;
-    
+
     /* 1Sg */
-    source[grid_stride * idx + nfv + i1Sg] = 
+    source[grid_stride * idx + nfv + i1Sg] =
         k1a * n_1D * n_O2
       - (k3a + k3b) * n_O3 * n_1Sg;
-    
+
     /* CO2 */
     source[grid_stride * idx + nfv + iCO2] = 0.0;
-    
+
     // Compute heating source term (energy equation)
     double Q = (
         (q0a * k0a + q0b * k0b) * n_hnu_val * n_O3
@@ -354,7 +354,7 @@ GPU_KERNEL void gpu_chemistry_source_kernel(
       + q5 * k5 * n_O3 * n_3Su
       + q6 * k6 * n_1Dg * n_O3
     ) * gamma_m1_inv;
-    
+
     // Set energy equation source (CPU uses assignment, not addition)
     source[grid_stride * idx + n_flow_vars - 1] = Q;
   }
@@ -396,10 +396,10 @@ void gpu_launch_chemistry_source(
   #ifndef DEFAULT_BLOCK_SIZE
   #define DEFAULT_BLOCK_SIZE 256
   #endif
-  
+
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
   int gridSize = (npoints + blockSize - 1) / blockSize;
-  
+
   GPU_KERNEL_LAUNCH(gpu_chemistry_source_kernel, gridSize, blockSize)(
     source, u, nv_hnu, npoints, nvars,
     n_flow_vars, grid_stride, z_stride, z_i, ndims,
@@ -408,7 +408,7 @@ void gpu_launch_chemistry_source(
     q0a, q0b, q1a, q1b, q2a, q2b, q3a, q3b, q4, q5, q6,
     gamma_m1_inv
   );
-  
+
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
 #endif
 }
@@ -443,15 +443,15 @@ void gpu_launch_chemistry_photon_density_1d2d(
   #ifndef DEFAULT_BLOCK_SIZE
   #define DEFAULT_BLOCK_SIZE 256
   #endif
-  
+
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE;
   int gridSize = (npoints + blockSize - 1) / blockSize;
-  
+
   GPU_KERNEL_LAUNCH(gpu_chemistry_photon_density_1d2d_kernel, gridSize, blockSize)(
     nv_hnu, u, imap, npoints, grid_stride, z_stride, n_flow_vars, nz,
     I0, c, h, nu, n_O2_chem, t_pulse_norm, t_start_norm, sO3, dz, t
   );
-  
+
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
 #endif
 }
@@ -484,17 +484,17 @@ void gpu_launch_chemistry_photon_density_3d_first_layer(
   #ifndef DEFAULT_BLOCK_SIZE_2D
   #define DEFAULT_BLOCK_SIZE_2D 16
   #endif
-  
+
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE_2D;
-  
+
   dim3 blockDim(blockSize, blockSize);
   dim3 gridDim((imax + blockSize - 1) / blockSize, (jmax + blockSize - 1) / blockSize);
-  
+
   GPU_KERNEL_LAUNCH(gpu_chemistry_photon_density_3d_first_layer_kernel, gridDim, blockDim)(
     nv_hnu, imap, imax, jmax, dim0, dim1, dim2, ghosts,
     I0, c, h, nu, n_O2_chem, t_pulse_norm, t_start_norm, t
   );
-  
+
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
 #endif
 }
@@ -525,16 +525,16 @@ void gpu_launch_chemistry_photon_density_3d_next_layer(
   #ifndef DEFAULT_BLOCK_SIZE_2D
   #define DEFAULT_BLOCK_SIZE_2D 16
   #endif
-  
+
   if (blockSize <= 0) blockSize = DEFAULT_BLOCK_SIZE_2D;
-  
+
   dim3 blockDim(blockSize, blockSize);
   dim3 gridDim((imax + blockSize - 1) / blockSize, (jmax + blockSize - 1) / blockSize);
-  
+
   GPU_KERNEL_LAUNCH(gpu_chemistry_photon_density_3d_next_layer_kernel, gridDim, blockDim)(
     nv_hnu, u, imax, jmax, k, dim0, dim1, dim2, ghosts, grid_stride, n_flow_vars, sO3, n_O2_chem, dz
   );
-  
+
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
 #endif
 }

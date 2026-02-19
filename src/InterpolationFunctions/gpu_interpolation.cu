@@ -19,12 +19,12 @@ struct GPUInterpMetadata {
   bool dim_stride_cached;  /* Track if dim/stride have been copied */
   int cached_dim[3];       /* Cached host-side dim values */
   int cached_stride[3];    /* Cached host-side stride values */
-  
+
   GPUInterpMetadata() : dim_gpu(NULL), stride_gpu(NULL), bounds_gpu(NULL), ndims(0), allocated(false), dim_stride_cached(false) {
     cached_dim[0] = cached_dim[1] = cached_dim[2] = 0;
     cached_stride[0] = cached_stride[1] = cached_stride[2] = 0;
   }
-  
+
   int setup(const int *dim_host, const int *stride_host, const int *bounds_host, int nd) {
     /* Only reallocate if ndims changed; otherwise reuse existing device buffers */
     if (!allocated || ndims != nd) {
@@ -68,11 +68,11 @@ struct GPUInterpMetadata {
       }
       dim_stride_cached = true;
       #ifdef GPU_INTERP_DEBUG
-      fprintf(stderr, "[GPU_INTERP] %s: copied dim and stride (ndims=%d)\n", 
+      fprintf(stderr, "[GPU_INTERP] %s: copied dim and stride (ndims=%d)\n",
               dims_changed ? "Dimensions changed" : "First call", ndims);
       #endif
     }
-    
+
     /* Always copy bounds_inter - it changes per direction */
     GPUCopyToDevice(bounds_gpu, bounds_host, ndims * sizeof(int));
     #ifdef GPU_INTERP_DEBUG
@@ -81,7 +81,7 @@ struct GPUInterpMetadata {
 
     return 0;
   }
-  
+
   void cleanup() {
     if (allocated) {
       GPUFree(dim_gpu);
@@ -96,7 +96,7 @@ struct GPUInterpMetadata {
       cached_stride[0] = cached_stride[1] = cached_stride[2] = 0;
     }
   }
-  
+
   ~GPUInterpMetadata() { cleanup(); }
 };
 
@@ -215,10 +215,10 @@ GPU_KERNEL void gpu_weno5_interpolation_kernel(
       qp1 = qm1 - stride;
       qp2 = qm1 - 2*stride;
     }
-    
+
     /* Candidate stencils */
     static const double one_sixth = 1.0/6.0;
-    
+
     for (int v = 0; v < nvars; v++) {
       /* Stencil 1: i-3, i-2, i-1 */
       double f1 = (2*one_sixth)*fC[qm3*nvars+v] + (-7*one_sixth)*fC[qm2*nvars+v] + (11*one_sixth)*fC[qm1*nvars+v];
@@ -226,7 +226,7 @@ GPU_KERNEL void gpu_weno5_interpolation_kernel(
       double f2 = (-one_sixth)*fC[qm2*nvars+v] + (5*one_sixth)*fC[qm1*nvars+v] + (2*one_sixth)*fC[qp1*nvars+v];
       /* Stencil 3: i-1, i, i+1 */
       double f3 = (2*one_sixth)*fC[qm1*nvars+v] + (5*one_sixth)*fC[qp1*nvars+v] + (-one_sixth)*fC[qp2*nvars+v];
-      
+
       /* Weighted combination */
       fI[idx*nvars+v] = w1[idx*nvars+v]*f1 + w2[idx*nvars+v]*f2 + w3[idx*nvars+v]*f3;
     }
@@ -246,7 +246,7 @@ GPU_KERNEL void gpu_central2_interpolation_kernel(
   if (idx < ninterfaces) {
     int q1 = idx + stride;      /* cell i */
     int q2 = idx + stride + 1;  /* cell i+1 */
-    
+
     for (int v = 0; v < nvars; v++) {
       fI[idx*nvars+v] = 0.5 * (fC[q1*nvars+v] + fC[q2*nvars+v]);
     }
@@ -268,12 +268,12 @@ GPU_KERNEL void gpu_central4_interpolation_kernel(
     int q0  = idx + stride;       /* cell i */
     int qp1 = idx + 1 + stride;  /* cell i+1 */
     int qp2 = idx + 2 + stride;  /* cell i+2 */
-    
+
     static const double c0 = -1.0/12.0;
     static const double c1 = 7.0/12.0;
     static const double c2 = 7.0/12.0;
     static const double c3 = -1.0/12.0;
-    
+
     for (int v = 0; v < nvars; v++) {
       fI[idx*nvars+v] = c0*fC[qm1*nvars+v] + c1*fC[q0*nvars+v] + c2*fC[qp1*nvars+v] + c3*fC[qp2*nvars+v];
     }
@@ -305,19 +305,19 @@ GPU_KERNEL void gpu_muscl3_interpolation_kernel(
       qm1 = idx + 1 + stride;
       q0  = idx + stride;
     }
-    
+
     static const double one_third = 1.0/3.0;
     static const double one_sixth = 1.0/6.0;
-    
+
     for (int v = 0; v < nvars; v++) {
       double df1 = fC[qm1*nvars+v] - fC[qm2*nvars+v];
       double df2 = fC[q0*nvars+v] - fC[qm1*nvars+v];
-      
+
       /* Koren's limiter */
       double num = 3.0 * df1 * df2 + eps;
       double den = 2.0 * (df2 - df1) * (df2 - df1) + 3.0 * df1 * df2 + eps;
       double phi = (den > 1e-14) ? num / den : 1.0;
-      
+
       /* MUSCL interpolation */
       fI[idx*nvars+v] = fC[qm1*nvars+v] + phi * (one_third*df2 + one_sixth*df1);
     }
@@ -1625,7 +1625,7 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_kernel(
   for (int i = 0; i < ndims; i++) {
     total_interfaces *= bounds_inter[i];
   }
-  
+
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < total_interfaces) {
     /* Decompose idx into multi-dimensional interface index */
@@ -1635,19 +1635,19 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_kernel(
       indexI[i] = temp % bounds_inter[i];
       temp /= bounds_inter[i];
     }
-    
+
     /* Compute 1D index for interface point (no ghosts) - matches _ArrayIndex1D_ with ghost=0 */
     int p = indexI[ndims-1];
     for (int i = ndims-2; i >= 0; i--) {
       p = p * bounds_inter[i] + indexI[i];
     }
-    
+
     /* Compute cell-centered index for this interface */
     int indexC[3];
     for (int i = 0; i < ndims; i++) {
       indexC[i] = indexI[i];
     }
-    
+
     /* Compute stencil point indices - match CPU code exactly */
     /* CPU code computes qm1 first, then uses relative offsets with stride[dir] */
     int qm1, qm2, qm3, qp1, qp2;
@@ -1678,10 +1678,10 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_kernel(
       qp1 = qm1 -   stride_with_ghosts[dir];
       qp2 = qm1 - 2*stride_with_ghosts[dir];
     }
-    
+
     /* Candidate stencils */
     static const double one_sixth = 1.0/6.0;
-    
+
     for (int v = 0; v < nvars; v++) {
       /* Stencil 1: i-3, i-2, i-1 */
       double f1 = (2*one_sixth)*fC[qm3*nvars+v] + (-7*one_sixth)*fC[qm2*nvars+v] + (11*one_sixth)*fC[qm1*nvars+v];
@@ -1689,7 +1689,7 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_kernel(
       double f2 = (-one_sixth)*fC[qm2*nvars+v] + (5*one_sixth)*fC[qm1*nvars+v] + (2*one_sixth)*fC[qp1*nvars+v];
       /* Stencil 3: i-1, i, i+1 */
       double f3 = (2*one_sixth)*fC[qm1*nvars+v] + (5*one_sixth)*fC[qp1*nvars+v] + (-one_sixth)*fC[qp2*nvars+v];
-      
+
       /* Weighted combination */
       fI[p*nvars+v] = w1[p*nvars+v]*f1 + w2[p*nvars+v]*f2 + w3[p*nvars+v]*f3;
     }
@@ -1718,27 +1718,27 @@ void gpu_launch_weno5_interpolation_nd(
   }
 #else
   if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
-  
+
   /* Use cached metadata to avoid repeated alloc/copy/free */
   if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
     fprintf(stderr, "Error: Failed to setup GPU metadata for interpolation\n");
     return;
   }
-  
+
   /* Compute total number of interface points */
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) {
     total_interfaces *= bounds_inter[i];
   }
-  
+
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
-  
+
   GPU_KERNEL_LAUNCH(gpu_weno5_interpolation_nd_kernel, gridSize, blockSize)(
-    fI, fC, w1, w2, w3, nvars, ndims, cached_metadata.dim_gpu, cached_metadata.stride_gpu, 
+    fI, fC, w1, w2, w3, nvars, ndims, cached_metadata.dim_gpu, cached_metadata.stride_gpu,
     cached_metadata.bounds_gpu, ghosts, dir, upw
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  
+
   /* No need to free - metadata cached for reuse */
 #endif
 }
@@ -1770,7 +1770,7 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_char_kernel(
   for (int i = 0; i < ndims; i++) {
     total_interfaces *= bounds_inter[i];
   }
-  
+
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < total_interfaces) {
     /* Decompose idx into multi-dimensional interface index */
@@ -1780,19 +1780,19 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_char_kernel(
       indexI[i] = temp % bounds_inter[i];
       temp /= bounds_inter[i];
     }
-    
+
     /* Compute 1D index for interface point (no ghosts) */
     int p = indexI[ndims-1];
     for (int i = ndims-2; i >= 0; i--) {
       p = p * bounds_inter[i] + indexI[i];
     }
-    
+
     /* Compute cell-centered indices for this interface */
     int indexC[3];
     for (int i = 0; i < ndims; i++) {
       indexC[i] = indexI[i];
     }
-    
+
     /* Compute stencil point indices - match CPU code exactly */
     /* Compute stencil point indices - match CPU code exactly */
     /* CPU code computes qm1 first, then uses relative offsets with stride[dir] */
@@ -1839,22 +1839,22 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_char_kernel(
         qR = qR * (dim[i] + 2*ghosts) + (indexC[i] + ghosts);
       }
     }
-    
+
     /* Determine base number of variables from ndims: 1D=3, 2D=4, 3D=5 */
     const int base_nvars = ndims + 2;
-    
+
     /* Compute Roe-averaged state at interface for base variables only */
     double uavg[5];  /* max base_nvars = 5 */
     gpu_roe_average(uavg, u + qL*nvars, u + qR*nvars, base_nvars, ndims, gamma);
-    
+
     /* Get left and right eigenvectors at averaged state for base variables only */
     double L[25], R[25];  /* max 5x5 */
     gpu_left_eigenvectors(uavg, L, gamma, base_nvars, ndims, dir);
     gpu_right_eigenvectors(uavg, R, gamma, base_nvars, ndims, dir);
-    
+
     /* Candidate stencils */
     static const double one_sixth = 1.0/6.0;
-    
+
     /* Characteristic decomposition for base flow variables */
     double fchar[5];  /* max base_nvars = 5 */
     for (int v = 0; v < base_nvars; v++) {
@@ -1867,21 +1867,21 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_char_kernel(
         fp1 += L[v*base_nvars+k] * fC[qp1*nvars+k];
         fp2 += L[v*base_nvars+k] * fC[qp2*nvars+k];
       }
-      
+
       /* Candidate stencils */
       double f1 = (2*one_sixth)*fm3 + (-7*one_sixth)*fm2 + (11*one_sixth)*fm1;
       double f2 = (-one_sixth)*fm2 + (5*one_sixth)*fm1 + (2*one_sixth)*fp1;
       double f3 = (2*one_sixth)*fm1 + (5*one_sixth)*fp1 + (-one_sixth)*fp2;
-      
+
       /* WENO weights */
       double w1_val = w1[p*nvars+v];
       double w2_val = w2[p*nvars+v];
       double w3_val = w3[p*nvars+v];
-      
+
       /* Fifth order WENO approximation in characteristic space */
       fchar[v] = w1_val*f1 + w2_val*f2 + w3_val*f3;
     }
-    
+
     /* Transform back to physical space for base variables */
     for (int k = 0; k < base_nvars; k++) {
       double s = 0.0;
@@ -1890,7 +1890,7 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_char_kernel(
       }
       fI[p*nvars + k] = s;
     }
-    
+
     /* Component-wise WENO5 for passive scalars (chemistry variables) */
     for (int k = base_nvars; k < nvars; k++) {
       /* Get stencil values */
@@ -1899,17 +1899,17 @@ GPU_KERNEL void gpu_weno5_interpolation_nd_char_kernel(
       double fm1 = fC[qm1*nvars + k];
       double fp1 = fC[qp1*nvars + k];
       double fp2 = fC[qp2*nvars + k];
-      
+
       /* Candidate stencils */
       double f1 = (2*one_sixth)*fm3 + (-7*one_sixth)*fm2 + (11*one_sixth)*fm1;
       double f2 = (-one_sixth)*fm2 + (5*one_sixth)*fm1 + (2*one_sixth)*fp1;
       double f3 = (2*one_sixth)*fm1 + (5*one_sixth)*fp1 + (-one_sixth)*fp2;
-      
+
       /* WENO weights */
       double w1_val = w1[p*nvars+k];
       double w2_val = w2[p*nvars+k];
       double w3_val = w3[p*nvars+k];
-      
+
       /* Fifth order WENO approximation */
       fI[p*nvars + k] = w1_val*f1 + w2_val*f2 + w3_val*f3;
     }
@@ -1927,27 +1927,27 @@ void gpu_launch_weno5_interpolation_nd_char(
   /* CPU fallback */
 #else
   if (blockSize <= 0) blockSize = GPUGetBlockSize("compute_bound", nvars);
-  
+
   /* Use cached metadata to avoid repeated alloc/copy/free */
   if (cached_metadata.setup(dim, stride_with_ghosts, bounds_inter, ndims)) {
     fprintf(stderr, "Error: Failed to setup GPU metadata for characteristic interpolation\n");
     return;
   }
-  
+
   /* Compute total number of interface points */
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) {
     total_interfaces *= bounds_inter[i];
   }
-  
+
   int gridSize = (total_interfaces + blockSize - 1) / blockSize;
-  
+
   GPU_KERNEL_LAUNCH(gpu_weno5_interpolation_nd_char_kernel, gridSize, blockSize)(
-    fI, fC, u, w1, w2, w3, nvars, ndims, cached_metadata.dim_gpu, cached_metadata.stride_gpu, 
+    fI, fC, u, w1, w2, w3, nvars, ndims, cached_metadata.dim_gpu, cached_metadata.stride_gpu,
     cached_metadata.bounds_gpu, ghosts, dir, upw, gamma
   );
   GPU_CHECK_ERROR(GPU_GET_LAST_ERROR());
-  
+
   /* No need to free - metadata cached for reuse */
 #endif
 }
@@ -2123,28 +2123,28 @@ GPU_KERNEL void gpu_first_order_upwind_nd_kernel(
 {
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  
+
   const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
   if (tid >= total_interfaces) return;
-  
+
   int indexI[3] = {0,0,0};
   int tmp = tid;
   for (int i = 0; i < ndims; i++) { indexI[i] = tmp % bounds_inter[i]; tmp /= bounds_inter[i]; }
-  
+
   int indexC[3];
   for (int i = 0; i < ndims; i++) indexC[i] = indexI[i];
-  
+
   /* Select cell based on upwind direction */
   if (upw > 0) {
     indexC[dir] = indexI[dir] - 1; /* left cell */
   } else {
     indexC[dir] = indexI[dir];     /* right cell */
   }
-  
+
   /* Compute 1D index for cell center */
   int q = indexC[ndims-1] + ghosts;
   for (int i = ndims - 2; i >= 0; i--) q = q * (dim[i] + 2*ghosts) + (indexC[i] + ghosts);
-  
+
   for (int v = 0; v < nvars; v++) {
     fI[tid*nvars + v] = fC[q*nvars + v];
   }
@@ -2160,27 +2160,27 @@ GPU_KERNEL void gpu_second_order_central_nd_kernel(
 {
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  
+
   const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
   if (tid >= total_interfaces) return;
-  
+
   int indexI[3] = {0,0,0};
   int tmp = tid;
   for (int i = 0; i < ndims; i++) { indexI[i] = tmp % bounds_inter[i]; tmp /= bounds_inter[i]; }
-  
+
   int indexC[3];
   for (int i = 0; i < ndims; i++) indexC[i] = indexI[i];
-  
+
   const int stride_dir = stride_with_ghosts[dir];
-  
+
   /* Compute qL (cell at indexI-1) */
   indexC[dir] = indexI[dir] - 1;
   int qL = indexC[ndims-1] + ghosts;
   for (int i = ndims - 2; i >= 0; i--) qL = qL * (dim[i] + 2*ghosts) + (indexC[i] + ghosts);
-  
+
   /* qR = qL + stride_dir */
   int qR = qL + stride_dir;
-  
+
   for (int v = 0; v < nvars; v++) {
     fI[tid*nvars + v] = 0.5 * (fC[qL*nvars + v] + fC[qR*nvars + v]);
   }
@@ -2196,33 +2196,33 @@ GPU_KERNEL void gpu_fourth_order_central_nd_kernel(
 {
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  
+
   const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
   if (tid >= total_interfaces) return;
-  
+
   int indexI[3] = {0,0,0};
   int tmp = tid;
   for (int i = 0; i < ndims; i++) { indexI[i] = tmp % bounds_inter[i]; tmp /= bounds_inter[i]; }
-  
+
   int indexC[3];
   for (int i = 0; i < ndims; i++) indexC[i] = indexI[i];
-  
+
   const int stride_dir = stride_with_ghosts[dir];
-  
+
   /* Compute qL (cell at indexI-1) */
   indexC[dir] = indexI[dir] - 1;
   int qL = indexC[ndims-1] + ghosts;
   for (int i = ndims - 2; i >= 0; i--) qL = qL * (dim[i] + 2*ghosts) + (indexC[i] + ghosts);
-  
+
   int qLL = qL - stride_dir;
   int qR = qL + stride_dir;
   int qRR = qL + 2*stride_dir;
-  
+
   static const double c1 = 7.0 / 12.0;
   static const double c2 = -1.0 / 12.0;
-  
+
   for (int v = 0; v < nvars; v++) {
-    fI[tid*nvars + v] = c2*fC[qLL*nvars + v] + c1*fC[qL*nvars + v] 
+    fI[tid*nvars + v] = c2*fC[qLL*nvars + v] + c1*fC[qL*nvars + v]
                       + c1*fC[qR*nvars + v] + c2*fC[qRR*nvars + v];
   }
 }
@@ -2237,26 +2237,26 @@ GPU_KERNEL void gpu_fifth_order_upwind_nd_kernel(
 {
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  
+
   const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
   if (tid >= total_interfaces) return;
-  
+
   /* Decode tid to indexI using CPU-compatible ordering (first index fastest) */
   int indexI[3] = {0,0,0};
   int tmp = tid;
   for (int i = 0; i < ndims; i++) { indexI[i] = tmp % bounds_inter[i]; tmp /= bounds_inter[i]; }
-  
+
   int indexC[3];
   for (int i = 0; i < ndims; i++) indexC[i] = indexI[i];
-  
+
   const int stride_dir = stride_with_ghosts[dir];
-  
+
   static const double c1 = 1.0/30.0;
   static const double c2 = -13.0/60.0;
   static const double c3 = 47.0/60.0;
   static const double c4 = 27.0/60.0;
   static const double c5 = -1.0/20.0;
-  
+
   int qm1, qm2, qm3, qp1, qp2;
   if (upw > 0) {
     /* Left-biased */
@@ -2277,7 +2277,7 @@ GPU_KERNEL void gpu_fifth_order_upwind_nd_kernel(
     qp1 = qm1 - stride_dir;
     qp2 = qm1 - 2*stride_dir;
   }
-  
+
   for (int v = 0; v < nvars; v++) {
     fI[tid*nvars + v] = c1*fC[qm3*nvars + v] + c2*fC[qm2*nvars + v] + c3*fC[qm1*nvars + v]
                       + c4*fC[qp1*nvars + v] + c5*fC[qp2*nvars + v];
@@ -2295,37 +2295,37 @@ GPU_KERNEL void gpu_first_order_upwind_nd_char_ns3d_kernel(
 {
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  
+
   const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
   if (tid >= total_interfaces) return;
-  
+
   int indexI[3] = {0,0,0};
   int tmp = tid;
   for (int i = 0; i < ndims; i++) { indexI[i] = tmp % bounds_inter[i]; tmp /= bounds_inter[i]; }
-  
+
   int indexC[3];
   for (int i = 0; i < ndims; i++) indexC[i] = indexI[i];
-  
+
   const int stride_dir = stride_with_ghosts[dir];
-  
+
   /* Compute qL and qR for averaging */
   indexC[dir] = indexI[dir] - 1;
   int qL = indexC[ndims-1] + ghosts;
   for (int i = ndims - 2; i >= 0; i--) qL = qL * (dim[i] + 2*ghosts) + (indexC[i] + ghosts);
   int qR = qL + stride_dir;
-  
+
   /* Determine base number of variables from ndims: 1D=3, 2D=4, 3D=5 */
   const int base_nvars = ndims + 2;
-  
+
   /* Compute Roe average and eigenvectors using unified dispatch */
   double uavg[5], L[25], R[25];  /* max base_nvars = 5 */
   gpu_roe_average(uavg, &u[qL*nvars], &u[qR*nvars], base_nvars, ndims, gamma);
   gpu_left_eigenvectors(uavg, L, gamma, base_nvars, ndims, dir);
   gpu_right_eigenvectors(uavg, R, gamma, base_nvars, ndims, dir);
-  
+
   /* Select upwind cell */
   int q = (upw > 0) ? qL : qR;
-  
+
   /* Transform to characteristic, copy, transform back */
   double fchar[5];
   for (int v = 0; v < base_nvars; v++) {
@@ -2334,14 +2334,14 @@ GPU_KERNEL void gpu_first_order_upwind_nd_char_ns3d_kernel(
       fchar[v] += L[v*base_nvars+k] * fC[q*nvars+k];
     }
   }
-  
+
   /* Transform back */
   for (int v = 0; v < base_nvars; v++) {
     double sum = 0.0;
     for (int k = 0; k < base_nvars; k++) sum += R[v*base_nvars+k] * fchar[k];
     fI[tid*nvars + v] = sum;
   }
-  
+
   /* Copy passive scalars directly */
   for (int v = base_nvars; v < nvars; v++) {
     fI[tid*nvars + v] = fC[q*nvars + v];
@@ -2359,34 +2359,34 @@ GPU_KERNEL void gpu_second_order_central_nd_char_ns3d_kernel(
 {
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  
+
   const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
   if (tid >= total_interfaces) return;
-  
+
   int indexI[3] = {0,0,0};
   int tmp = tid;
   for (int i = 0; i < ndims; i++) { indexI[i] = tmp % bounds_inter[i]; tmp /= bounds_inter[i]; }
-  
+
   int indexC[3];
   for (int i = 0; i < ndims; i++) indexC[i] = indexI[i];
-  
+
   const int stride_dir = stride_with_ghosts[dir];
-  
+
   /* Compute qL and qR */
   indexC[dir] = indexI[dir] - 1;
   int qL = indexC[ndims-1] + ghosts;
   for (int i = ndims - 2; i >= 0; i--) qL = qL * (dim[i] + 2*ghosts) + (indexC[i] + ghosts);
   int qR = qL + stride_dir;
-  
+
   /* Determine base number of variables from ndims: 1D=3, 2D=4, 3D=5 */
   const int base_nvars = ndims + 2;
-  
+
   /* Compute Roe average and eigenvectors using unified dispatch */
   double uavg[5], L[25], R[25];  /* max base_nvars = 5 */
   gpu_roe_average(uavg, &u[qL*nvars], &u[qR*nvars], base_nvars, ndims, gamma);
   gpu_left_eigenvectors(uavg, L, gamma, base_nvars, ndims, dir);
   gpu_right_eigenvectors(uavg, R, gamma, base_nvars, ndims, dir);
-  
+
   /* Transform to characteristic space and interpolate */
   double fcharL[5], fcharR[5];
   for (int v = 0; v < base_nvars; v++) {
@@ -2396,18 +2396,18 @@ GPU_KERNEL void gpu_second_order_central_nd_char_ns3d_kernel(
       fcharR[v] += L[v*base_nvars+k] * fC[qR*nvars+k];
     }
   }
-  
+
   /* Second order central: average */
   double fchar[5];
   for (int v = 0; v < base_nvars; v++) fchar[v] = 0.5*(fcharL[v] + fcharR[v]);
-  
+
   /* Transform back */
   for (int v = 0; v < base_nvars; v++) {
     double sum = 0.0;
     for (int k = 0; k < base_nvars; k++) sum += R[v*base_nvars+k] * fchar[k];
     fI[tid*nvars + v] = sum;
   }
-  
+
   /* Passive scalars */
   for (int v = base_nvars; v < nvars; v++) {
     fI[tid*nvars + v] = 0.5*(fC[qL*nvars + v] + fC[qR*nvars + v]);
@@ -2425,19 +2425,19 @@ GPU_KERNEL void gpu_fourth_order_central_nd_char_ns3d_kernel(
 {
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  
+
   const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
   if (tid >= total_interfaces) return;
-  
+
   int indexI[3] = {0,0,0};
   int tmp = tid;
   for (int i = 0; i < ndims; i++) { indexI[i] = tmp % bounds_inter[i]; tmp /= bounds_inter[i]; }
-  
+
   int indexC[3];
   for (int i = 0; i < ndims; i++) indexC[i] = indexI[i];
-  
+
   const int stride_dir = stride_with_ghosts[dir];
-  
+
   /* Compute qL (cell at indexI-1) */
   indexC[dir] = indexI[dir] - 1;
   int qL = indexC[ndims-1] + ghosts;
@@ -2445,19 +2445,19 @@ GPU_KERNEL void gpu_fourth_order_central_nd_char_ns3d_kernel(
   int qLL = qL - stride_dir;
   int qR = qL + stride_dir;
   int qRR = qL + 2*stride_dir;
-  
+
   /* Determine base number of variables from ndims: 1D=3, 2D=4, 3D=5 */
   const int base_nvars = ndims + 2;
-  
+
   /* Compute Roe average and eigenvectors using unified dispatch */
   double uavg[5], L[25], R[25];  /* max base_nvars = 5 */
   gpu_roe_average(uavg, &u[qL*nvars], &u[qR*nvars], base_nvars, ndims, gamma);
   gpu_left_eigenvectors(uavg, L, gamma, base_nvars, ndims, dir);
   gpu_right_eigenvectors(uavg, R, gamma, base_nvars, ndims, dir);
-  
+
   static const double c1 = 7.0 / 12.0;
   static const double c2 = -1.0 / 12.0;
-  
+
   /* Transform to characteristic space and interpolate */
   double fcharLL[5], fcharL[5], fcharR[5], fcharRR[5];
   for (int v = 0; v < base_nvars; v++) {
@@ -2469,23 +2469,23 @@ GPU_KERNEL void gpu_fourth_order_central_nd_char_ns3d_kernel(
       fcharRR[v] += L[v*base_nvars+k] * fC[qRR*nvars+k];
     }
   }
-  
+
   /* Fourth order central interpolation in characteristic space */
   double fchar[5];
   for (int v = 0; v < base_nvars; v++) {
     fchar[v] = c2*fcharLL[v] + c1*fcharL[v] + c1*fcharR[v] + c2*fcharRR[v];
   }
-  
+
   /* Transform back */
   for (int v = 0; v < base_nvars; v++) {
     double sum = 0.0;
     for (int k = 0; k < base_nvars; k++) sum += R[v*base_nvars+k] * fchar[k];
     fI[tid*nvars + v] = sum;
   }
-  
+
   /* Passive scalars */
   for (int v = base_nvars; v < nvars; v++) {
-    fI[tid*nvars + v] = c2*fC[qLL*nvars + v] + c1*fC[qL*nvars + v] 
+    fI[tid*nvars + v] = c2*fC[qLL*nvars + v] + c1*fC[qL*nvars + v]
                       + c1*fC[qR*nvars + v] + c2*fC[qRR*nvars + v];
   }
 }
@@ -2501,25 +2501,25 @@ GPU_KERNEL void gpu_fifth_order_upwind_nd_char_ns3d_kernel(
 {
   int total_interfaces = 1;
   for (int i = 0; i < ndims; i++) total_interfaces *= bounds_inter[i];
-  
+
   const int tid = (int)(blockIdx.x * blockDim.x + threadIdx.x);
   if (tid >= total_interfaces) return;
-  
+
   int indexI[3] = {0,0,0};
   int tmp = tid;
   for (int i = 0; i < ndims; i++) { indexI[i] = tmp % bounds_inter[i]; tmp /= bounds_inter[i]; }
-  
+
   int indexC[3];
   for (int i = 0; i < ndims; i++) indexC[i] = indexI[i];
-  
+
   const int stride_dir = stride_with_ghosts[dir];
-  
+
   static const double c1 = 1.0/30.0;
   static const double c2 = -13.0/60.0;
   static const double c3 = 47.0/60.0;
   static const double c4 = 27.0/60.0;
   static const double c5 = -1.0/20.0;
-  
+
   int qL, qR, qm1, qm2, qm3, qp1, qp2;
   if (upw > 0) {
     indexC[dir] = indexI[dir] - 1;
@@ -2542,16 +2542,16 @@ GPU_KERNEL void gpu_fifth_order_upwind_nd_char_ns3d_kernel(
     qL = qp1;
     qR = qm1;
   }
-  
+
   /* Determine base number of variables from ndims: 1D=3, 2D=4, 3D=5 */
   const int base_nvars = ndims + 2;
-  
+
   /* Compute Roe average and eigenvectors using unified dispatch */
   double uavg[5], L[25], R[25];  /* max base_nvars = 5 */
   gpu_roe_average(uavg, &u[qL*nvars], &u[qR*nvars], base_nvars, ndims, gamma);
   gpu_left_eigenvectors(uavg, L, gamma, base_nvars, ndims, dir);
   gpu_right_eigenvectors(uavg, R, gamma, base_nvars, ndims, dir);
-  
+
   /* Transform to characteristic space */
   double fm3[5], fm2[5], fm1[5], fp1[5], fp2[5];
   for (int v = 0; v < base_nvars; v++) {
@@ -2564,20 +2564,20 @@ GPU_KERNEL void gpu_fifth_order_upwind_nd_char_ns3d_kernel(
       fp2[v] += L[v*base_nvars+k] * fC[qp2*nvars+k];
     }
   }
-  
+
   /* Fifth order upwind interpolation in characteristic space */
   double fchar[5];
   for (int v = 0; v < base_nvars; v++) {
     fchar[v] = c1*fm3[v] + c2*fm2[v] + c3*fm1[v] + c4*fp1[v] + c5*fp2[v];
   }
-  
+
   /* Transform back */
   for (int v = 0; v < base_nvars; v++) {
     double sum = 0.0;
     for (int k = 0; k < base_nvars; k++) sum += R[v*base_nvars+k] * fchar[k];
     fI[tid*nvars + v] = sum;
   }
-  
+
   /* Passive scalars */
   for (int v = base_nvars; v < nvars; v++) {
     fI[tid*nvars + v] = c1*fC[qm3*nvars + v] + c2*fC[qm2*nvars + v] + c3*fC[qm1*nvars + v]

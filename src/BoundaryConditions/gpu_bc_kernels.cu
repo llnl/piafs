@@ -55,11 +55,11 @@ GPU_KERNEL void gpu_bc_extrapolate_kernel(
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid >= npoints) return;
-  
+
   /* Compute bounds */
   int bounds[3];
   for (int i = 0; i < ndims; i++) bounds[i] = bc_ie[i] - bc_is[i];
-  
+
   /* Decompose tid into multi-dimensional boundary index */
   int indexb[3] = {0,0,0};
   int tmp = tid;
@@ -67,13 +67,13 @@ GPU_KERNEL void gpu_bc_extrapolate_kernel(
     indexb[i] = tmp % bounds[i];
     tmp /= bounds[i];
   }
-  
+
   /* Compute interior index for extrapolation */
   int indexi[3] = {0,0,0};
   for (int i = 0; i < ndims; i++) {
     indexi[i] = indexb[i] + bc_is[i];
   }
-  
+
   /* Adjust interior index based on face */
   if (bc_face == 1) {
     /* Left face: extrapolate from right */
@@ -82,13 +82,13 @@ GPU_KERNEL void gpu_bc_extrapolate_kernel(
     /* Right face: extrapolate from left */
     indexi[bc_dim] = size[bc_dim] - indexb[bc_dim] - 1;
   }
-  
+
   /* Compute 1D indices:
      p1 = boundary ghost cell (use offset, no ghost addition)
      p2 = interior cell (add ghosts) */
   int p1 = gpu_bc_index1d_wo(ndims, size, indexb, bc_is, ghosts);
   int p2 = gpu_bc_index1d(ndims, size, indexi, ghosts);
-  
+
   /* Copy values */
   for (int v = 0; v < nvars; v++) {
     phi[p1*nvars + v] = phi[p2*nvars + v];
@@ -109,20 +109,20 @@ GPU_KERNEL void gpu_bc_dirichlet_kernel(
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid >= npoints) return;
-  
+
   int bounds[3];
   for (int i = 0; i < ndims; i++) bounds[i] = bc_ie[i] - bc_is[i];
-  
+
   int indexb[3] = {0,0,0};
   int tmp = tid;
   for (int i = ndims - 1; i >= 0; i--) {
     indexb[i] = tmp % bounds[i];
     tmp /= bounds[i];
   }
-  
+
   /* p = boundary ghost cell (use offset, no ghost addition) */
   int p = gpu_bc_index1d_wo(ndims, size, indexb, bc_is, ghosts);
-  
+
   for (int v = 0; v < nvars; v++) {
     phi[p*nvars + v] = dirichlet_value[v];
   }
@@ -143,32 +143,32 @@ GPU_KERNEL void gpu_bc_reflect_kernel(
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid >= npoints) return;
-  
+
   int bounds[3];
   for (int i = 0; i < ndims; i++) bounds[i] = bc_ie[i] - bc_is[i];
-  
+
   int indexb[3] = {0,0,0};
   int tmp = tid;
   for (int i = ndims - 1; i >= 0; i--) {
     indexb[i] = tmp % bounds[i];
     tmp /= bounds[i];
   }
-  
+
   int indexi[3] = {0,0,0};
   for (int i = 0; i < ndims; i++) {
     indexi[i] = indexb[i] + bc_is[i];
   }
-  
+
   if (bc_face == 1) {
     indexi[bc_dim] = ghosts - 1 - indexb[bc_dim];
   } else if (bc_face == -1) {
     indexi[bc_dim] = size[bc_dim] - indexb[bc_dim] - 1;
   }
-  
+
   /* p1 = boundary ghost cell (use offset), p2 = interior cell (add ghosts) */
   int p1 = gpu_bc_index1d_wo(ndims, size, indexb, bc_is, ghosts);
   int p2 = gpu_bc_index1d(ndims, size, indexi, ghosts);
-  
+
   /* Copy with negation */
   for (int v = 0; v < nvars; v++) {
     phi[p1*nvars + v] = -phi[p2*nvars + v];
@@ -190,22 +190,22 @@ GPU_KERNEL void gpu_bc_periodic_kernel(
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid >= npoints) return;
-  
+
   int bounds[3];
   for (int i = 0; i < ndims; i++) bounds[i] = bc_ie[i] - bc_is[i];
-  
+
   int index1[3] = {0,0,0};
   int tmp = tid;
   for (int i = ndims - 1; i >= 0; i--) {
     index1[i] = tmp % bounds[i];
     tmp /= bounds[i];
   }
-  
+
   int index2[3] = {0,0,0};
   for (int i = 0; i < ndims; i++) {
     index2[i] = index1[i];
   }
-  
+
   int p1, p2;
   if (bc_face == 1) {
     /* Left face: copy from right side of domain */
@@ -223,7 +223,7 @@ GPU_KERNEL void gpu_bc_periodic_kernel(
   } else {
     return;
   }
-  
+
   for (int v = 0; v < nvars; v++) {
     phi[p1*nvars + v] = phi[p2*nvars + v];
   }
@@ -244,32 +244,32 @@ GPU_KERNEL void gpu_bc_slipwall_kernel(
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid >= npoints) return;
-  
+
   int bounds[3];
   for (int i = 0; i < ndims; i++) bounds[i] = bc_ie[i] - bc_is[i];
-  
+
   int indexb[3] = {0,0,0};
   int tmp = tid;
   for (int i = ndims - 1; i >= 0; i--) {
     indexb[i] = tmp % bounds[i];
     tmp /= bounds[i];
   }
-  
+
   int indexi[3] = {0,0,0};
   for (int i = 0; i < ndims; i++) {
     indexi[i] = indexb[i] + bc_is[i];
   }
-  
+
   if (bc_face == 1) {
     indexi[bc_dim] = ghosts - 1 - indexb[bc_dim];
   } else if (bc_face == -1) {
     indexi[bc_dim] = size[bc_dim] - indexb[bc_dim] - 1;
   }
-  
+
   /* p1 = boundary ghost cell (use offset), p2 = interior cell (add ghosts) */
   int p1 = gpu_bc_index1d_wo(ndims, size, indexb, bc_is, ghosts);
   int p2 = gpu_bc_index1d(ndims, size, indexi, ghosts);
-  
+
   /* For Euler/NS: rho=0, rho*u=1, rho*v=2, rho*w=3, E=4, scalars=5+ */
   /* Extrapolate all, then negate normal momentum */
   for (int v = 0; v < nvars; v++) {
@@ -301,68 +301,68 @@ GPU_KERNEL void gpu_bc_noslipwall_kernel(
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid >= npoints) return;
-  
+
   int bounds[3];
   for (int i = 0; i < ndims; i++) bounds[i] = bc_ie[i] - bc_is[i];
-  
+
   int indexb[3] = {0,0,0};
   int tmp = tid;
   for (int i = ndims - 1; i >= 0; i--) {
     indexb[i] = tmp % bounds[i];
     tmp /= bounds[i];
   }
-  
+
   int indexi[3] = {0,0,0};
   for (int i = 0; i < ndims; i++) {
     indexi[i] = indexb[i] + bc_is[i];
   }
-  
+
   if (bc_face == 1) {
     indexi[bc_dim] = ghosts - 1 - indexb[bc_dim];
   } else if (bc_face == -1) {
     indexi[bc_dim] = size[bc_dim] - indexb[bc_dim] - 1;
   }
-  
+
   /* p1 = boundary ghost cell (use offset), p2 = interior cell (add ghosts) */
   int p1 = gpu_bc_index1d_wo(ndims, size, indexb, bc_is, ghosts);
   int p2 = gpu_bc_index1d(ndims, size, indexi, ghosts);
-  
+
   /* Read interior values */
   double rho = phi[p2*nvars + 0];
   double rhou = phi[p2*nvars + 1];
   double rhov = (nvars >= 3) ? phi[p2*nvars + 2] : 0.0;
   double rhow = (nvars >= 4 && ndims == 3) ? phi[p2*nvars + 3] : 0.0;
-  
+
   /* Compute velocities */
   double uvel = rhou / rho;
   double vvel = rhov / rho;
   double wvel = rhow / rho;
-  
+
   /* Get energy (index depends on ndims: 2D->3, 3D->4) */
   int E_idx = (ndims == 2) ? 3 : 4;
   double E = phi[p2*nvars + E_idx];
-  
+
   /* Compute pressure from interior */
   double ke = 0.5 * rho * (uvel*uvel + vvel*vvel + wvel*wvel);
   double p = (gamma - 1.0) * (E - ke);
   double inv_gamma_m1 = 1.0 / (gamma - 1.0);
-  
+
   /* Ghost point velocities: vel_ghost = 2*wall_vel - vel_interior */
   double uvel_gpt = 2.0 * wall_u - uvel;
   double vvel_gpt = 2.0 * wall_v - vvel;
   double wvel_gpt = 2.0 * wall_w - wvel;
-  
+
   /* Ghost point energy with ghost velocities */
   double ke_gpt = 0.5 * rho * (uvel_gpt*uvel_gpt + vvel_gpt*vvel_gpt + wvel_gpt*wvel_gpt);
   double E_gpt = inv_gamma_m1 * p + ke_gpt;
-  
+
   /* Set ghost point values */
   phi[p1*nvars + 0] = rho;
   phi[p1*nvars + 1] = rho * uvel_gpt;
   if (ndims >= 2) phi[p1*nvars + 2] = rho * vvel_gpt;
   if (ndims == 3) phi[p1*nvars + 3] = rho * wvel_gpt;
   phi[p1*nvars + E_idx] = E_gpt;
-  
+
   /* Copy passive scalars (if any) */
   int first_scalar = (ndims == 2) ? 4 : 5;
   for (int v = first_scalar; v < nvars; v++) {
@@ -387,30 +387,30 @@ GPU_KERNEL void gpu_bc_supersonic_inflow_kernel(
 {
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid >= npoints) return;
-  
+
   int bounds[3];
   for (int i = 0; i < ndims; i++) bounds[i] = bc_ie[i] - bc_is[i];
-  
+
   int indexb[3] = {0,0,0};
   int tmp = tid;
   for (int i = ndims - 1; i >= 0; i--) {
     indexb[i] = tmp % bounds[i];
     tmp /= bounds[i];
   }
-  
+
   /* p = boundary ghost cell (use offset, no ghost addition) */
   int p = gpu_bc_index1d_wo(ndims, size, indexb, bc_is, ghosts);
-  
+
   /* Set conserved variables */
   phi[p*nvars + 0] = rho_bc;
   phi[p*nvars + 1] = rho_bc * u_bc;
   if (nvars > 2) phi[p*nvars + 2] = rho_bc * v_bc;
   if (nvars > 3) phi[p*nvars + 3] = rho_bc * w_bc;
-  
+
   double ke = 0.5 * rho_bc * (u_bc*u_bc + v_bc*v_bc + w_bc*w_bc);
   double E = p_bc / (gamma - 1.0) + ke;
   if (nvars >= 5) phi[p*nvars + 4] = E;
-  
+
   /* Scalars */
   for (int v = 0; v < n_scalars && (5+v) < nvars; v++) {
     phi[p*nvars + 5 + v] = rho_bc * scalars_bc[v];
@@ -433,32 +433,32 @@ GPU_KERNEL void gpu_bc_supersonic_outflow_kernel(
   /* Same as extrapolate */
   int tid = blockIdx.x * blockDim.x + threadIdx.x;
   if (tid >= npoints) return;
-  
+
   int bounds[3];
   for (int i = 0; i < ndims; i++) bounds[i] = bc_ie[i] - bc_is[i];
-  
+
   int indexb[3] = {0,0,0};
   int tmp = tid;
   for (int i = ndims - 1; i >= 0; i--) {
     indexb[i] = tmp % bounds[i];
     tmp /= bounds[i];
   }
-  
+
   int indexi[3] = {0,0,0};
   for (int i = 0; i < ndims; i++) {
     indexi[i] = indexb[i] + bc_is[i];
   }
-  
+
   if (bc_face == 1) {
     indexi[bc_dim] = ghosts - 1 - indexb[bc_dim];
   } else if (bc_face == -1) {
     indexi[bc_dim] = size[bc_dim] - indexb[bc_dim] - 1;
   }
-  
+
   /* p1 = boundary ghost cell (use offset), p2 = interior cell (add ghosts) */
   int p1 = gpu_bc_index1d_wo(ndims, size, indexb, bc_is, ghosts);
   int p2 = gpu_bc_index1d(ndims, size, indexi, ghosts);
-  
+
   for (int v = 0; v < nvars; v++) {
     phi[p1*nvars + v] = phi[p2*nvars + v];
   }

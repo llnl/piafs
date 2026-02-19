@@ -397,7 +397,7 @@ __global__ void gpu_weno5_weights_char_kernel(
 
   /* Determine base number of variables from ndims: 1D=3, 2D=4, 3D=5 */
   const int base_nvars = ndims + 2;
-  
+
   /* averaged state and left eigenvectors at this interface (match CPU):
      - eigenvectors depend only on the base Euler/NS variables
      - passive scalars (if any) are identity in characteristic space */

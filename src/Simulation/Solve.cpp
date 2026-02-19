@@ -57,7 +57,7 @@ int Solve(  void  *s,     /*!< Array of simulation objects of type #SimulationOb
   if (!rank) printf("Solving in time (from %d to %d iterations)\n",TS.restart_iter,TS.n_iter);
   for (TS.iter = TS.restart_iter; TS.iter < TS.n_iter; TS.iter++) {
 
-    
+
     /* Write initial solution to file if this is the first iteration */
     if (!TS.iter) {
       for (int ns = 0; ns < nsims; ns++) {

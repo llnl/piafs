@@ -57,14 +57,14 @@ int GPUNavierStokes3DParabolicFunction(
     double *QDerivZ = solver->gpu_parabolic_workspace_QDerivZ;
     double *FViscous = solver->gpu_parabolic_workspace_FViscous;
     double *FDeriv = solver->gpu_parabolic_workspace_FDeriv;
-    
+
     /* Verify workspace is large enough */
     if (solver->gpu_parabolic_workspace_size < (size_t)(size * nvars)) {
       fprintf(stderr, "Error: Parabolic workspace too small (%zu < %d)\n",
               solver->gpu_parabolic_workspace_size, size * nvars);
       return 1;
     }
-    
+
     /* Initialize arrays to zero */
     GPUMemset(QDerivX, 0, size * nvars * sizeof(double));
     GPUMemset(QDerivY, 0, size * nvars * sizeof(double));
@@ -100,12 +100,12 @@ int GPUNavierStokes3DParabolicFunction(
     /* Use cached metadata arrays - no allocation/copy overhead */
     int *dim_gpu = solver->gpu_dim_local;
     int *stride_gpu = solver->gpu_stride_with_ghosts;
-    
+
     /* Compute offsets for each direction in dxinv */
     int offset_x = 0;
     int offset_y = dim[0] + 2 * ghosts;
     int offset_z = offset_y + dim[1] + 2 * ghosts;
-    
+
     /* Scale derivatives using GPU kernels (use device pointer d_dxinv) */
     gpu_launch_scale_array_with_dxinv(QDerivX, solver->d_dxinv, nvars, size,
                                       _MODEL_NDIMS_, dim_gpu, stride_gpu,
@@ -138,7 +138,7 @@ int GPUNavierStokes3DParabolicFunction(
                                      _MODEL_NDIMS_, dim_gpu, stride_gpu,
                                      ghosts, _XDIR_, offset_x_add, 256);
     if (GPUShouldSyncEveryOp()) GPUSync();
-    
+
     /* Y direction */
     gpu_launch_ns3d_viscous_flux_y(
       FViscous, Q, QDerivX, QDerivY, QDerivZ,
@@ -149,7 +149,7 @@ int GPUNavierStokes3DParabolicFunction(
 
     IERR solver->FirstDerivativePar(FDeriv, FViscous, _YDIR_, -1, solver, mpi);
     CHECKERR(ierr);
-    
+
     int offset_y_add = dim[0] + 2 * ghosts;
     gpu_launch_add_scaled_derivative(par, FDeriv, solver->d_dxinv, nvars, npoints_interior,
                                      _MODEL_NDIMS_, dim_gpu, stride_gpu,
@@ -166,13 +166,13 @@ int GPUNavierStokes3DParabolicFunction(
 
     IERR solver->FirstDerivativePar(FDeriv, FViscous, _ZDIR_, -1, solver, mpi);
     CHECKERR(ierr);
-    
+
     int offset_z_add = offset_y + dim[1] + 2 * ghosts;
     gpu_launch_add_scaled_derivative(par, FDeriv, solver->d_dxinv, nvars, npoints_interior,
                                      _MODEL_NDIMS_, dim_gpu, stride_gpu,
                                      ghosts, _ZDIR_, offset_z_add, 256);
     if (GPUShouldSyncEveryOp()) GPUSync();
-    
+
     /* No need to free - using persistent workspace buffers and cached metadata */
     return 0;
   } else {

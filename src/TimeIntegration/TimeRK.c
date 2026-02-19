@@ -45,18 +45,18 @@
 */
 int TimeRK(void *ts /*!< Object of type #TimeIntegration */)
 {
-  
+
   TimeIntegration* TS = (TimeIntegration*) ts;
-  
+
   SimulationObject* sim = (SimulationObject*) TS->simulation;
-  
+
   ExplicitRKParameters *params = (ExplicitRKParameters*) sim[0].solver.msti;
-  
+
   if (!params) {
     return 1;
   }
-  
-  
+
+
   int ns, stage, i, nsims = TS->nsims;
 
   /* Calculate stage values */

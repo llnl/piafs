@@ -69,7 +69,7 @@ int InitializeSolvers(  void  *s,   /*!< Array of simulation objects of type #Si
 
     solver->ApplyBoundaryConditions = ApplyBoundaryConditions;
     solver->SourceFunction = SourceFunction;
-    
+
     /* Set function pointers - use GPU versions if GPU should be used */
 #ifdef GPU_CUDA
     if (GPUShouldUse()) {
@@ -86,7 +86,7 @@ int InitializeSolvers(  void  *s,   /*!< Array of simulation objects of type #Si
 #else
     solver->HyperbolicFunction = HyperbolicFunction;
 #endif
-    
+
     solver->VolumeIntegralFunction      = VolumeIntegral;
     solver->BoundaryIntegralFunction    = BoundaryIntegral;
     solver->CalculateConservationError  = CalculateConservationError;

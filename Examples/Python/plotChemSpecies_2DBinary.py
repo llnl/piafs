@@ -82,18 +82,18 @@ for zi in range(nz):
     op_prefix = 'op_species_z' + f'{zi:01d}'
 
   if solver_inp_data['op_overwrite'] == 'no':
-  
+
     niter = int(solver_inp_data['n_iter'][0])
     dt = float(solver_inp_data['dt'][0])
     t_final = dt*niter
-  
+
     op_write_iter = int(solver_inp_data['file_op_iter'][0])
     dt_snapshots = op_write_iter*dt
     if (op_write_iter > niter):
       n_snapshots = 2
     else:
       n_snapshots = int(niter/op_write_iter) + 1
-  
+
     print('Simulation parameters:')
     print('  ndims = ', ndims)
     print('  nspecies = ', nspecies)
@@ -103,7 +103,7 @@ for zi in range(nz):
     print('  final time = ', t_final)
     print('  snapshot dt = ', dt_snapshots)
     print('  expected number of snapshots = ', n_snapshots)
-  
+
     '''
     Load simulation data (solution snapshots)
     '''
@@ -125,7 +125,7 @@ for zi in range(nz):
     print(' y: ', np.min(y), np.max(y))
     print(' y.shape: ', y.shape)
     y2d, x2d = np.meshgrid(y, x)
-  
+
     for var in range(nspecies):
       for i in range(n_snapshots):
         for s in range(nsims):
@@ -145,22 +145,22 @@ for zi in range(nz):
           print('Saving %s' % plt_fname)
           plt.savefig(plt_fname)
           plt.close()
-  
+
   else:
-  
+
     niter = int(solver_inp_data['n_iter'][0])
     dt = float(solver_inp_data['dt'][0])
     t_final = dt*niter
-  
+
     n_snapshots = 1
-  
+
     print('Simulation parameters:')
     print('  ndims = ', ndims)
     print('  nspecies = ', nspecies)
     print('  grid size = ', size)
     print('  final time = ', t_final)
     print('  number of snapshots = ', n_snapshots)
-  
+
     '''
     Load simulation data (solution snapshots)
     '''
@@ -179,7 +179,7 @@ for zi in range(nz):
     print(' y: ', np.min(y), np.max(y))
     print(' y.shape: ', y.shape)
     y2d, x2d = np.meshgrid(y, x)
-  
+
     for var in range(nspecies):
       for s in range(nsims):
         fig = plt.figure(figsize=figsize)

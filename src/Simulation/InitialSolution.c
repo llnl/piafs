@@ -57,12 +57,12 @@ int InitialSolution ( void  *s,   /*!< Array of simulation objects of type #Simu
       /* Allocate temporary host buffer for u */
       int size_u = simobj[n].solver.npoints_local_wghosts * simobj[n].solver.nvars;
       double *u_host = (double*) calloc(size_u, sizeof(double));
-      
+
       if (!u_host) {
         fprintf(stderr, "Error: Failed to allocate host buffer for initial solution\n");
         return 1;
       }
-      
+
       /* Read to host buffers (x is already on host) */
       ierr = ReadArray( simobj[n].solver.ndims,
                         simobj[n].solver.nvars,
@@ -87,7 +87,7 @@ int InitialSolution ( void  *s,   /*!< Array of simulation objects of type #Simu
         return(1);
       }
       CHECKERR(ierr);
-      
+
       /* Exchange MPI-boundary values on host */
       MPIExchangeBoundariesnD(  simobj[n].solver.ndims,
                                 simobj[n].solver.nvars,
@@ -95,14 +95,14 @@ int InitialSolution ( void  *s,   /*!< Array of simulation objects of type #Simu
                                 simobj[n].solver.ghosts,
                                 &(simobj[n].mpi),
                                 u_host  );
-      
+
       /* Copy u from host to GPU (x will be copied later via GPUCopyGridArraysToDevice) */
       GPUCopyToDevice(simobj[n].solver.u, u_host, size_u * sizeof(double));
       GPUSync();
-      
+
       /* Free host buffer */
       free(u_host);
-      
+
       /* Exchange boundaries on GPU */
       GPUMPIExchangeBoundariesnD(  simobj[n].solver.ndims,
                                   simobj[n].solver.nvars,
@@ -222,20 +222,20 @@ int InitialSolution ( void  *s,   /*!< Array of simulation objects of type #Simu
       /* VolumeIntegral accesses u - need host copy. dxinv is already on host */
       int size_u = simobj[n].solver.npoints_local_wghosts * simobj[n].solver.nvars;
       double *u_host = (double*) malloc(size_u * sizeof(double));
-      
+
       if (!u_host) {
         fprintf(stderr, "Error: Failed to allocate host buffer for VolumeIntegral\n");
         return 1;
       }
-      
+
       GPUCopyToHost(u_host, simobj[n].solver.u, size_u * sizeof(double));
       GPUSync();
-      
+
       ierr = VolumeIntegral(  simobj[n].solver.VolumeIntegralInitial,
                             u_host,
                             &(simobj[n].solver),
                             &(simobj[n].mpi) ); CHECKERR(ierr);
-      
+
       free(u_host);
     } else {
       ierr = VolumeIntegral(  simobj[n].solver.VolumeIntegralInitial,

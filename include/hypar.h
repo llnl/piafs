@@ -340,12 +340,12 @@ typedef struct main_parameters {
   int *gpu_dim_local;           /*!< device copy of dim_local */
   int *gpu_stride_with_ghosts;  /*!< device copy of stride_with_ghosts */
   int *gpu_stride_without_ghosts; /*!< device copy of stride_without_ghosts */
-  
+
   /*! GPU optimization: persistent temporary buffers for reduction operations */
   double *gpu_reduce_buffer;    /*!< device buffer for intermediate reduction results */
   size_t gpu_reduce_buffer_size; /*!< size of reduction buffer in bytes */
   double *gpu_reduce_result;    /*!< device buffer for final reduction result */
-  
+
   /*! GPU optimization: persistent workspace buffers for parabolic terms */
   double *gpu_parabolic_workspace_Q;        /*!< workspace for primitive variables */
   double *gpu_parabolic_workspace_QDerivX;  /*!< workspace for X derivatives */

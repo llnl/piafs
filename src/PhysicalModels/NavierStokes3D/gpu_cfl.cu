@@ -36,7 +36,7 @@ GPU_KERNEL void gpu_ns3d_compute_cfl_kernel(
   for (int i = 0; i < ndims; i++) {
     npoints *= dim[i];
   }
-  
+
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < npoints) {
     /* Decompose idx into multi-dimensional index */
@@ -46,13 +46,13 @@ GPU_KERNEL void gpu_ns3d_compute_cfl_kernel(
       index[i] = temp % dim[i];
       temp /= dim[i];
     }
-    
+
     /* Compute 1D array index for this point (with ghosts) */
     int p = 0;
     for (int i = 0; i < ndims; i++) {
       p += (index[i] + ghosts) * stride_with_ghosts[i];
     }
-    
+
     /* Get flow variables (GPU-safe version without fprintf/exit) */
     double rho = u[p*nvars + 0];
     double vx = (rho == 0.0) ? 0.0 : u[p*nvars + 1] / rho;
@@ -61,21 +61,21 @@ GPU_KERNEL void gpu_ns3d_compute_cfl_kernel(
     double e = u[p*nvars + 4];
     double vsq = (vx*vx) + (vy*vy) + (vz*vz);
     double P = (e - 0.5*rho*vsq) * (gamma - 1.0);
-    
+
     /* Check for invalid values */
-    if (isnan(rho) || isinf(rho) || rho <= 0.0 || 
+    if (isnan(rho) || isinf(rho) || rho <= 0.0 ||
         isnan(P) || isinf(P) || P <= 0.0) {
       cfl_local[idx] = 0.0; /* Skip invalid points */
       return;
     }
-    
+
     /* Compute speed of sound */
     double c = sqrt(gamma * P / rho);
     if (isnan(c) || isinf(c) || c <= 0.0) {
       cfl_local[idx] = 0.0; /* Skip invalid points */
       return;
     }
-    
+
     /* Compute local CFL for each direction */
     double max_local_cfl = 0.0;
     for (int dir = 0; dir < ndims; dir++) {
@@ -85,13 +85,13 @@ GPU_KERNEL void gpu_ns3d_compute_cfl_kernel(
         dir_offset += (dim[k] + 2 * ghosts);
       }
       double dxinv_dir = dxinv[dir_offset + ghosts + index[dir]];
-      
+
       /* Compute velocity magnitude in this direction */
       double v_mag = 0.0;
       if (dir == 0) v_mag = fabs(vx);
       else if (dir == 1) v_mag = fabs(vy);
       else if (dir == 2) v_mag = fabs(vz);
-      
+
       /* Compute local CFL */
       double local_cfl = (v_mag + c) * dt * dxinv_dir;
       if (isnan(local_cfl) || isinf(local_cfl)) {
@@ -101,7 +101,7 @@ GPU_KERNEL void gpu_ns3d_compute_cfl_kernel(
         max_local_cfl = local_cfl;
       }
     }
-    
+
     cfl_local[idx] = max_local_cfl;
   }
 }

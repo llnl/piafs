@@ -24,7 +24,7 @@ int GPUAllocate(void **ptr, size_t size)
     fprintf(stderr, "  HIP error: %s\n", hipGetErrorString((hipError_t)prev_err));
 #endif
   }
-  
+
   int err = GPU_MALLOC(ptr, size);
   if (err != GPU_SUCCESS) {
     fprintf(stderr, "Error: GPU memory allocation failed (size: %zu bytes, error: %d)\n", size, err);
@@ -48,7 +48,7 @@ int GPUFree(void *ptr)
 #else
   /* Clear any previous errors before freeing - sticky errors can interfere with free operations */
   (void)GPU_GET_LAST_ERROR(); /* This clears the error state in CUDA/HIP */
-  
+
   int err = GPU_FREE(ptr);
   if (err != GPU_SUCCESS) {
     /* Note: GPU memory free errors during cleanup are often benign and can be safely ignored */
@@ -81,20 +81,20 @@ int GPUCopyToHost(void *dst, const void *src, size_t size)
 #else
   /* Clear any previous errors */
   GPU_GET_LAST_ERROR();
-  
+
   int err = GPU_MEMCPY(dst, src, size, GPU_MEMCPY_D2H);
   if (err != GPU_SUCCESS) {
     fprintf(stderr, "Error: GPU copy device-to-host failed (size: %zu bytes, error: %d)\n", size, err);
     return 1;
   }
-  
+
   /* Check for asynchronous errors */
   err = GPU_GET_LAST_ERROR();
   if (err != GPU_SUCCESS) {
     fprintf(stderr, "Error: Asynchronous CUDA error detected after copy: %d\n", err);
     return 1;
   }
-  
+
   return 0;
 #endif
 }
@@ -122,26 +122,26 @@ int GPUMemset(void *ptr, int value, size_t size)
 #else
   /* Clear any previous errors */
   GPU_GET_LAST_ERROR();
-  
+
   if (!ptr) {
     fprintf(stderr, "Error: GPUMemset: NULL pointer (size: %zu bytes)\n", size);
     return 1;
   }
-  
+
   int err = GPU_MEMSET(ptr, value, size);
   if (err != GPU_SUCCESS) {
     fprintf(stderr, "Error: GPU memset failed (ptr=%p, size: %zu bytes, error: %d)\n", ptr, size, err);
     return 1;
   }
-  
+
   /* Check for asynchronous errors */
   err = GPU_GET_LAST_ERROR();
   if (err != GPU_SUCCESS) {
-    fprintf(stderr, "Error: Asynchronous CUDA error detected after memset (ptr=%p, size: %zu bytes, error: %d)\n", 
+    fprintf(stderr, "Error: Asynchronous CUDA error detected after memset (ptr=%p, size: %zu bytes, error: %d)\n",
             ptr, size, err);
     return 1;
   }
-  
+
   return 0;
 #endif
 }
@@ -155,9 +155,9 @@ void GPUSync(void)
     fprintf(stderr, "Error: CUDA error detected before sync: %d\n", err);
     /* Don't exit here - let the sync happen and check again */
   }
-  
+
   GPU_DEVICE_SYNC();
-  
+
   /* Check for errors after sync */
   err = GPU_GET_LAST_ERROR();
   if (err != GPU_SUCCESS) {
@@ -298,7 +298,7 @@ int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou)
   cudaStream_t *s_hyp = (cudaStream_t*)malloc(sizeof(cudaStream_t));
   cudaStream_t *s_par = (cudaStream_t*)malloc(sizeof(cudaStream_t));
   cudaStream_t *s_sou = (cudaStream_t*)malloc(sizeof(cudaStream_t));
-  
+
   if (!s_hyp || !s_par || !s_sou) {
     fprintf(stderr, "Error: Failed to allocate memory for CUDA streams\n");
     if (s_hyp) free(s_hyp);
@@ -306,7 +306,7 @@ int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou)
     if (s_sou) free(s_sou);
     return 1;
   }
-  
+
   cudaError_t err;
   err = cudaStreamCreate(s_hyp);
   if (err != cudaSuccess) {
@@ -314,7 +314,7 @@ int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou)
     free(s_hyp); free(s_par); free(s_sou);
     return 1;
   }
-  
+
   err = cudaStreamCreate(s_par);
   if (err != cudaSuccess) {
     fprintf(stderr, "Error: Failed to create CUDA stream (par): %s\n", cudaGetErrorString(err));
@@ -322,7 +322,7 @@ int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou)
     free(s_hyp); free(s_par); free(s_sou);
     return 1;
   }
-  
+
   err = cudaStreamCreate(s_sou);
   if (err != cudaSuccess) {
     fprintf(stderr, "Error: Failed to create CUDA stream (sou): %s\n", cudaGetErrorString(err));
@@ -331,17 +331,17 @@ int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou)
     free(s_hyp); free(s_par); free(s_sou);
     return 1;
   }
-  
+
   *stream_hyp = (void*)s_hyp;
   *stream_par = (void*)s_par;
   *stream_sou = (void*)s_sou;
   return 0;
-  
+
 #elif defined(GPU_HIP)
   hipStream_t *s_hyp = (hipStream_t*)malloc(sizeof(hipStream_t));
   hipStream_t *s_par = (hipStream_t*)malloc(sizeof(hipStream_t));
   hipStream_t *s_sou = (hipStream_t*)malloc(sizeof(hipStream_t));
-  
+
   if (!s_hyp || !s_par || !s_sou) {
     fprintf(stderr, "Error: Failed to allocate memory for HIP streams\n");
     if (s_hyp) free(s_hyp);
@@ -349,7 +349,7 @@ int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou)
     if (s_sou) free(s_sou);
     return 1;
   }
-  
+
   hipError_t err;
   err = hipStreamCreate(s_hyp);
   if (err != hipSuccess) {
@@ -357,7 +357,7 @@ int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou)
     free(s_hyp); free(s_par); free(s_sou);
     return 1;
   }
-  
+
   err = hipStreamCreate(s_par);
   if (err != hipSuccess) {
     fprintf(stderr, "Error: Failed to create HIP stream (par): %s\n", hipGetErrorString(err));
@@ -365,7 +365,7 @@ int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou)
     free(s_hyp); free(s_par); free(s_sou);
     return 1;
   }
-  
+
   err = hipStreamCreate(s_sou);
   if (err != hipSuccess) {
     fprintf(stderr, "Error: Failed to create HIP stream (sou): %s\n", hipGetErrorString(err));
@@ -374,12 +374,12 @@ int GPUCreateStreams(void **stream_hyp, void **stream_par, void **stream_sou)
     free(s_hyp); free(s_par); free(s_sou);
     return 1;
   }
-  
+
   *stream_hyp = (void*)s_hyp;
   *stream_par = (void*)s_par;
   *stream_sou = (void*)s_sou;
   return 0;
-  
+
 #else
   *stream_hyp = NULL;
   *stream_par = NULL;
@@ -404,7 +404,7 @@ int GPUDestroyStreams(void *stream_hyp, void *stream_par, void *stream_sou)
     free(stream_sou);
   }
   return 0;
-  
+
 #elif defined(GPU_HIP)
   if (stream_hyp) {
     hipStreamDestroy(*(hipStream_t*)stream_hyp);
@@ -419,7 +419,7 @@ int GPUDestroyStreams(void *stream_hyp, void *stream_par, void *stream_sou)
     free(stream_sou);
   }
   return 0;
-  
+
 #else
   (void)stream_hyp;
   (void)stream_par;
@@ -439,7 +439,7 @@ int GPUStreamSynchronize(void *stream)
     }
   }
   return 0;
-  
+
 #elif defined(GPU_HIP)
   if (stream) {
     hipError_t err = hipStreamSynchronize(*(hipStream_t*)stream);
@@ -449,7 +449,7 @@ int GPUStreamSynchronize(void *stream)
     }
   }
   return 0;
-  
+
 #else
   (void)stream;
   return 0;

@@ -100,7 +100,7 @@ int GPUGetDeviceCount(void)
       return 0;
     }
     /* For other errors, print warning but still return 0 */
-    fprintf(stderr, "Warning: cudaGetDeviceCount() failed with error: %s (code: %d)\n", 
+    fprintf(stderr, "Warning: cudaGetDeviceCount() failed with error: %s (code: %d)\n",
             cudaGetErrorString(err), (int)err);
     return 0;
   }
@@ -114,7 +114,7 @@ int GPUGetDeviceCount(void)
       return 0;
     }
     /* For other errors, print warning but still return 0 */
-    fprintf(stderr, "Warning: hipGetDeviceCount() failed with error: %s (code: %d)\n", 
+    fprintf(stderr, "Warning: hipGetDeviceCount() failed with error: %s (code: %d)\n",
             hipGetErrorString(err), (int)err);
     return 0;
   }
@@ -130,7 +130,7 @@ int GPUSelectDevice(int device_id)
 #ifdef GPU_CUDA
   cudaError_t err = cudaSetDevice(device_id);
   if (err != cudaSuccess) {
-    fprintf(stderr, "Error: cudaSetDevice(%d) failed: %s\n", 
+    fprintf(stderr, "Error: cudaSetDevice(%d) failed: %s\n",
             device_id, cudaGetErrorString(err));
     return 1;
   }
@@ -138,7 +138,7 @@ int GPUSelectDevice(int device_id)
 #elif defined(GPU_HIP)
   hipError_t err = hipSetDevice(device_id);
   if (err != hipSuccess) {
-    fprintf(stderr, "Error: hipSetDevice(%d) failed: %s\n", 
+    fprintf(stderr, "Error: hipSetDevice(%d) failed: %s\n",
             device_id, hipGetErrorString(err));
     return 1;
   }
@@ -149,17 +149,17 @@ int GPUSelectDevice(int device_id)
 #endif
 }
 
-/* Initialize GPU for MPI: select device based on local rank  
+/* Initialize GPU for MPI: select device based on local rank
    Returns the number of GPU devices available */
 int GPUInitializeMPI(int global_rank, int local_rank, int local_size)
 {
   int num_devices = GPUGetDeviceCount();
-  
+
   /* Check for CUDA_VISIBLE_DEVICES which may limit visible GPUs */
   const char *cuda_visible = getenv("CUDA_VISIBLE_DEVICES");
   const char *rocr_visible = getenv("ROCR_VISIBLE_DEVICES");
   const char *hip_visible = getenv("HIP_VISIBLE_DEVICES");
-  
+
   if (num_devices <= 0) {
     if (global_rank == 0) {
       fprintf(stderr, "Warning: GPU enabled but no GPU devices found!\n");
@@ -169,12 +169,12 @@ int GPUInitializeMPI(int global_rank, int local_rank, int local_size)
     }
     return num_devices; /* Return 0 if no GPUs available */
   }
-  
+
   /* Warn if more local ranks than GPUs (GPU oversubscription) */
   if (local_size > num_devices && local_rank == 0) {
     /* Check if this is GPU isolation (scheduler assigned one GPU per task) */
     int gpu_isolation = (num_devices == 1) && (cuda_visible || rocr_visible || hip_visible);
-    
+
     if (gpu_isolation) {
       /* GPU isolation detected - each rank sees only its assigned GPU as "GPU 0" */
       if (global_rank == 0) {
@@ -195,24 +195,24 @@ int GPUInitializeMPI(int global_rank, int local_rank, int local_size)
       }
     }
   }
-  
+
   /* Assign GPU based on local rank (round-robin if more ranks than GPUs) */
   int device_id = local_rank % num_devices;
-  
+
   if (GPUSelectDevice(device_id)) {
     return -1; /* Return -1 on error */
   }
-  
+
   /* Verbose output controlled by environment variable */
   const char *verbose = getenv("PIAFS_GPU_VERBOSE");
   if (verbose && (strcmp(verbose, "1") == 0 || strcmp(verbose, "yes") == 0)) {
-    fprintf(stdout, "  Rank %d (local %d/%d): GPU %d of %d", 
+    fprintf(stdout, "  Rank %d (local %d/%d): GPU %d of %d",
             global_rank, local_rank, local_size, device_id, num_devices);
     if (cuda_visible) fprintf(stdout, " [CUDA_VISIBLE_DEVICES=%s]", cuda_visible);
     fprintf(stdout, "\n");
     fflush(stdout);
   }
-  
+
   return num_devices; /* Return number of devices */
 }
 

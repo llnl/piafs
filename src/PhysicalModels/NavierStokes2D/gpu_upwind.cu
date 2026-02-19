@@ -151,7 +151,7 @@ GPU_KERNEL void gpu_ns2d_upwind_roe_kernel(
     int threadId = blockIdx.x * blockDim.x + threadIdx.x;
     size_t workspace_per_thread = 3 * nvars + 5 * nvars * nvars;
     double *thread_workspace = workspace + threadId * workspace_per_thread;
-    
+
     double *udiff = thread_workspace;
     double *uavg = udiff + nvars;
     double *udiss = uavg + nvars;
@@ -240,7 +240,7 @@ GPU_KERNEL void gpu_ns2d_upwind_rf_kernel(
     int threadId = blockIdx.x * blockDim.x + threadIdx.x;
     size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
     double *thread_workspace = workspace + threadId * workspace_per_thread;
-    
+
     double *uavg = thread_workspace;
     double *fcL = uavg + nvars;
     double *fcR = fcL + nvars;
@@ -330,7 +330,7 @@ GPU_KERNEL void gpu_ns2d_upwind_llf_kernel(
     int threadId = blockIdx.x * blockDim.x + threadIdx.x;
     size_t workspace_per_thread = 9 * nvars + 3 * nvars * nvars;
     double *thread_workspace = workspace + threadId * workspace_per_thread;
-    
+
     double *uavg = thread_workspace;
     double *fcL = uavg + nvars;
     double *fcR = fcL + nvars;
@@ -414,7 +414,7 @@ GPU_KERNEL void gpu_ns2d_upwind_rusanov_kernel(
     int threadId = blockIdx.x * blockDim.x + threadIdx.x;
     size_t workspace_per_thread = 2 * nvars;
     double *thread_workspace = workspace + threadId * workspace_per_thread;
-    
+
     double *uavg = thread_workspace;
     double *udiff = uavg + nvars;
 
