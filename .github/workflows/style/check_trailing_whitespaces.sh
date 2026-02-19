@@ -30,9 +30,13 @@ if [ -z "$gitdiff" ]
 then
     exit 0
 else
-    echo -e "\nTrailing whitespaces at the end of a line are not allowed. Changes suggested by"
-    echo -e "  ${0}\n"
+    echo -e "\nTrailing whitespaces at the end of a line are not allowed. Apply this patch to fix:"
+    echo -e "  git apply trailing_whitespaces.patch\n"
+    echo -e "Or apply directly with:"
+    echo -e "  curl <CI-URL> | git apply\n"
+    echo "====== BEGIN PATCH ======"
     git --no-pager diff
+    echo "====== END PATCH ======"
     echo ""
     exit 1
 fi
