@@ -104,3 +104,5 @@ PIAFS_DIR=/path/to/piafs
 ## Release
 
 LLNL-CODE-2015997
+
+**DOI:** [10.11578/dc.20260220.15](https://doi.org/10.11578/dc.20260220.15)

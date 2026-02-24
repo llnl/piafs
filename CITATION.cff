@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Photochemically Induced Acousto-optics Fluid Simulations"
+version: 1.0
+date-released: 2025-10-22
+url: "https://github.com/llnl/piafs"
+repository-code: "https://github.com/llnl/piafs"
+abstract: "PIAFS is a finite-difference code to solve the compressible Navier-Stokes equations with chemical heating on Cartesian grids. It models chemical reactions of air (oxygen and carbon dioxide) with ozone subject to radiation. It uses a high-order WENO spatial discretization and explicit Runge-Kutta time integration. It is capable of parallel simulations using MPI. The code is written in C/C++."
+authors:
+  - family-names: Oudin
+    given-names: Albertine N.
+  - family-names: Ghosh
+    given-names: Debojyoti
+identifiers:
+  - type: doi
+    value: "10.11578/dc.20260220.15"
+license: MIT
+keywords:
+  - computational fluid dynamics
+  - Navier-Stokes
+  - WENO
+  - MPI
